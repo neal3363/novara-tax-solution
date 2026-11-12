@@ -28,10 +28,10 @@ export function AppNav() {
         ]
       : currentUser.role === 'preparer'
         ? [
-            { to: '/app/preparer', label: 'Dashboard' },
+            { to: '/app/preparer', label: 'Inbox' },
+            { to: '/app/preparer/entry-plan', label: 'Entry plan' },
+            { to: '/app/preparer/workspace', label: 'Binder' },
             { to: '/app/preparer/clients', label: 'Clients' },
-            { to: '/app/preparer/workspace', label: 'Workspace' },
-            { to: '/app/fees', label: 'Fees' },
           ]
         : currentUser.role === 'efin_owner'
           ? [

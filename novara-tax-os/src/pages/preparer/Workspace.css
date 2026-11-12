@@ -1,0 +1,61 @@
+.binder-tabs {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.85rem;
+  overflow-x: auto;
+}
+
+.binder-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.binder-fact {
+  width: 100%;
+  text-align: left;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 12px;
+  padding: 0.75rem 0.65rem;
+  cursor: pointer;
+  display: grid;
+  gap: 0.2rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.binder-fact strong {
+  font-size: 0.95rem;
+}
+
+.binder-fact span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.binder-fact.selected {
+  background: var(--teal-soft);
+  border-color: rgba(13, 110, 102, 0.2);
+}
+
+.source-card {
+  margin: 0.5rem 0 1rem;
+  padding: 1rem;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fbfaf8, #f3f1ec);
+  border: 1px solid var(--line);
+}
+
+.source-card h3 {
+  margin: 0.2rem 0 0.35rem;
+  font-size: 1.1rem;
+}
+
+.source-card p {
+  margin: 0.15rem 0;
+}
+
+@media (min-width: 900px) {
+  .binder-grid {
+    grid-template-columns: 1.05fr 0.95fr;
+  }
+}

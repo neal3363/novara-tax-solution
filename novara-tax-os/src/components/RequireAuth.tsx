@@ -10,6 +10,11 @@ export function RequireAuth() {
     <div className="app-shell">
       <AppNav />
       <main className="app-main">
+        <div className="container" style={{ paddingTop: '0.85rem' }}>
+          <div className="sample-banner" role="status">
+            Sample demo data — session only on this device. Not a live filing connection.
+          </div>
+        </div>
         <Outlet />
       </main>
     </div>

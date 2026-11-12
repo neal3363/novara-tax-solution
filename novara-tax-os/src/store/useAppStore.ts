@@ -4,7 +4,9 @@ import type {
   AppState,
   DocumentRecord,
   DocType,
+  EntryPlanLine,
   Message,
+  PreEntryNote,
   ReturnState,
   Role,
   TaxReturn,
@@ -12,10 +14,103 @@ import type {
 } from '../data/types'
 import { CONSUMER_PRICES, TP_FEES } from '../data/fees'
 
-const STORAGE_KEY = 'novara-tax-os-v1'
+/** Role preference only — never store tax demo payloads in localStorage */
+const ROLE_KEY = 'novara-tax-os-role'
+/** Session-scoped demo state (clears when the tab closes) */
+const SESSION_KEY = 'novara-tax-os-session-v2'
 
 type Store = AppState & {
   hydrated: boolean
+}
+
+const DEFAULT_NOTES: PreEntryNote[] = [
+  {
+    id: 'n1',
+    severity: 'high',
+    title: 'Low-confidence 1099-NEC',
+    detail: 'Nonemployee compensation confidence is below firm threshold. Confirm amount against source before approval.',
+  },
+  {
+    id: 'n2',
+    severity: 'medium',
+    title: 'Possible missing 1099-INT',
+    detail: 'Prior-year binder included First Harbor Bank interest. Upload current year or confirm account closed.',
+  },
+  {
+    id: 'n3',
+    severity: 'low',
+    title: 'Dependent care unanswered',
+    detail: 'Smart question on childcare is unanswered and may affect credits.',
+  },
+]
+
+function buildEntryPlan(docs: DocumentRecord[]): EntryPlanLine[] {
+  const lines: EntryPlanLine[] = []
+  docs.forEach((d) => {
+    d.facts.forEach((f) => {
+      const field =
+        f.label.toLowerCase().includes('wage')
+          ? 'Form 1040 · Line 1a'
+          : f.label.toLowerCase().includes('withheld')
+            ? 'Form 1040 · Line 25a'
+            : f.label.toLowerCase().includes('compensation')
+              ? 'Schedule C · Gross receipts'
+              : `Mapped · ${f.label}`
+      lines.push({
+        id: `ep-${f.id}`,
+        form: d.type,
+        field,
+        proposedValue: f.value,
+        sourceDocId: d.id,
+        sourceDocName: d.name,
+        sourceBox: f.label,
+        sourcePage: f.sourcePage,
+        confidence: f.confidence,
+        status: 'proposed',
+      })
+    })
+  })
+  if (lines.length === 0) {
+    return [
+      {
+        id: 'ep-seed-1',
+        form: 'W-2',
+        field: 'Form 1040 · Line 1a',
+        proposedValue: '$72,400.00',
+        sourceDocId: 'd-1',
+        sourceDocName: 'W2_Acme_2025.pdf',
+        sourceBox: 'Box 1 Wages',
+        sourcePage: 1,
+        confidence: 0.98,
+        status: 'proposed',
+      },
+      {
+        id: 'ep-seed-2',
+        form: 'W-2',
+        field: 'Form 1040 · Line 25a',
+        proposedValue: '$8,920.00',
+        sourceDocId: 'd-1',
+        sourceDocName: 'W2_Acme_2025.pdf',
+        sourceBox: 'Box 2 Federal withheld',
+        sourcePage: 1,
+        confidence: 0.97,
+        status: 'proposed',
+      },
+      {
+        id: 'ep-seed-3',
+        form: '1099-NEC',
+        field: 'Schedule C · Gross receipts',
+        proposedValue: '$4,250.00',
+        sourceDocId: 'd-2',
+        sourceDocName: '1099NEC_Studio.pdf',
+        sourceBox: 'Box 1 NEC',
+        sourcePage: 1,
+        confidence: 0.81,
+        status: 'proposed',
+      },
+    ]
+  }
+  return lines
 }
 
 let state: Store = {
@@ -26,13 +121,18 @@ let state: Store = {
     {
       id: 'm0',
       role: 'assistant',
-      text: 'Hi — I’m your NOVARA Tax AI. Upload documents and I’ll classify, extract, and guide your return. I propose; the rules engine calculates.',
+      text: 'Hi — I’m your NOVARA Tax AI. Upload documents and I’ll classify, extract, and guide your return. I propose; the rules engine calculates. A preparer approves the entry plan before anything is written.',
       at: new Date().toISOString(),
     },
   ],
   prepStep: 0,
   questions: SMART_QUESTIONS,
   vaultFilter: 'all',
+  entryPlan: buildEntryPlan(SEED_DOCS),
+  entryPlanStatus: 'awaiting_approval',
+  preEntryNotes: DEFAULT_NOTES,
+  activeReturnId: SEED_RETURNS.find((r) => r.state === 'Preparer Review')?.id ?? SEED_RETURNS[0].id,
+  binderTab: 'forms',
   hydrated: false,
 }
 
@@ -44,10 +144,15 @@ function emit() {
 }
 
 function persist() {
-  if (!state.hydrated) return
-  const { hydrated: _, ...rest } = state
+  if (!state.hydrated || typeof window === 'undefined') return
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(rest))
+    if (state.currentUser) {
+      localStorage.setItem(ROLE_KEY, state.currentUser.role)
+    } else {
+      localStorage.removeItem(ROLE_KEY)
+    }
+    const { hydrated: _, currentUser: __, ...sessionRest } = state
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(sessionRest))
   } catch {
     /* ignore quota */
   }
@@ -56,12 +161,25 @@ function persist() {
 function hydrate() {
   if (state.hydrated || typeof window === 'undefined') return
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw) as AppState
-      state = { ...state, ...parsed, hydrated: true }
+    // Migrate away from older plaintext localStorage payload
+    localStorage.removeItem('novara-tax-os-v1')
+
+    const role = localStorage.getItem(ROLE_KEY) as Role | null
+    const sessionRaw = sessionStorage.getItem(SESSION_KEY)
+    if (sessionRaw) {
+      const parsed = JSON.parse(sessionRaw) as Omit<AppState, 'currentUser'>
+      state = {
+        ...state,
+        ...parsed,
+        currentUser: role ? (DEMO_USERS.find((u) => u.role === role) ?? null) : null,
+        hydrated: true,
+      }
     } else {
-      state = { ...state, hydrated: true }
+      state = {
+        ...state,
+        currentUser: role ? (DEMO_USERS.find((u) => u.role === role) ?? null) : null,
+        hydrated: true,
+      }
     }
   } catch {
     state = { ...state, hydrated: true }
@@ -102,7 +220,7 @@ function uid(prefix: string) {
 export const actions = {
   loginAs(role: Role) {
     const user = DEMO_USERS.find((u) => u.role === role) ?? DEMO_USERS[0]
-    state = { ...state, currentUser: user, prepStep: role === 'taxpayer' ? state.prepStep : state.prepStep }
+    state = { ...state, currentUser: user }
     emit()
   },
   logout() {
@@ -115,6 +233,14 @@ export const actions = {
   },
   setVaultFilter(filter: string) {
     state = { ...state, vaultFilter: filter }
+    emit()
+  },
+  setBinderTab(tab: AppState['binderTab']) {
+    state = { ...state, binderTab: tab }
+    emit()
+  },
+  setActiveReturn(id: string) {
+    state = { ...state, activeReturnId: id }
     emit()
   },
   answerQuestion(id: string, answer: string) {
@@ -133,19 +259,22 @@ export const actions = {
     actions.addMessage('user', prompt)
     const lower = prompt.toLowerCase()
     let reply =
-      'I’ve reviewed your authorized documents and return state. Tell me what you’d like clarified — refund, missing docs, or next step.'
+      'I’ve reviewed your authorized documents and return state. Ask about refund, missing docs, the entry plan, or next step.'
     if (lower.includes('refund')) {
       reply =
-        'Your current draft shows an estimated refund based on verified wages and withholding. Tap any number in Your Result to see provenance. This is not a guarantee until the rules engine and preparer review complete.'
+        'Your draft estimate uses verified wages and withholding. Tap any number to see provenance. Not a guarantee until rules engine + preparer approval complete.'
     } else if (lower.includes('missing') || lower.includes('document')) {
       reply =
-        'Missing Document Radar: last year you had a 1099-INT from First Harbor Bank. Upload it or confirm the account closed. You also have one 1099-NEC fact awaiting verification.'
+        'Pre-Entry Notes: possible missing 1099-INT from First Harbor Bank, and one 1099-NEC line needs confirmation.'
+    } else if (lower.includes('plan') || lower.includes('approve') || lower.includes('enter')) {
+      reply =
+        'Filed-style flow: NOVARA reads documents → you approve the data-entry plan (correct or remove lines) → then values can be entered. Nothing is written without approval.'
     } else if (lower.includes('sign') || lower.includes('file')) {
       reply =
-        'Filing gates require: verified facts, cleared blocking diagnostics, required signatures/consents, and valid credentials. AI cannot transmit returns.'
+        'Filing gates require verified facts, cleared blocking diagnostics, required signatures/consents, and valid credentials. AI cannot transmit returns.'
     } else if (lower.includes('business') || lower.includes('1120') || lower.includes('1065')) {
       reply =
-        'Business returns need the business-enabled office tier, TP business surcharge ($239.98), or direct-consumer business service. Upload P&L, trial balance, ownership, and prior-year docs.'
+        'Business returns need the business-enabled office tier, TP business surcharge ($239.98), or direct-consumer business service.'
     }
     setTimeout(() => actions.addMessage('assistant', reply), 450)
   },
@@ -160,7 +289,10 @@ export const actions = {
         name: file.name,
         type,
         taxYear: 2025,
-        sizeLabel: file.size > 1024 * 1024 ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(file.size / 1024))} KB`,
+        sizeLabel:
+          file.size > 1024 * 1024
+            ? `${(file.size / 1024 / 1024).toFixed(1)} MB`
+            : `${Math.max(1, Math.round(file.size / 1024))} KB`,
         uploadedAt: now,
         status: 'scanning',
         confidence: 0,
@@ -168,11 +300,15 @@ export const actions = {
         facts: [],
       }
     })
-    state = { ...state, documents: [...docs, ...state.documents], prepStep: Math.max(state.prepStep, 1) }
+    state = {
+      ...state,
+      documents: [...docs, ...state.documents],
+      prepStep: Math.max(state.prepStep, 1),
+      entryPlanStatus: 'draft',
+    }
     emit()
-    actions.addMessage('assistant', `Received ${docs.length} file${docs.length === 1 ? '' : 's'}. Scanning, classifying, and extracting…`)
+    actions.addMessage('assistant', `Received ${docs.length} file${docs.length === 1 ? '' : 's'}. Reading every document…`)
 
-    // Simulate pipeline
     docs.forEach((doc, i) => {
       setTimeout(() => {
         const confidence = 0.84 + Math.random() * 0.14
@@ -180,30 +316,58 @@ export const actions = {
           doc.type === 'W-2'
             ? [
                 { id: uid('f'), label: 'Wages (Box 1)', value: '$64,200.00', sourcePage: 1, confidence, verified: false },
-                { id: uid('f'), label: 'Federal withheld', value: '$7,110.00', sourcePage: 1, confidence: confidence - 0.02, verified: false },
+                {
+                  id: uid('f'),
+                  label: 'Federal withheld',
+                  value: '$7,110.00',
+                  sourcePage: 1,
+                  confidence: confidence - 0.02,
+                  verified: false,
+                },
               ]
             : doc.type === '1099-NEC'
-              ? [{ id: uid('f'), label: 'Nonemployee compensation', value: '$3,800.00', sourcePage: 1, confidence, verified: false }]
-              : [{ id: uid('f'), label: 'Detected label', value: doc.name.replace(/\.[^.]+$/, ''), sourcePage: 1, confidence, verified: false }]
+              ? [
+                  {
+                    id: uid('f'),
+                    label: 'Nonemployee compensation',
+                    value: '$3,800.00',
+                    sourcePage: 1,
+                    confidence,
+                    verified: false,
+                  },
+                ]
+              : [
+                  {
+                    id: uid('f'),
+                    label: 'Detected label',
+                    value: doc.name.replace(/\.[^.]+$/, ''),
+                    sourcePage: 1,
+                    confidence,
+                    verified: false,
+                  },
+                ]
 
+        const documents = state.documents.map((d) =>
+          d.id === doc.id
+            ? {
+                ...d,
+                status: confidence < 0.9 ? ('needs_review' as const) : ('extracted' as const),
+                confidence,
+                facts,
+              }
+            : d,
+        )
         state = {
           ...state,
-          documents: state.documents.map((d) =>
-            d.id === doc.id
-              ? {
-                  ...d,
-                  status: confidence < 0.9 ? 'needs_review' : 'extracted',
-                  confidence,
-                  facts,
-                }
-              : d,
-          ),
+          documents,
+          entryPlan: buildEntryPlan(documents),
+          entryPlanStatus: 'awaiting_approval',
         }
         emit()
         if (i === docs.length - 1) {
           actions.addMessage(
             'assistant',
-            'Classification complete. Review low-confidence fields, then answer a few smart questions — you should not retype numbers already on your documents.',
+            'Extraction complete. Review the data-entry plan — every value links to its source box. Approve before anything is entered.',
           )
         }
       }, 900 + i * 500)
@@ -238,7 +402,7 @@ export const actions = {
     emit()
     actions.addMessage(
       'assistant',
-      `Your Result is ready: estimated refund ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(refund)}. Deterministic engine + readiness score. Approve & sign when ready.`,
+      `Your Result is ready: estimated refund ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(refund)}. Deterministic engine + readiness score.`,
     )
   },
   signAndFile() {
@@ -254,7 +418,7 @@ export const actions = {
     )
     state = { ...state, returns, prepStep: 5 }
     emit()
-    actions.addMessage('system', 'E-sign captured. Return transmitted through integrated provider adapter. Watching for acknowledgment…')
+    actions.addMessage('system', 'E-sign captured. Return transmitted through integrated provider adapter.')
     setTimeout(() => {
       state = {
         ...state,
@@ -266,7 +430,7 @@ export const actions = {
         prepStep: 5,
       }
       emit()
-      actions.addMessage('assistant', 'Accepted. Your return and source documents are in the Tax Vault. I’ll stay with you year-round for notices and next year’s head start.')
+      actions.addMessage('assistant', 'Accepted. Final records are in your Document Manager. I’ll stay with you year-round.')
     }, 1600)
   },
   advanceReturn(id: string, next: ReturnState) {
@@ -292,11 +456,59 @@ export const actions = {
       feeSnapshot: [{ label: fee.label, amount: fee.amount, status: fee.status }],
       updatedAt: new Date().toISOString(),
     }
-    state = { ...state, returns: [ret, ...state.returns] }
+    state = { ...state, returns: [ret, ...state.returns], activeReturnId: ret.id }
+    emit()
+  },
+  updateEntryLine(id: string, patch: Partial<EntryPlanLine>) {
+    state = {
+      ...state,
+      entryPlan: state.entryPlan.map((l) => (l.id === id ? { ...l, ...patch } : l)),
+    }
+    emit()
+  },
+  approveEntryPlan() {
+    const remaining = state.entryPlan.filter((l) => l.status !== 'removed')
+    if (remaining.some((l) => l.status === 'proposed')) {
+      state = {
+        ...state,
+        entryPlan: state.entryPlan.map((l) => (l.status === 'proposed' ? { ...l, status: 'approved' } : l)),
+      }
+    }
+    state = { ...state, entryPlanStatus: 'approved' }
+    emit()
+    actions.addMessage('system', 'Data-entry plan approved. Ready to enter fields.')
+  },
+  runEntry() {
+    if (state.entryPlanStatus !== 'approved') return
+    state = { ...state, entryPlanStatus: 'entering' }
+    emit()
+    actions.addMessage('assistant', 'Entering approved fields… verifying each value against the plan.')
+    setTimeout(() => {
+      const activeId = state.activeReturnId
+      state = {
+        ...state,
+        entryPlanStatus: 'entered',
+        returns: state.returns.map((r) =>
+          r.id === activeId
+            ? { ...r, state: 'Preparer Review' as ReturnState, readiness: Math.max(r.readiness, 94), updatedAt: new Date().toISOString() }
+            : r,
+        ),
+      }
+      emit()
+      actions.addMessage('assistant', 'Entry complete. Every field checked after entry. A tax pro still signs off on the return.')
+    }, 1400)
+  },
+  rebuildEntryPlan() {
+    state = {
+      ...state,
+      entryPlan: buildEntryPlan(state.documents),
+      entryPlanStatus: 'awaiting_approval',
+    }
     emit()
   },
   resetDemo() {
-    localStorage.removeItem(STORAGE_KEY)
+    localStorage.removeItem('novara-tax-os-v1')
+    sessionStorage.removeItem(SESSION_KEY)
     state = {
       currentUser: state.currentUser,
       documents: SEED_DOCS,
@@ -305,13 +517,18 @@ export const actions = {
         {
           id: 'm0',
           role: 'assistant',
-          text: 'Demo reset. Upload your documents — I’ll handle classification and draft preparation.',
+          text: 'Demo reset. Upload documents — I’ll build an entry plan for preparer approval.',
           at: new Date().toISOString(),
         },
       ],
       prepStep: 0,
       questions: SMART_QUESTIONS,
       vaultFilter: 'all',
+      entryPlan: buildEntryPlan(SEED_DOCS),
+      entryPlanStatus: 'awaiting_approval',
+      preEntryNotes: DEFAULT_NOTES,
+      activeReturnId: SEED_RETURNS.find((r) => r.state === 'Preparer Review')?.id ?? SEED_RETURNS[0].id,
+      binderTab: 'forms',
       hydrated: true,
     }
     emit()
