@@ -27,6 +27,18 @@ import {
   type EfileProviderAssociation,
 } from '../engine/credentials'
 import {
+  applyHouseholdToProfile,
+  emptyHouseholdIntake,
+  extractPeopleFromDocuments,
+  nextDependentQualifyPrompt,
+  nextRelationshipPrompt,
+  recommendFilingStatus,
+  relationshipsComplete,
+  vaultCategoryForDoc,
+  type HouseholdIntakeState,
+  type HouseholdRelationChoice,
+} from '../engine/documentIntakeEngine'
+import {
   TC_PERSONAL_FEE,
   dedupeFeeLines,
   returnSoftwareFee,
@@ -77,7 +89,7 @@ import type { BenefitSnapshot } from '../data/types'
 const ROLE_KEY = 'novara-tax-os-role'
 const USER_KEY = 'novara-tax-os-user-id'
 /** Session-scoped demo state (clears when the tab closes) */
-const SESSION_KEY = 'novara-tax-os-session-v9'
+const SESSION_KEY = 'novara-tax-os-session-v10'
 
 function money(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n)
@@ -372,6 +384,7 @@ let state: Store = {
   accountTier: undefined,
   registrationPayments: [],
   officeStaff: SEED_OFFICE_STAFF,
+  householdIntake: emptyHouseholdIntake(),
   hydrated: false,
 }
 
@@ -442,6 +455,7 @@ function hydrate() {
     sessionStorage.removeItem('novara-tax-os-session-v6')
     sessionStorage.removeItem('novara-tax-os-session-v7')
     sessionStorage.removeItem('novara-tax-os-session-v8')
+    sessionStorage.removeItem('novara-tax-os-session-v9')
 
     const role = localStorage.getItem(ROLE_KEY) as Role | null
     const userId = localStorage.getItem(USER_KEY)
@@ -470,6 +484,7 @@ function hydrate() {
         registrationPayments: parsed.registrationPayments ?? [],
         accountTier: parsed.accountTier ?? roleToTier(role ?? '') ?? undefined,
         officeStaff: parsed.officeStaff?.length ? parsed.officeStaff : SEED_OFFICE_STAFF,
+        householdIntake: parsed.householdIntake ?? emptyHouseholdIntake(),
         returns: scoped.returns,
         documents: scoped.documents,
         benefitReport,
@@ -767,19 +782,44 @@ export const actions = {
           taxProfile,
           `Uploaded ${doc.type} and filled matching return fields. ${plainLanguageExtractionSummary({ ...doc, facts })}.`,
         )
+        const prior = state.householdIntake
+        const candidates = extractPeopleFromDocuments(
+          documents,
+          state.currentUser?.name ?? 'Jordan Blake',
+        ).map((c) => {
+          const prev = prior.candidates.find((p) => p.id === c.id)
+          return prev
+            ? {
+                ...c,
+                relationToPrimary: prev.relationToPrimary,
+                mayQualifyDependent: prev.mayQualifyDependent,
+                onReturn: prev.onReturn,
+              }
+            : c
+        })
+        const householdIntake: HouseholdIntakeState = {
+          ...prior,
+          phase: 'extract_review',
+          candidates,
+        }
+        const categorized = documents.map((d) => ({
+          ...d,
+          vaultCategory: vaultCategoryForDoc(d, householdIntake),
+        }))
         state = {
           ...state,
-          documents,
+          documents: categorized,
           taxProfile,
           benefitReport,
+          householdIntake,
           uploadIssues: [...conflicts, ...state.uploadIssues.filter((u) => u.kind === 'duplicate')].slice(0, 40),
-          entryPlan: buildEntryPlan(documents),
+          entryPlan: buildEntryPlan(categorized),
           entryPlanStatus: 'awaiting_approval',
           returns: syncReturnRefund(benefitReport),
           auditEvents: appendAudit(
             'document_extract',
-            `Extracted ${doc.type} fields into the return draft. Sensitive IDs masked.`,
-            { docType: doc.type },
+            `Extracted ${doc.type} fields into the return draft. Sensitive IDs masked. Identified ${candidates.length} person(s) for confirmation.`,
+            { docType: doc.type, people: candidates.length },
           ),
         }
         emit()
@@ -787,7 +827,7 @@ export const actions = {
           const chat = {
             id: uid('iv'),
             role: 'assistant' as const,
-            text: 'Extraction complete. Confirm the details below — I won’t ask you to re-type wages, withholding, tuition, or childcare amounts already on your documents. Correct only what’s missing or wrong.',
+            text: `Extraction complete. I found ${candidates.length} person(s) on your documents. Confirm extracted fields, then tell me who is filing — I will not assume relationships from names or ages.`,
             at: new Date().toISOString(),
           }
           state = { ...state, interviewChat: [...state.interviewChat, chat], prepStep: Math.max(state.prepStep, 1) }
@@ -818,19 +858,244 @@ export const actions = {
   confirmExtracedDetails() {
     const taxProfile = syncProfileFromDocuments(state.taxProfile, state.documents)
     const benefitReport = toSnapshot(taxProfile)
-    const filing = nextFilingStatusTurn(taxProfile)
+    const candidates = extractPeopleFromDocuments(
+      state.documents,
+      state.currentUser?.name ?? 'Jordan Blake',
+    ).map((c) => {
+      const prev = state.householdIntake.candidates.find((p) => p.id === c.id)
+      return prev
+        ? {
+            ...c,
+            relationToPrimary: prev.relationToPrimary,
+            mayQualifyDependent: prev.mayQualifyDependent,
+            onReturn: prev.onReturn,
+          }
+        : c
+    })
     const chat = {
       id: uid('iv'),
       role: 'assistant' as const,
-      text: filing
-        ? `${filing.aiLead} ${filing.prompt}`
-        : 'Filing status looks complete from prior answers. Let’s check for tax benefits next.',
+      text: 'Which person is filing this tax return? Select the primary taxpayer from the names on your documents — or correct a name if extraction missed it.',
       at: new Date().toISOString(),
     }
     state = {
       ...state,
       taxProfile,
       benefitReport,
+      prepStep: 1,
+      householdIntake: {
+        ...state.householdIntake,
+        phase: 'identify_primary',
+        candidates,
+      },
+      interviewChat: [...state.interviewChat, chat],
+    }
+    emit()
+  },
+  setPrimaryTaxpayer(personId: string, correctedName?: string) {
+    const candidates = state.householdIntake.candidates.map((c) =>
+      c.id === personId
+        ? { ...c, fullLegalName: correctedName?.trim() || c.fullLegalName, onReturn: true }
+        : c,
+    )
+    const primary = candidates.find((c) => c.id === personId)
+    const chat = {
+      id: uid('iv'),
+      role: 'assistant' as const,
+      text: primary
+        ? `Primary taxpayer set to ${primary.fullLegalName}. Next I’ll ask who each additional person is — I won’t assume relationships.`
+        : 'Primary taxpayer selected.',
+      at: new Date().toISOString(),
+    }
+    const householdIntake: HouseholdIntakeState = {
+      ...state.householdIntake,
+      primaryPersonId: personId,
+      candidates,
+      phase: candidates.length > 1 ? 'confirm_relationships' : 'discover_missing',
+    }
+    state = {
+      ...state,
+      householdIntake,
+      interviewChat: [...state.interviewChat, chat],
+      documents: state.documents.map((d) => ({
+        ...d,
+        vaultCategory: vaultCategoryForDoc(d, householdIntake),
+        personId:
+          d.facts.some((f) => /name/i.test(f.label) && primary && f.value === primary.fullLegalName)
+            ? personId
+            : d.personId,
+      })),
+      auditEvents: appendAudit('primary_taxpayer_set', 'Primary taxpayer confirmed from document extraction.', {
+        personId,
+      }),
+    }
+    emit()
+  },
+  confirmPersonRelationship(personId: string, relation: HouseholdRelationChoice) {
+    let candidates = state.householdIntake.candidates.map((c) =>
+      c.id === personId
+        ? {
+            ...c,
+            relationToPrimary: relation,
+            onReturn: relation !== 'not_on_return',
+            mayQualifyDependent: relation === 'spouse' || relation === 'not_on_return' ? false : c.mayQualifyDependent,
+          }
+        : c,
+    )
+    let householdIntake: HouseholdIntakeState = { ...state.householdIntake, candidates }
+    const qualify = nextDependentQualifyPrompt(householdIntake)
+    const relNext = nextRelationshipPrompt(householdIntake)
+    if (!relNext && !qualify && relationshipsComplete(householdIntake)) {
+      householdIntake = { ...householdIntake, phase: 'discover_missing' }
+    }
+    const person = candidates.find((c) => c.id === personId)
+    const chat = {
+      id: uid('iv'),
+      role: 'assistant' as const,
+      text: person
+        ? `Recorded: ${person.fullLegalName} → ${relation.replace(/_/g, ' ')}.${
+            qualify ? ` ${qualify.prompt}` : relNext ? ` ${relNext.prompt}` : ' Is there anyone else you may be able to claim who was not on these documents?'
+          }`
+        : 'Relationship recorded.',
+      at: new Date().toISOString(),
+    }
+    let taxProfile = applyHouseholdToProfile(state.taxProfile, householdIntake, 2025)
+    const benefitReport = toSnapshot(taxProfile, 'Household relationship updated — benefits recalculated when eligible.')
+    state = {
+      ...state,
+      householdIntake,
+      taxProfile,
+      benefitReport,
+      returns: syncReturnRefund(benefitReport),
+      interviewChat: [...state.interviewChat, chat],
+      documents: state.documents.map((d) => ({ ...d, vaultCategory: vaultCategoryForDoc(d, householdIntake) })),
+      auditEvents: appendAudit('household_relationship', 'Taxpayer confirmed a household relationship (no assumptions from docs).', {
+        personId,
+        relation,
+      }),
+    }
+    emit()
+  },
+  confirmMayQualifyDependent(personId: string, yes: boolean) {
+    const candidates = state.householdIntake.candidates.map((c) =>
+      c.id === personId ? { ...c, mayQualifyDependent: yes } : c,
+    )
+    let householdIntake: HouseholdIntakeState = { ...state.householdIntake, candidates }
+    if (relationshipsComplete(householdIntake) && !nextRelationshipPrompt(householdIntake)) {
+      householdIntake = { ...householdIntake, phase: 'discover_missing' }
+    }
+    const taxProfile = applyHouseholdToProfile(state.taxProfile, householdIntake, 2025)
+    const benefitReport = toSnapshot(taxProfile, 'Dependent qualification answer updated — refund recalculated.')
+    state = {
+      ...state,
+      householdIntake,
+      taxProfile,
+      benefitReport,
+      returns: syncReturnRefund(benefitReport),
+      auditEvents: appendAudit('dependent_qualify_flag', 'Taxpayer answered whether a person may qualify as a dependent.', {
+        personId,
+        yes,
+      }),
+    }
+    emit()
+  },
+  answerMissingHousehold(answer: 'yes' | 'no') {
+    let householdIntake: HouseholdIntakeState = {
+      ...state.householdIntake,
+      missingHouseholdAsked: true,
+      missingHouseholdAnswer: answer,
+      phase: answer === 'yes' ? 'discover_missing' : 'interview',
+      filingRecommendation: recommendFilingStatus({
+        ...state.householdIntake,
+        missingHouseholdAnswer: answer,
+      }),
+    }
+    let taxProfile = applyHouseholdToProfile(state.taxProfile, householdIntake, 2025)
+    if (answer === 'no') {
+      const rec = householdIntake.filingRecommendation
+      if (rec?.recommended === 'mfj') taxProfile = { ...taxProfile, answers: { ...taxProfile.answers, married_dec31: 'yes' } }
+      if (rec?.recommended === 'single') taxProfile = { ...taxProfile, filingStatus: 'single' }
+      householdIntake = { ...householdIntake, phase: 'interview' }
+    }
+    const benefitReport = toSnapshot(taxProfile, 'Household discovery updated.')
+    const chat = {
+      id: uid('iv'),
+      role: 'assistant' as const,
+      text:
+        answer === 'yes'
+          ? 'Add anyone missing securely below. We never assume your uploaded documents are the complete household.'
+          : `${householdIntake.filingRecommendation?.rationale ?? ''} Continuing to filing-status and benefit questions.`,
+      at: new Date().toISOString(),
+    }
+    state = {
+      ...state,
+      householdIntake,
+      taxProfile,
+      benefitReport,
+      returns: syncReturnRefund(benefitReport),
+      prepStep: answer === 'no' ? 2 : state.prepStep,
+      interviewChat: [...state.interviewChat, chat],
+    }
+    emit()
+  },
+  addMissingHouseholdPerson(input: { fullLegalName: string; dateOfBirth?: string; relation: HouseholdRelationChoice }) {
+    const id = `person-${input.fullLegalName.toLowerCase().replace(/[^a-z]/g, '')}-${uid('p')}`
+    const person = {
+      id,
+      fullLegalName: input.fullLegalName.trim(),
+      dateOfBirth: input.dateOfBirth,
+      sourceDocIds: [] as string[],
+      sourceLabels: ['manual_household'],
+      confidence: 1,
+      needsConfirmation: false,
+      relationToPrimary: input.relation,
+      mayQualifyDependent:
+        input.relation === 'spouse' || input.relation === 'not_on_return' ? false : true,
+      onReturn: input.relation !== 'not_on_return',
+    }
+    const candidates = [...state.householdIntake.candidates, person]
+    const householdIntake: HouseholdIntakeState = {
+      ...state.householdIntake,
+      candidates,
+      filingRecommendation: recommendFilingStatus({ ...state.householdIntake, candidates }),
+    }
+    const taxProfile = applyHouseholdToProfile(state.taxProfile, householdIntake, 2025)
+    const benefitReport = toSnapshot(taxProfile, 'Added household member — benefits recalculated.')
+    state = {
+      ...state,
+      householdIntake,
+      taxProfile,
+      benefitReport,
+      returns: syncReturnRefund(benefitReport),
+      auditEvents: appendAudit('household_member_added', 'Taxpayer added a household member not found on uploaded documents.', {
+        relation: input.relation,
+      }),
+    }
+    emit()
+  },
+  finishHouseholdDiscovery() {
+    const filingRecommendation = recommendFilingStatus(state.householdIntake)
+    const householdIntake: HouseholdIntakeState = {
+      ...state.householdIntake,
+      missingHouseholdAsked: true,
+      missingHouseholdAnswer: state.householdIntake.missingHouseholdAnswer ?? 'no',
+      filingRecommendation,
+      phase: 'interview',
+    }
+    const taxProfile = applyHouseholdToProfile(state.taxProfile, householdIntake, 2025)
+    const benefitReport = toSnapshot(taxProfile, 'Household structure confirmed — evaluating filing status and benefits.')
+    const chat = {
+      id: uid('iv'),
+      role: 'assistant' as const,
+      text: `${filingRecommendation.rationale} Recommended status: ${filingRecommendation.recommended.toUpperCase()}.`,
+      at: new Date().toISOString(),
+    }
+    state = {
+      ...state,
+      householdIntake,
+      taxProfile,
+      benefitReport,
+      returns: syncReturnRefund(benefitReport),
       prepStep: 2,
       interviewChat: [...state.interviewChat, chat],
     }
@@ -1714,6 +1979,7 @@ export const actions = {
       accountTier: roleToTier(state.currentUser?.role ?? '') ?? undefined,
       registrationPayments: [],
       officeStaff: SEED_OFFICE_STAFF,
+      householdIntake: emptyHouseholdIntake(),
       hydrated: true,
     }
     emit()
