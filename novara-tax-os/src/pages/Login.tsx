@@ -4,29 +4,33 @@ import { actions } from '../store/useAppStore'
 import type { Role } from '../data/types'
 import './Login.css'
 
-const ROLES: { role: Role; title: string; blurb: string; path: string }[] = [
+const ROLES: { role: Role; title: string; blurb: string; path: string; finds: string }[] = [
   {
     role: 'taxpayer',
     title: 'Direct taxpayer',
-    blurb: 'Upload documents, answer smart questions, review, sign.',
+    blurb: 'Home shows Refund Opportunity Tracker + tax-savings summary.',
+    finds: 'Open Savings for Benefit Optimization Engine',
     path: '/app/taxpayer',
   },
   {
     role: 'preparer',
     title: 'Tax preparer (TP)',
-    blurb: 'Review drafted returns, verify extractions, escalate, file.',
+    blurb: 'Return editor, Benefits engine, Filed-style Entry plan, live queue.',
+    finds: 'Use Return / Benefits / Entry tabs',
     path: '/app/preparer',
   },
   {
     role: 'efin_owner',
     title: 'EFIN office owner',
-    blurb: 'Pipeline, staff, pricing, billing, and office AI.',
+    blurb: 'Pipeline is status-only. Pricing has $899, calculator, and FAQ.',
+    finds: 'Open Pricing for transparency page',
     path: '/app/office',
   },
   {
     role: 'admin',
     title: 'Platform admin',
     blurb: 'Tenants, fee catalog, feature flags, system health.',
+    finds: 'Fee Catalog includes approved vs provisional terms',
     path: '/app/admin',
   },
 ]
@@ -41,7 +45,9 @@ export function Login() {
           <BrandMark size={52} />
           <div>
             <h1 className="brand">NOVARA</h1>
-            <p>Choose a demo role. Everything saves locally on this computer.</p>
+            <p>
+              Choose a demo role to see the latest updates. Sample data only — session storage on this device.
+            </p>
           </div>
         </div>
         <div className="role-grid">
@@ -57,6 +63,7 @@ export function Login() {
             >
               <strong>{r.title}</strong>
               <span>{r.blurb}</span>
+              <em className="role-finds">{r.finds}</em>
             </button>
           ))}
         </div>

@@ -27,6 +27,75 @@
   align-items: center;
   justify-content: space-between;
   padding: 1.1rem 0;
+  gap: 0.75rem;
+}
+
+.hero-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.landing-ghost {
+  color: white !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+}
+
+.landing-kicker {
+  margin: 0 0 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--teal);
+}
+
+.update-grid {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.update-card {
+  padding: 1.2rem 1.25rem;
+}
+
+.update-card h3 {
+  margin: 0.55rem 0 0.4rem;
+  font-size: 1.2rem;
+}
+
+.update-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.update-path {
+  margin-top: 0.7rem !important;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--line);
+  color: var(--ink) !important;
+  font-size: 0.9rem;
+}
+
+.pricing-steps {
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 720px) {
+  .update-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .pricing-steps {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .update-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 
 .landing-brand {
