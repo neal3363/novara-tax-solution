@@ -1,6 +1,7 @@
 import type { DocType, DocumentRecord } from '../data/types'
 import type { TaxpayerProfile } from './benefitOptimizer'
 import { runBenefitOptimization } from './benefitOptimizer'
+import { buildDependentDocumentChecklist } from './dependentsEngine'
 
 export type DocRequirementStatus = 'needed' | 'uploaded' | 'under_review' | 'verified' | 'not_required'
 
@@ -232,6 +233,35 @@ export function buildDocumentChecklist(
       })
   }
 
+  const vaultHasId = documents.some((d) => d.type === 'ID' && (d.status === 'extracted' || d.status === 'verified'))
+  const vaultHasChildcare = documents.some((d) => d.type === 'Childcare')
+  buildDependentDocumentChecklist(
+    profile.dependents,
+    profile.answers,
+    profile.childcarePaid > 0,
+    vaultHasId,
+    false,
+    false,
+    vaultHasChildcare,
+  ).forEach((d) => {
+    push({
+      id: d.id,
+      benefitId: 'ctc',
+      benefitName: d.dependentName,
+      name: d.name,
+      reason: d.reason,
+      requiredForFiling: d.requiredForFiling,
+      matchTypes: d.name.toLowerCase().includes('childcare') ? ['Childcare', 'ID'] : ['ID'],
+      alternative: d.alternative,
+      status:
+        d.status === 'recommended'
+          ? 'needed'
+          : d.status === 'needed' || d.status === 'uploaded' || d.status === 'verified' || d.status === 'not_required'
+            ? d.status
+            : 'needed',
+    })
+  })
+
   // Deduplicate by id
   const byId = new Map<string, DocumentRequirement>()
   items.forEach((i) => {
@@ -239,7 +269,7 @@ export function buildDocumentChecklist(
     if (!existing || existing.status === 'needed') byId.set(i.id, i)
   })
 
-  return Array.from(byId.values()).filter((i) => i.status !== 'not_required' || false)
+  return Array.from(byId.values()).filter((i) => i.status !== 'not_required')
 }
 
 export function documentsStillNeeded(checklist: DocumentRequirement[]) {

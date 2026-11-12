@@ -230,25 +230,46 @@ export function nextFilingStatusTurn(profile: TaxpayerProfile): SmartTurn | null
     }
   }
 
-  if (!answered(profile, 'has_qualifying_person')) {
+  if (!answered(profile, 'potential_dependents') && !answered(profile, 'has_qualifying_person')) {
     return {
-      id: 'has_qualifying_person',
+      id: 'potential_dependents',
       phase: 'filing_status',
-      prompt: 'Do you have children or other qualifying individuals living with you?',
+      prompt: 'Do you have any children or other people who may qualify as your dependents?',
       kind: 'choice',
       choices: ['Yes', 'No'],
-      mapsTo: 'has_qualifying_person',
+      mapsTo: 'potential_dependents',
       aiLead:
         !married
-          ? 'To check Head of Household or dependent-related options, I need to know who lived with you.'
-          : 'This helps confirm dependents and any Head of Household analysis if filing separately.',
+          ? 'Dependent credits and Head of Household require knowing exactly who you may claim — we never assume a count from documents or estimates.'
+          : 'We’ll collect each potential dependent’s details before calculating Child Tax Credit, EITC, or other dependent benefits.',
     }
   }
 
   if (
-    (profile.answers.has_qualifying_person === 'Yes' || profile.answers.has_qualifying_person === 'yes') &&
-    !answered(profile, 'maintained_home')
+    (profile.answers.potential_dependents === 'yes' ||
+      profile.answers.potential_dependents === 'Yes' ||
+      profile.answers.has_qualifying_person === 'Yes' ||
+      profile.answers.has_qualifying_person === 'yes') &&
+    !answered(profile, 'dependent_count')
   ) {
+    return {
+      id: 'dependent_count',
+      phase: 'filing_status',
+      prompt: 'How many children or other potential dependents do you have?',
+      kind: 'choice',
+      choices: ['0', '1', '2', '3', '4', '5+'],
+      mapsTo: 'dependent_count',
+      aiLead: 'Enter the actual number. Do not skip this — refund amounts cannot be verified without it.',
+    }
+  }
+
+  const hasPotential =
+    profile.answers.potential_dependents === 'yes' ||
+    profile.answers.potential_dependents === 'Yes' ||
+    profile.answers.has_qualifying_person === 'Yes' ||
+    profile.answers.has_qualifying_person === 'yes'
+
+  if (hasPotential && !answered(profile, 'maintained_home')) {
     return {
       id: 'maintained_home',
       phase: 'filing_status',
@@ -279,22 +300,24 @@ export function applyFilingStatusAnswer(profile: TaxpayerProfile, mapsTo: string
     else if (value.includes('Single')) next.filingStatus = 'single'
   }
 
-  if (mapsTo === 'has_qualifying_person') {
-    next.answers.has_dependents = value === 'Yes' || value === 'yes' ? 'yes' : 'no'
-    if (value === 'Yes' || value === 'yes') {
-      next.answers.has_child = next.answers.has_child ?? 'yes'
-      if (next.dependents.length === 0) {
-        next.dependents = [
-          { name: 'Child 1', age: 7, relationship: 'child' },
-          { name: 'Child 2', age: 10, relationship: 'child' },
-        ]
-      }
+  if (mapsTo === 'potential_dependents' || mapsTo === 'has_qualifying_person') {
+    const yes = value === 'Yes' || value === 'yes'
+    next.answers.has_qualifying_person = yes ? 'Yes' : 'No'
+    next.answers.potential_dependents = yes ? 'yes' : 'no'
+    next.answers.has_dependents = yes ? 'yes' : 'no'
+    if (!yes) {
+      next.answers.dependent_count = 0
+      next.dependents = []
+      next.answers.has_child = 'no'
     }
   }
 
   if (mapsTo === 'maintained_home') {
     const unmarried = next.answers.married_dec31 === 'No' || next.answers.married_dec31 === 'My spouse passed away'
-    const hasQP = next.answers.has_qualifying_person === 'Yes' || next.answers.has_qualifying_person === 'yes'
+    const hasQP =
+      next.answers.has_qualifying_person === 'Yes' ||
+      next.answers.has_qualifying_person === 'yes' ||
+      next.answers.potential_dependents === 'yes'
     if (unmarried && hasQP && (value === 'Yes' || value === 'yes')) {
       next.filingStatus = 'hoh'
       next.answers.unmarried_or_considered = 'yes'

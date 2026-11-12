@@ -6,9 +6,22 @@ import {
   type DocSupportStatus,
 } from '../data/benefitsCatalog'
 import { answerPresent } from './benefitAnswers'
+import {
+  applyDependentAnswer,
+  coerceDependents,
+  countCdccPersons,
+  countCtcEligible,
+  countEitcQualifyingChildren,
+  countOdcEligible,
+  dependentsReadyForVerifiedCredits,
+  getDiscoveryState,
+  hasHohQualifyingPerson,
+  type DependentRecord,
+} from './dependentsEngine'
 import { buildAppliedFormLines, formMappingFor } from './returnForms'
 
 export type ProfileAnswers = Record<string, string | number | boolean | undefined>
+export type { DependentRecord }
 
 export interface TaxpayerProfile {
   taxYear: number
@@ -16,7 +29,7 @@ export interface TaxpayerProfile {
   withholding: number
   selfEmploymentIncome: number
   filingStatus: 'single' | 'mfj' | 'hoh' | 'mfs' | 'unknown'
-  dependents: { name: string; age: number; relationship: string }[]
+  dependents: DependentRecord[]
   childcarePaid: number
   careProvider?: string
   employerDependentCare: number
@@ -71,6 +84,11 @@ export interface OptimizationReport {
   comparisonNotes: string[]
   blockers: string[]
   auditComplete: boolean
+  /** False until dependent discovery + per-dependent interview complete (or explicitly zero) */
+  dependentInfoComplete: boolean
+  /** When true, do not present dependent-based refund as verified */
+  refundIncomplete: boolean
+  refundIncompleteReason?: string
 }
 
 export function defaultProfile(): TaxpayerProfile {
@@ -101,12 +119,28 @@ export function defaultProfile(): TaxpayerProfile {
   }
 }
 
+function normalizedDeps(p: TaxpayerProfile): DependentRecord[] {
+  return coerceDependents(p.dependents, p.taxYear)
+}
+
 function hasChild(p: TaxpayerProfile) {
-  return p.dependents.some((d) => d.age < 17) || p.answers.has_child === true || p.answers.has_child === 'yes'
+  const deps = normalizedDeps(p)
+  if (dependentsReadyForVerifiedCredits(p.answers, deps)) {
+    return deps.some((d) => d.ctcEligible || d.eitcQualifyingChild || (d.qualifyingChild && d.age < 17))
+  }
+  // Soft probe only — never invent credit amounts from this
+  return p.answers.has_child === true || p.answers.has_child === 'yes' || p.answers.potential_dependents === 'yes'
 }
 
 function hasDependents(p: TaxpayerProfile) {
-  return p.dependents.length > 0 || p.answers.has_dependents === true || p.answers.has_dependents === 'yes'
+  const deps = normalizedDeps(p)
+  const discovery = getDiscoveryState(p.answers, deps)
+  if (discovery.discoveryComplete) return (discovery.declaredCount ?? 0) > 0 || deps.length > 0
+  return (
+    p.answers.has_dependents === true ||
+    p.answers.has_dependents === 'yes' ||
+    p.answers.potential_dependents === 'yes'
+  )
 }
 
 function factMap(p: TaxpayerProfile): Record<string, boolean> {
@@ -137,17 +171,23 @@ function factMap(p: TaxpayerProfile): Record<string, boolean> {
 }
 
 function kidsUnder17(p: TaxpayerProfile) {
-  return p.dependents.filter((d) => d.age < 17).length || (hasChild(p) ? 1 : 0)
+  const deps = normalizedDeps(p)
+  if (!dependentsReadyForVerifiedCredits(p.answers, deps)) return 0
+  return countCtcEligible(deps)
 }
 
 /** Tax-year calculation helpers — amounts come from profile facts, not catalog hints. */
 function estimateFor(rule: BenefitRule, p: TaxpayerProfile): number {
+  const deps = normalizedDeps(p)
+  const depsReady = dependentsReadyForVerifiedCredits(p.answers, deps)
+
   switch (rule.id) {
     case 'ctc':
-      return kidsUnder17(p) * 2000
+      return depsReady ? countCtcEligible(deps) * 2000 : 0
     case 'cdcc': {
-      // IRC §21: up to $3,000 (1 qualifying person) / $6,000 (2+); credit rate 20–35% (demo uses 20% floor + AGI-ish bump)
-      const persons = Math.max(1, kidsUnder17(p))
+      if (!depsReady || p.childcarePaid <= 0) return 0
+      // IRC §21: up to $3,000 (1 qualifying person) / $6,000 (2+); credit rate 20–35%
+      const persons = Math.max(1, countCdccPersons(deps))
       const cap = persons >= 2 ? 6000 : 3000
       const care = Math.min(Math.max(0, p.childcarePaid), cap)
       const afterFsa = Math.max(0, care - Math.max(0, p.employerDependentCare))
@@ -181,9 +221,10 @@ function estimateFor(rule: BenefitRule, p: TaxpayerProfile): number {
       return itemized > standard && salt > 0 ? Math.round(salt * 0.22) : 0
     }
     case 'eitc': {
-      const kids = kidsUnder17(p)
       const earned = p.wages + p.selfEmploymentIncome
       if (earned <= 0) return 0
+      // Without completed dependent discovery, do not assume qualifying children
+      const kids = depsReady ? countEitcQualifyingChildren(deps) : 0
       // Simplified TY2025-style phaseout bands for demo engine
       if (kids === 0 && earned > 18591) return 0
       if (kids === 1 && earned > 49084) return 0
@@ -222,11 +263,10 @@ function estimateFor(rule: BenefitRule, p: TaxpayerProfile): number {
     case 'educator':
       return p.isEducator || p.answers.is_educator === 'yes' ? Math.min(300, p.educatorExpenses || 300) : 0
     case 'hoh':
+      if (!depsReady || !hasHohQualifyingPerson(deps)) return 0
       return p.filingStatus === 'hoh' ? 1200 : 0
-    case 'odc': {
-      const other = p.dependents.filter((d) => d.age >= 17).length
-      return other * 500
-    }
+    case 'odc':
+      return depsReady ? countOdcEligible(deps) * 500 : 0
     case 'ptc':
       return p.answers.had_marketplace === 'yes' || p.answers.marketplace_coverage === 'yes' ? 1400 : 0
     case 'state_eitc': {
@@ -364,6 +404,8 @@ function disqualifiedByAnswers(rule: BenefitRule, p: TaxpayerProfile): string | 
   return null
 }
 
+const DEPENDENT_CREDIT_RULES = new Set(['ctc', 'eitc', 'cdcc', 'odc', 'hoh'])
+
 function evaluateRule(rule: BenefitRule, p: TaxpayerProfile, facts: Record<string, boolean>): BenefitFinding {
   const dq = disqualifiedByAnswers(rule, p)
   if (dq) {
@@ -374,8 +416,29 @@ function evaluateRule(rule: BenefitRule, p: TaxpayerProfile, facts: Record<strin
     })
   }
 
+  const deps = normalizedDeps(p)
+  const depsReady = dependentsReadyForVerifiedCredits(p.answers, deps)
+
   const triggered = rule.triggerFacts.some((t) => facts[t])
-  const missingAnswers = rule.requiredAnswers.filter((k) => !answerPresent(p, k))
+  // Per-dependent interview replaces legacy CTC/EITC questionnaire keys when complete
+  let missingAnswers = rule.requiredAnswers.filter((k) => !answerPresent(p, k))
+  if (DEPENDENT_CREDIT_RULES.has(rule.id) && depsReady) {
+    missingAnswers = missingAnswers.filter(
+      (k) =>
+        !(
+          k === 'has_child' ||
+          k === 'child_lived_with' ||
+          k === 'child_support' ||
+          k === 'another_claimant' ||
+          k === 'has_other_dependent' ||
+          k === 'other_dependent_qualifies' ||
+          k === 'unmarried_or_considered' ||
+          k === 'has_qualifying_person' ||
+          k === 'maintained_home' ||
+          k === 'complete_dependent_interview'
+        ),
+    )
+  }
   const softProbe =
     !triggered &&
     rule.triggerFacts.some((t) =>
@@ -530,8 +593,35 @@ export function computeBaseRefund(p: TaxpayerProfile): number {
 }
 
 export function runBenefitOptimization(p: TaxpayerProfile): OptimizationReport {
+  const deps = normalizedDeps(p)
+  const discovery = getDiscoveryState(p.answers, deps)
+  const dependentInfoComplete = dependentsReadyForVerifiedCredits(p.answers, deps)
+  const refundIncomplete = !dependentInfoComplete
+  const refundIncompleteReason = refundIncomplete
+    ? 'Refund calculation incomplete — dependent information needed.'
+    : undefined
+
   const facts = factMap(p)
-  let findings = BENEFIT_CATALOG_2025.map((rule) => evaluateRule(rule, p, facts))
+  let findings = BENEFIT_CATALOG_2025.map((rule) => {
+    const finding = evaluateRule(rule, p, facts)
+    // Block unsupported dependent-based projections until discovery + interview complete
+    if (DEPENDENT_CREDIT_RULES.has(rule.id) && !dependentInfoComplete) {
+      return {
+        ...finding,
+        status: 'needs_info' as const,
+        estimatedSavings: 0,
+        affectingRefund: 0,
+        explanation: refundIncompleteReason!,
+        missingAnswers: discovery.askedPotential
+          ? discovery.countAnswered
+            ? ['complete_dependent_interview']
+            : ['dependent_count']
+          : ['potential_dependents'],
+        docStatus: 'requested' as const,
+      }
+    }
+    return finding
+  })
   findings = resolveIncompatibilities(findings)
 
   const baseRefund = computeBaseRefund(p)
@@ -542,6 +632,9 @@ export function runBenefitOptimization(p: TaxpayerProfile): OptimizationReport {
     .reduce((s, f) => s + Math.max(0, f.estimatedSavings), 0)
 
   const comparisonNotes: string[] = []
+  if (refundIncomplete) {
+    comparisonNotes.push(refundIncompleteReason!)
+  }
   const itemized =
     p.mortgageInterest +
     Math.min(10000, p.propertyTax) +
@@ -556,8 +649,14 @@ export function runBenefitOptimization(p: TaxpayerProfile): OptimizationReport {
   if (p.tuitionPaid > 0 || p.answers.education_expenses === 'yes') {
     comparisonNotes.push('Education credits: AOTC vs Lifetime Learning — only the higher allowable option is applied.')
   }
+  if (dependentInfoComplete && deps.length > 0) {
+    comparisonNotes.push(
+      `Dependents on file: ${deps.length}. CTC-eligible: ${countCtcEligible(deps)}; ODC-eligible: ${countOdcEligible(deps)}; EITC qualifying children: ${countEitcQualifyingChildren(deps)}.`,
+    )
+  }
 
   const blockers: string[] = []
+  if (refundIncomplete) blockers.unshift(refundIncompleteReason!)
   findings
     .filter((f) => f.status === 'needs_info')
     .forEach((f) => blockers.push(`${f.shortName}: answer ${f.missingAnswers.join(', ') || 'follow-ups'}`))
@@ -577,6 +676,7 @@ export function runBenefitOptimization(p: TaxpayerProfile): OptimizationReport {
     taxYear: p.taxYear,
     ruleVersion: BENEFIT_RULE_VERSION,
     baseRefund,
+    // Only non-dependent verified benefits + base until dependent interview is complete
     projectedRefund: baseRefund + verifiedSavings,
     verifiedSavings,
     potentialSavings,
@@ -585,7 +685,10 @@ export function runBenefitOptimization(p: TaxpayerProfile): OptimizationReport {
     newlyApplied: [],
     comparisonNotes,
     blockers,
-    auditComplete: !openNeeds && !unresolved,
+    auditComplete: !openNeeds && !unresolved && dependentInfoComplete,
+    dependentInfoComplete,
+    refundIncomplete,
+    refundIncompleteReason,
   }
 }
 
@@ -800,8 +903,25 @@ export function applyAnswer(p: TaxpayerProfile, mapsTo: string, value: string | 
     unresolvedKeys: p.unresolvedKeys.filter((k) => k !== mapsTo),
   }
 
-  if (mapsTo === 'has_child' && (value === 'yes' || value === true) && next.dependents.length === 0) {
-    next.dependents = [{ name: 'Dependent child', age: 8, relationship: 'child' }]
+  if (mapsTo === 'has_child' && (value === 'yes' || value === true)) {
+    // Do not invent a dependent — open the dependent interview instead
+    next.answers.potential_dependents = next.answers.potential_dependents ?? 'yes'
+  }
+  if (mapsTo === 'has_child' && (value === 'no' || value === false)) {
+    next.answers.potential_dependents = next.answers.potential_dependents ?? 'no'
+  }
+  if (mapsTo === 'has_dependents' && (value === 'yes' || value === true)) {
+    next.answers.potential_dependents = next.answers.potential_dependents ?? 'yes'
+  }
+  if (mapsTo === 'has_dependents' && (value === 'no' || value === false)) {
+    next.answers.potential_dependents = 'no'
+    next.answers.dependent_count = 0
+    next.dependents = []
+  }
+  if (mapsTo === 'potential_dependents' || mapsTo === 'dependent_count' || mapsTo.startsWith('dep_')) {
+    const applied = applyDependentAnswer(next.answers, next.dependents, mapsTo, value, next.taxYear)
+    next.answers = applied.answers
+    next.dependents = applied.dependents
   }
   if (mapsTo === 'paid_childcare' && (value === 'yes' || value === true)) {
     next.answers.worked_or_looked = 'yes'
@@ -908,9 +1028,7 @@ export function applyAnswer(p: TaxpayerProfile, mapsTo: string, value: string | 
   }
   if (mapsTo === 'has_other_dependent' && (value === 'yes' || value === true)) {
     next.answers.has_dependents = 'yes'
-    if (!next.dependents.some((d) => d.age >= 17)) {
-      next.dependents = [...next.dependents, { name: 'Other dependent', age: 19, relationship: 'relative' }]
-    }
+    next.answers.potential_dependents = next.answers.potential_dependents ?? 'yes'
   }
   if (mapsTo === 'maintained_home' && (value === 'yes' || value === true)) {
     next.filingStatus = 'hoh'

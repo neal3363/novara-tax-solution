@@ -182,6 +182,9 @@ export interface BenefitSnapshot {
   /** Plain-language explanation of the latest recalculation */
   lastChangeNote?: string
   lastApplications?: BenefitApplicationEvent[]
+  dependentInfoComplete?: boolean
+  refundIncomplete?: boolean
+  refundIncompleteReason?: string
 }
 
 export interface AppState {

@@ -34,6 +34,7 @@ import {
   plainLanguageExtractionSummary,
 } from '../engine/documentProcessing'
 import { applyParsedFacts, parseTaxpayerStatement } from '../engine/naturalLanguageFacts'
+import { evaluateDependent } from '../engine/dependentsEngine'
 import type { BenefitSnapshot } from '../data/types'
 
 /** Role preference only — never store tax demo payloads in localStorage */
@@ -179,8 +180,13 @@ function toSnapshot(profile: TaxpayerProfile, reason?: string): BenefitSnapshot 
     findings: report.findings,
     formLines: report.formLines,
     lastRunAt: new Date().toISOString(),
-    lastChangeNote,
+    lastChangeNote: report.refundIncomplete
+      ? `${report.refundIncompleteReason} ${lastChangeNote}`
+      : lastChangeNote,
     lastApplications,
+    dependentInfoComplete: report.dependentInfoComplete,
+    refundIncomplete: report.refundIncomplete,
+    refundIncompleteReason: report.refundIncompleteReason,
   }
 }
 
@@ -685,10 +691,25 @@ export const actions = {
       at: new Date().toISOString(),
     }
 
-    const filingKeys = ['married_dec31', 'married_filing_plan', 'has_qualifying_person', 'maintained_home']
+    const filingKeys = [
+      'married_dec31',
+      'married_filing_plan',
+      'has_qualifying_person',
+      'maintained_home',
+      'potential_dependents',
+      'dependent_count',
+    ]
     let taxProfile: TaxpayerProfile
     if (filingKeys.includes(mapsTo)) {
-      taxProfile = applyFilingStatusAnswer(state.taxProfile, mapsTo, strVal)
+      const normalized =
+        mapsTo === 'potential_dependents'
+          ? strVal === 'Yes' || strVal === 'yes'
+            ? 'yes'
+            : strVal === 'No' || strVal === 'no'
+              ? 'no'
+              : strVal
+          : strVal
+      taxProfile = applyFilingStatusAnswer(state.taxProfile, mapsTo, String(normalized))
     } else {
       const normalized =
         strVal === 'Yes' || strVal === 'yes' ? 'yes' : strVal === 'No' || strVal === 'no' ? 'no' : value
@@ -935,6 +956,45 @@ export const actions = {
       benefitReport.lastChangeNote ??
         `Tax Benefit Optimization rerun complete (${benefitReport.ruleVersion}).`,
     )
+  },
+  answerDependentQuestion(mapsTo: string, value: string | number | boolean, prompt?: string) {
+    const display =
+      value === true || value === 'yes' || value === 'Yes'
+        ? 'Yes'
+        : value === false || value === 'no' || value === 'No'
+          ? 'No'
+          : value
+    let taxProfile = applyAnswer(state.taxProfile, mapsTo, value)
+    // Mark ID docs as verifying TINs when uploaded (never display full SSN)
+    const hasId = state.documents.some(
+      (d) => d.type === 'ID' && (d.status === 'extracted' || d.status === 'verified' || d.status === 'needs_review'),
+    )
+    if (hasId) {
+      taxProfile = {
+        ...taxProfile,
+        dependents: taxProfile.dependents.map((d) => {
+          const tinStatus =
+            d.tinStatus === 'provided' || (d.tinLast4 && d.tinLast4.length === 4) ? 'verified' : d.tinStatus
+          return evaluateDependent({ ...d, tinStatus }, taxProfile.taxYear)
+        }),
+      }
+    }
+    const benefitReport = toSnapshot(
+      taxProfile,
+      `Dependent information updated (“${String(display)}”). Return recalculated.`,
+    )
+    state = {
+      ...state,
+      taxProfile,
+      benefitReport,
+      benefitReviewSigned: false,
+      returns: syncReturnRefund(benefitReport),
+      interviewAnswers: recordInterviewAnswer(mapsTo, prompt ?? mapsTo, display as string | number),
+      auditEvents: appendAudit('dependent_answer', `Updated dependent fact ${mapsTo} (sensitive values omitted).`, {
+        mapsTo,
+      }),
+    }
+    emit()
   },
   answerBenefitQuestion(mapsTo: string, value: string | number | boolean, prompt?: string) {
     const display =
