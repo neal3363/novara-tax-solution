@@ -31,7 +31,67 @@ import type { BenefitSnapshot } from '../data/types'
 /** Role preference only — never store tax demo payloads in localStorage */
 const ROLE_KEY = 'novara-tax-os-role'
 /** Session-scoped demo state (clears when the tab closes) */
-const SESSION_KEY = 'novara-tax-os-session-v4'
+const SESSION_KEY = 'novara-tax-os-session-v5'
+
+function recordInterviewAnswer(mapsTo: string, prompt: string, answer: string | number) {
+  const existing = state.interviewAnswers.filter((a) => a.mapsTo !== mapsTo)
+  return [
+    ...existing,
+    {
+      id: uid(`ans-${mapsTo}`),
+      mapsTo,
+      prompt,
+      answer,
+      at: new Date().toISOString(),
+    },
+  ]
+}
+
+/** Clear a confirmed answer and later-dependent answers so the question can be re-asked. */
+function clearAnswerTree(mapsTo: string) {
+  const idx = state.interviewAnswers.findIndex((a) => a.mapsTo === mapsTo)
+  const keep = idx >= 0 ? state.interviewAnswers.slice(0, idx) : state.interviewAnswers.filter((a) => a.mapsTo !== mapsTo)
+  const removed = new Set(
+    idx >= 0
+      ? state.interviewAnswers.slice(idx).map((a) => a.mapsTo)
+      : [mapsTo],
+  )
+
+  const answers = { ...state.taxProfile.answers }
+  removed.forEach((key) => {
+    delete answers[key]
+  })
+
+  // Side-effect fields that were seeded from interview answers
+  let dependents = state.taxProfile.dependents
+  if (removed.has('has_qualifying_person') || removed.has('has_dependents') || removed.has('has_child')) {
+    if (!answers.has_dependents && !answers.has_qualifying_person) {
+      dependents = []
+    }
+  }
+
+  let childcarePaid = state.taxProfile.childcarePaid
+  if (removed.has('paid_childcare') || removed.has('childcare_amount')) {
+    childcarePaid = 0
+  }
+
+  let filingStatus = state.taxProfile.filingStatus
+  if (removed.has('married_dec31') || removed.has('married_filing_plan') || removed.has('maintained_home')) {
+    filingStatus = 'single'
+  }
+
+  return {
+    interviewAnswers: keep,
+    taxProfile: {
+      ...state.taxProfile,
+      answers,
+      dependents,
+      childcarePaid,
+      filingStatus,
+      unresolvedKeys: state.taxProfile.unresolvedKeys.filter((k) => !removed.has(k)),
+    },
+  }
+}
 
 function toSnapshot(profile: TaxpayerProfile): BenefitSnapshot {
   const report = runBenefitOptimization(profile)
@@ -188,6 +248,7 @@ let state: Store = {
       at: new Date().toISOString(),
     },
   ],
+  interviewAnswers: [],
   hydrated: false,
 }
 
@@ -220,6 +281,7 @@ function hydrate() {
     localStorage.removeItem('novara-tax-os-v1')
     sessionStorage.removeItem('novara-tax-os-session-v2')
     sessionStorage.removeItem('novara-tax-os-session-v3')
+    sessionStorage.removeItem('novara-tax-os-session-v4')
 
     const role = localStorage.getItem(ROLE_KEY) as Role | null
     const sessionRaw = sessionStorage.getItem(SESSION_KEY)
@@ -234,6 +296,7 @@ function hydrate() {
         benefitReport,
         benefitReviewSigned: parsed.benefitReviewSigned ?? false,
         interviewChat: parsed.interviewChat?.length ? parsed.interviewChat : state.interviewChat,
+        interviewAnswers: parsed.interviewAnswers ?? [],
         currentUser: role ? (DEMO_USERS.find((u) => u.role === role) ?? null) : null,
         hydrated: true,
       }
@@ -499,7 +562,7 @@ export const actions = {
     }
     emit()
   },
-  confirmExtractionsDetails() {
+  confirmExtracedDetails() {
     const taxProfile = syncProfileFromDocuments(state.taxProfile, state.documents)
     const benefitReport = toSnapshot(taxProfile)
     const filing = nextFilingStatusTurn(taxProfile)
@@ -520,9 +583,14 @@ export const actions = {
     }
     emit()
   },
-  answerSmartInterview(mapsTo: string, value: string | number) {
+  answerSmartInterview(mapsTo: string, value: string | number, prompt?: string) {
     const strVal = String(value)
-    const userMsg = { id: uid('iv'), role: 'user' as const, text: strVal, at: new Date().toISOString() }
+    const userMsg = {
+      id: uid('iv'),
+      role: 'user' as const,
+      text: `Confirmed answer: ${strVal}`,
+      at: new Date().toISOString(),
+    }
 
     const filingKeys = ['married_dec31', 'married_filing_plan', 'has_qualifying_person', 'maintained_home']
     let taxProfile: TaxpayerProfile
@@ -533,6 +601,8 @@ export const actions = {
         strVal === 'Yes' || strVal === 'yes' ? 'yes' : strVal === 'No' || strVal === 'no' ? 'no' : value
       taxProfile = applyAnswer(state.taxProfile, mapsTo, normalized)
     }
+
+    const questionPrompt = prompt ?? state.interviewAnswers.find((a) => a.mapsTo === mapsTo)?.prompt ?? mapsTo
 
     const reply = conversationalReply(mapsTo, strVal, taxProfile)
     const benefitReport = toSnapshot(taxProfile)
@@ -582,13 +652,38 @@ export const actions = {
       benefitReviewSigned: false,
       returns: syncReturnRefund(benefitReport),
       interviewChat: [...state.interviewChat, userMsg, ...assistantMsgs],
+      interviewAnswers: recordInterviewAnswer(mapsTo, questionPrompt, value),
       prepStep: filingNext || benefitNext ? 2 : state.prepStep,
     }
     emit()
 
-    if (!filingNext && !benefitNext) {
-      actions.completeSmartInterview()
+    // Do not auto-jump past interview — taxpayer presses Calculate when ready
+  },
+  editInterviewAnswer(mapsTo: string) {
+    const cleared = clearAnswerTree(mapsTo)
+    const benefitReport = toSnapshot(cleared.taxProfile)
+    const filingNext = nextFilingStatusTurn(cleared.taxProfile)
+    const benefitNext = filingNext ? null : nextBenefitDiscoveryTurn(cleared.taxProfile)
+    const reopen = filingNext ?? benefitNext
+    const chat = {
+      id: uid('iv'),
+      role: 'assistant' as const,
+      text: reopen
+        ? `Let’s update that answer. ${reopen.prompt}`
+        : 'Answer cleared. Continue when you are ready.',
+      at: new Date().toISOString(),
     }
+    const inPrepareInterview = state.prepStep === 2 || state.prepStep === 3 || state.prepStep === 4
+    state = {
+      ...state,
+      ...cleared,
+      benefitReport,
+      benefitReviewSigned: false,
+      returns: syncReturnRefund(benefitReport),
+      prepStep: inPrepareInterview ? 2 : state.prepStep,
+      interviewChat: [...state.interviewChat, chat],
+    }
+    emit()
   },
   completeSmartInterview() {
     const benefitReport = toSnapshot(state.taxProfile)
@@ -737,19 +832,27 @@ export const actions = {
       `Tax Benefit Optimization rerun complete (${benefitReport.ruleVersion}). Verified savings ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(benefitReport.verifiedSavings)}; potential ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(benefitReport.potentialSavings)}.`,
     )
   },
-  answerBenefitQuestion(mapsTo: string, value: string | number | boolean) {
+  answerBenefitQuestion(mapsTo: string, value: string | number | boolean, prompt?: string) {
+    const display =
+      value === true || value === 'yes' || value === 'Yes'
+        ? 'Yes'
+        : value === false || value === 'no' || value === 'No'
+          ? 'No'
+          : value
     const taxProfile = applyAnswer(state.taxProfile, mapsTo, value)
     const benefitReport = toSnapshot(taxProfile)
+    const questionPrompt = prompt ?? mapsTo
     state = {
       ...state,
       taxProfile,
       benefitReport,
       benefitReviewSigned: false,
       returns: syncReturnRefund(benefitReport),
+      interviewAnswers: recordInterviewAnswer(mapsTo, questionPrompt, display as string | number),
     }
     emit()
   },
-  markBenefitUnresolved(mapsTo: string) {
+  markBenefitUnresolved(mapsTo: string, prompt?: string) {
     const taxProfile = {
       ...state.taxProfile,
       answers: { ...state.taxProfile.answers, [mapsTo]: 'unresolved' },
@@ -768,14 +871,14 @@ export const actions = {
       taxProfile,
       benefitReport,
       benefitReviewSigned: false,
+      interviewAnswers: recordInterviewAnswer(mapsTo, prompt ?? mapsTo, 'Unresolved'),
       interviewChat: [
         ...state.interviewChat,
-        { id: uid('iv'), role: 'user', text: 'Skip / unresolved', at: new Date().toISOString() },
+        { id: uid('iv'), role: 'user', text: 'Confirmed answer: Unresolved', at: new Date().toISOString() },
         { id: uid('iv'), role: 'assistant', text: follow, at: new Date().toISOString() },
       ],
     }
     emit()
-    if (!filingNext && !benefitNext && state.prepStep === 2) actions.completeSmartInterview()
   },
   verifyBenefit(ruleId: string) {
     const taxProfile = {
@@ -874,6 +977,7 @@ export const actions = {
           at: new Date().toISOString(),
         },
       ],
+      interviewAnswers: [],
       hydrated: true,
     }
     emit()

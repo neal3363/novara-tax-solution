@@ -1,16 +1,48 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { formatMoney } from '../../data/fees'
 import { nextInterviewQuestions, runBenefitOptimization } from '../../engine/benefitOptimizer'
 import { RefundTracker } from '../../components/benefits/RefundTracker'
+import { AnswerHistory, InterviewChoice } from '../../components/interview/InterviewChoice'
 import { actions, useAppStore } from '../../store/useAppStore'
 import '../shared.css'
 import './Benefits.css'
 
 export function BenefitInterview() {
-  const { taxProfile, benefitReport, currentUser } = useAppStore()
+  const { taxProfile, benefitReport, currentUser, interviewAnswers } = useAppStore()
   const live = runBenefitOptimization(taxProfile)
   const questions = nextInterviewQuestions(taxProfile, live)
+  const active = questions[0] ?? null
   const dashPath = currentUser?.role === 'preparer' ? '/app/preparer/benefits' : '/app/taxpayer/benefits'
+  const [saving, setSaving] = useState(false)
+
+  async function confirm(value: string | number) {
+    if (!active || saving) return
+    setSaving(true)
+    try {
+      const normalized =
+        typeof value === 'string' && value.toLowerCase() === 'yes'
+          ? 'yes'
+          : typeof value === 'string' && value.toLowerCase() === 'no'
+            ? 'no'
+            : value
+      actions.answerBenefitQuestion(active.mapsTo, normalized, active.prompt)
+      await new Promise((r) => setTimeout(r, 160))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function skip() {
+    if (!active || saving) return
+    setSaving(true)
+    try {
+      actions.markBenefitUnresolved(active.mapsTo, active.prompt)
+      await new Promise((r) => setTimeout(r, 160))
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <div className="page container">
@@ -27,13 +59,34 @@ export function BenefitInterview() {
       <RefundTracker report={benefitReport} />
 
       <section className="list-panel panel" style={{ marginTop: '1rem' }}>
-        <h2>Dynamic questions</h2>
+        <h2>One question at a time</h2>
         <p className="muted" style={{ marginTop: 0 }}>
-          Based on your answers, NOVARA asks only relevant follow-ups — for example childcare details after dependents are
-          disclosed — then recalculates the refund opportunity.
+          Tap YES or NO to select, confirm Your answer, then press Continue. Double taps do not submit. Use Change Answer
+          anytime before or after saving.
         </p>
 
-        {questions.length === 0 ? (
+        {active ? (
+          <div className="question panel">
+            <InterviewChoice
+              key={active.id}
+              questionId={active.id}
+              prompt={active.prompt}
+              kind={active.kind === 'yesno' ? 'yesno' : active.kind}
+              choices={
+                active.kind === 'yesno'
+                  ? ['Yes', 'No']
+                  : active.choices
+              }
+              saving={saving}
+              secondaryLabel="Mark unresolved"
+              onSecondary={() => void skip()}
+              onConfirm={(value) => confirm(value)}
+            />
+            <span className="row-meta" style={{ display: 'block', marginTop: '0.75rem' }}>
+              Affects: {active.benefitIds.join(', ')} · {questions.length} open prompt{questions.length === 1 ? '' : 's'}
+            </span>
+          </div>
+        ) : (
           <div className="callout-success">
             <strong>No open interview prompts.</strong>
             <p className="muted">Run Find More Tax Savings or proceed to mandatory final review.</p>
@@ -41,48 +94,9 @@ export function BenefitInterview() {
               Open discovery dashboard
             </Link>
           </div>
-        ) : (
-          <div className="question-list">
-            {questions.map((q) => (
-              <div className="question panel" key={q.id}>
-                <p>{q.prompt}</p>
-                <div className="answer-row">
-                  {q.kind === 'yesno' &&
-                    ['yes', 'no'].map((a) => (
-                      <button
-                        key={a}
-                        type="button"
-                        className="btn btn-secondary"
-                        onClick={() => actions.answerBenefitQuestion(q.mapsTo, a)}
-                      >
-                        {a === 'yes' ? 'Yes' : 'No'}
-                      </button>
-                    ))}
-                  {q.kind === 'number' && (
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={() => {
-                        const raw = window.prompt('Enter amount (USD)', '2400')
-                        if (raw != null) actions.answerBenefitQuestion(q.mapsTo, Number(raw) || 0)
-                      }}
-                    >
-                      Enter amount
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className="btn btn-ghost"
-                    onClick={() => actions.markBenefitUnresolved(q.mapsTo)}
-                  >
-                    Mark unresolved
-                  </button>
-                </div>
-                <span className="row-meta">Affects: {q.benefitIds.join(', ')}</span>
-              </div>
-            ))}
-          </div>
         )}
+
+        <AnswerHistory items={interviewAnswers} onEdit={(mapsTo) => actions.editInterviewAnswer(mapsTo)} />
       </section>
 
       <section className="list-panel panel" style={{ marginTop: '1rem' }}>
