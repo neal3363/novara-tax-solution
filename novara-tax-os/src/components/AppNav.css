@@ -1,0 +1,134 @@
+.top-nav {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  backdrop-filter: blur(16px);
+  background: rgba(247, 251, 250, 0.82);
+  border-bottom: 1px solid var(--line);
+}
+
+.top-nav-inner {
+  width: min(1180px, calc(100% - 1.25rem));
+  margin: 0 auto;
+  min-height: var(--nav-h);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.top-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.top-brand strong {
+  display: block;
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.top-brand span {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.top-links {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.top-links a {
+  padding: 0.55rem 0.85rem;
+  border-radius: 999px;
+  color: var(--slate);
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+.top-links a.active,
+.bottom-nav a.active {
+  background: rgba(15, 118, 110, 0.12);
+  color: var(--ink);
+}
+
+.top-user {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.user-chip {
+  display: none;
+  text-align: right;
+  line-height: 1.15;
+}
+
+.user-name {
+  display: block;
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+
+.user-role {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-transform: capitalize;
+}
+
+.bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.25rem;
+  padding: 0.55rem 0.5rem calc(0.55rem + var(--safe-bottom));
+  background: rgba(255, 255, 255, 0.92);
+  border-top: 1px solid var(--line);
+  backdrop-filter: blur(16px);
+}
+
+.bottom-nav a {
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted);
+  padding: 0.55rem 0.2rem;
+  border-radius: 12px;
+}
+
+.desktop-only {
+  display: none;
+}
+
+.mobile-only {
+  display: grid;
+}
+
+.app-main {
+  flex: 1;
+  padding-bottom: calc(5.5rem + var(--safe-bottom));
+}
+
+@media (min-width: 900px) {
+  .desktop-only {
+    display: flex;
+  }
+
+  .mobile-only {
+    display: none;
+  }
+
+  .user-chip {
+    display: block;
+  }
+
+  .app-main {
+    padding-bottom: 2rem;
+  }
+}

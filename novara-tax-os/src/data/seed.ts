@@ -1,0 +1,163 @@
+import type { DocumentRecord, TaxReturn, UserAccount } from './types'
+
+export const DEMO_USERS: UserAccount[] = [
+  {
+    id: 'u-tax',
+    name: 'Jordan Blake',
+    email: 'jordan@example.com',
+    role: 'taxpayer',
+    tenantId: 'tenant-novara-direct',
+  },
+  {
+    id: 'u-prep',
+    name: 'Alex Rivera',
+    email: 'alex@summit-tax.office',
+    role: 'preparer',
+    tenantId: 'tenant-summit',
+    ptin: 'P12345678',
+  },
+  {
+    id: 'u-owner',
+    name: 'Morgan Lee',
+    email: 'morgan@summit-tax.office',
+    role: 'efin_owner',
+    tenantId: 'tenant-summit',
+  },
+  {
+    id: 'u-admin',
+    name: 'Nova Ops',
+    email: 'ops@novara.tax',
+    role: 'admin',
+    tenantId: 'platform',
+  },
+]
+
+export const SEED_RETURNS: TaxReturn[] = [
+  {
+    id: 'r-1001',
+    clientName: 'Jordan Blake',
+    clientId: 'u-tax',
+    taxYear: 2025,
+    returnType: '1040',
+    state: 'Documents Pending',
+    readiness: 42,
+    refundOrOwe: 0,
+    preparerId: 'u-prep',
+    isBusiness: false,
+    feeSnapshot: [{ label: 'Consumer basic W-2', amount: 149, status: 'provisional' }],
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'r-1002',
+    clientName: 'Casey Nguyen',
+    clientId: 'c-casey',
+    taxYear: 2025,
+    returnType: '1040_Schedule_C',
+    state: 'Preparer Review',
+    readiness: 88,
+    refundOrOwe: 2140,
+    preparerId: 'u-prep',
+    isBusiness: false,
+    feeSnapshot: [{ label: 'TP personal return', amount: 89.99, status: 'approved' }],
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'r-1003',
+    clientName: 'Harbor Craft LLC',
+    clientId: 'c-harbor',
+    taxYear: 2025,
+    returnType: '1120-S',
+    state: 'Extraction/Verification',
+    readiness: 61,
+    refundOrOwe: 0,
+    preparerId: 'u-prep',
+    isBusiness: true,
+    feeSnapshot: [{ label: 'TP business return', amount: 239.98, status: 'approved' }],
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'r-1004',
+    clientName: 'Sam Ortiz',
+    clientId: 'c-sam',
+    taxYear: 2025,
+    returnType: '1040',
+    state: 'Signature Pending',
+    readiness: 96,
+    refundOrOwe: -480,
+    preparerId: 'u-prep',
+    isBusiness: false,
+    feeSnapshot: [{ label: 'TP personal return', amount: 89.99, status: 'approved' }],
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'r-1005',
+    clientName: 'Riley Chen',
+    clientId: 'c-riley',
+    taxYear: 2024,
+    returnType: '1040',
+    state: 'Accepted',
+    readiness: 100,
+    refundOrOwe: 1785,
+    preparerId: 'u-prep',
+    isBusiness: false,
+    feeSnapshot: [{ label: 'TP personal return', amount: 89.99, status: 'approved' }],
+    updatedAt: new Date(Date.now() - 86400000 * 40).toISOString(),
+  },
+]
+
+export const SEED_DOCS: DocumentRecord[] = [
+  {
+    id: 'd-1',
+    name: 'W2_Acme_2025.pdf',
+    type: 'W-2',
+    taxYear: 2025,
+    sizeLabel: '240 KB',
+    uploadedAt: new Date().toISOString(),
+    status: 'extracted',
+    confidence: 0.97,
+    ownerId: 'u-tax',
+    facts: [
+      { id: 'f1', label: 'Employer', value: 'Acme Logistics Inc.', sourcePage: 1, confidence: 0.99, verified: true },
+      { id: 'f2', label: 'Wages (Box 1)', value: '$72,400.00', sourcePage: 1, confidence: 0.98, verified: true },
+      { id: 'f3', label: 'Federal withheld', value: '$8,920.00', sourcePage: 1, confidence: 0.97, verified: false },
+    ],
+  },
+  {
+    id: 'd-2',
+    name: '1099NEC_Studio.pdf',
+    type: '1099-NEC',
+    taxYear: 2025,
+    sizeLabel: '188 KB',
+    uploadedAt: new Date(Date.now() - 3600000).toISOString(),
+    status: 'needs_review',
+    confidence: 0.81,
+    ownerId: 'u-tax',
+    facts: [
+      { id: 'f4', label: 'Payer', value: 'Northlight Studio', sourcePage: 1, confidence: 0.9, verified: false },
+      { id: 'f5', label: 'Nonemployee compensation', value: '$4,250.00', sourcePage: 1, confidence: 0.81, verified: false },
+    ],
+  },
+]
+
+export const SMART_QUESTIONS = [
+  {
+    id: 'q1',
+    prompt: 'Did you move to a different state during 2025?',
+  },
+  {
+    id: 'q2',
+    prompt: 'Do you want to contribute to an IRA or retirement account for this tax year?',
+  },
+  {
+    id: 'q3',
+    prompt: 'Did anyone claim you as a dependent on their return?',
+  },
+  {
+    id: 'q4',
+    prompt: 'Did you pay for childcare or dependent care so you could work?',
+  },
+  {
+    id: 'q5',
+    prompt: 'Last year you had a 1099-INT from First Harbor Bank. Did that account close?',
+  },
+]

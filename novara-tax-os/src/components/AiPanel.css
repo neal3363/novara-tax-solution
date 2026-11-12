@@ -1,0 +1,112 @@
+.ai-panel {
+  padding: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  min-height: 420px;
+}
+
+.ai-panel.compact {
+  min-height: 360px;
+}
+
+.ai-panel header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.ai-panel .eyebrow {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--teal);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.ai-panel h2 {
+  margin: 0.25rem 0 0;
+  font-size: 1.2rem;
+}
+
+.ai-thread {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  max-height: 320px;
+  padding-right: 0.25rem;
+}
+
+.bubble {
+  max-width: 92%;
+  padding: 0.8rem 0.95rem;
+  border-radius: 16px;
+  animation: rise-in 0.35s ease both;
+}
+
+.bubble p {
+  margin: 0;
+  line-height: 1.45;
+  font-size: 0.94rem;
+}
+
+.bubble.assistant,
+.bubble.system {
+  align-self: flex-start;
+  background: linear-gradient(180deg, rgba(238, 246, 244, 0.95), rgba(213, 232, 228, 0.75));
+  border: 1px solid var(--line);
+}
+
+.bubble.user {
+  align-self: flex-end;
+  background: var(--ink);
+  color: white;
+}
+
+.bubble.system {
+  border-style: dashed;
+}
+
+.ai-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.chip {
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 999px;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--slate);
+}
+
+.chip:hover {
+  border-color: rgba(15, 118, 110, 0.4);
+  color: var(--ink);
+}
+
+.ai-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.55rem;
+}
+
+.ai-form input {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.8rem 1rem;
+  background: white;
+}
+
+.ai-disclaimer {
+  margin: 0;
+  font-size: 0.78rem;
+}
