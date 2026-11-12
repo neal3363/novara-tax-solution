@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { CATEGORY_LABELS, STATUS_LABELS, type BenefitCategory } from '../../data/benefitsCatalog'
 import { formatMoney } from '../../data/fees'
 import { nextInterviewQuestions, runBenefitOptimization } from '../../engine/benefitOptimizer'
+import { AppliedBenefitBanner } from '../../components/benefits/AppliedBenefitBanner'
 import { RefundTracker } from '../../components/benefits/RefundTracker'
 import { actions, useAppStore } from '../../store/useAppStore'
 import '../shared.css'
@@ -9,12 +10,29 @@ import './Benefits.css'
 
 function statusBadge(status: string) {
   if (status === 'applied') return 'badge-ok'
+  if (status === 'pending_verification') return 'badge-warn'
   if (status === 'needs_info' || status === 'flagged_review') return 'badge-warn'
   return 'badge-neutral'
 }
 
+function docLabel(docStatus?: string) {
+  if (docStatus === 'on_file') return 'Documentation on file'
+  if (docStatus === 'optional_later') return 'Receipt not yet uploaded (optional for now)'
+  if (docStatus === 'requested') return 'More information or documents needed'
+  return 'Documentation not required'
+}
+
 export function BenefitDashboard() {
-  const { benefitReport, taxProfile, benefitReviewSigned, currentUser, auditEvents, uploadIssues } = useAppStore()
+  const {
+    benefitReport,
+    taxProfile,
+    benefitReviewSigned,
+    currentUser,
+    auditEvents,
+    uploadIssues,
+    returns,
+    activeReturnId,
+  } = useAppStore()
   const report = benefitReport
   const live = runBenefitOptimization(taxProfile)
   const questions = nextInterviewQuestions(taxProfile, live)
@@ -23,21 +41,25 @@ export function BenefitDashboard() {
   const reviewPath = isPreparer ? '/app/preparer/benefits/review' : '/app/taxpayer/benefits/review'
   const vaultPath = isPreparer ? '/app/preparer/clients' : '/app/taxpayer/vault'
   const preparePath = isPreparer ? '/app/preparer/return' : '/app/taxpayer/prepare'
+  const mine =
+    returns.find((r) => r.clientId === currentUser?.id && r.taxYear === 2025) ??
+    returns.find((r) => r.id === activeReturnId)
 
-  const actionable =
-    report?.findings.filter((f) => f.status !== 'ineligible').slice(0, 12) ??
-    live.findings.filter((f) => f.status !== 'ineligible').slice(0, 12)
+  const findings = report?.findings ?? live.findings
+  const applied = findings.filter((f) => f.status === 'applied' || f.status === 'pending_verification')
+  const needsInfo = findings.filter((f) => f.status === 'needs_info' || f.status === 'flagged_review')
+  const formLines = report?.formLines?.length ? report.formLines : mine?.appliedBenefits ?? []
 
   return (
     <div className="page container">
       <header className="page-header">
         <div>
-          <p className="eyebrow">Upload → Answer → Review → Approve</p>
+          <p className="eyebrow">Answer or upload → Apply → Recalculate</p>
           <h1>Tax Savings</h1>
         </div>
         <div className="benefit-actions">
           <button className="btn btn-secondary" type="button" onClick={() => actions.runBenefitScan()}>
-            Recheck my savings
+            Recalculate return
           </button>
           <Link className="btn btn-primary" to={interviewPath}>
             Answer questions
@@ -45,12 +67,101 @@ export function BenefitDashboard() {
         </div>
       </header>
 
-      <p className="muted" style={{ marginTop: '-0.35rem', maxWidth: '42rem' }}>
-        NOVARA looks for every legally available credit and deduction supported by your documents and answers. Verified
-        amounts update your refund estimate; possible savings stay separate until confirmed.
+      <p className="muted" style={{ marginTop: '-0.35rem', maxWidth: '44rem' }}>
+        When you answer or upload, NOVARA calculates allowable credits and deductions and applies them to your working
+        return automatically. Supporting documents can be added later when needed for filing.
       </p>
 
       <RefundTracker report={report} />
+      <AppliedBenefitBanner events={report?.lastApplications} returnPath={preparePath} />
+
+      <section style={{ marginTop: '1.25rem' }}>
+        <h2 className="savings-section-title">Applied benefits</h2>
+        <p className="muted" style={{ marginTop: 0 }}>
+          These amounts are on your working return and refund projection now.
+        </p>
+        {applied.length === 0 ? (
+          <p className="muted">No benefits applied yet — answer a few questions or upload documents.</p>
+        ) : (
+          <div className="savings-card-grid">
+            {applied.map((f) => (
+              <article className="savings-card applied" key={f.ruleId}>
+                <div className="savings-card-top">
+                  <h3>{f.shortName || f.name}</h3>
+                  <span className={`badge ${statusBadge(f.status)}`}>
+                    {STATUS_LABELS[f.status] ?? f.status.replace(/_/g, ' ')}
+                  </span>
+                </div>
+                <p className="savings-card-body">{f.explanation}</p>
+                <p className="savings-card-meta">
+                  Allowable credit: {formatMoney(f.affectingRefund ?? f.estimatedSavings)}
+                  {(f.affectingRefund ?? 0) > 0 ? ` · Affecting refund: ${formatMoney(f.affectingRefund ?? 0)}` : ''}
+                </p>
+                <p className="savings-card-meta">
+                  {f.form ? `${f.form} · ${f.field}` : CATEGORY_LABELS[f.category as BenefitCategory]}
+                </p>
+                <p className="savings-card-meta">{docLabel(f.docStatus)}</p>
+                <div className="savings-card-actions">
+                  <Link className="btn btn-secondary" to={vaultPath}>
+                    Upload supporting document
+                  </Link>
+                  <Link className="btn btn-ghost" to={preparePath}>
+                    View return
+                  </Link>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {formLines.length > 0 && (
+        <section className="list-panel panel" style={{ marginTop: '1.25rem' }}>
+          <h2>Tax form entries</h2>
+          {formLines.map((line) => (
+            <div className="row-item" key={line.id}>
+              <div>
+                <strong>
+                  {line.form} · {line.field}
+                </strong>
+                <span className="row-meta">
+                  {line.name} · {line.status.replace(/_/g, ' ')} · {docLabel(line.docStatus)}
+                </span>
+              </div>
+              <strong>{formatMoney(line.amount)}</strong>
+            </div>
+          ))}
+        </section>
+      )}
+
+      <section style={{ marginTop: '1.25rem' }}>
+        <h2 className="savings-section-title">More information needed</h2>
+        <p className="muted" style={{ marginTop: 0 }}>
+          Answer or upload — once eligible, benefits apply automatically.
+        </p>
+        <div className="savings-card-grid">
+          {needsInfo.map((f) => (
+            <article className="savings-card" key={f.ruleId}>
+              <div className="savings-card-top">
+                <h3>{f.shortName || f.name}</h3>
+                <span className={`badge ${statusBadge(f.status)}`}>
+                  {STATUS_LABELS[f.status] ?? f.status.replace(/_/g, ' ')}
+                </span>
+              </div>
+              <p className="savings-card-body">{f.explanation}</p>
+              <div className="savings-card-actions">
+                <Link className="btn btn-primary" to={interviewPath}>
+                  Answer questions
+                </Link>
+                <Link className="btn btn-secondary" to={vaultPath}>
+                  Upload document
+                </Link>
+              </div>
+            </article>
+          ))}
+          {needsInfo.length === 0 && <p className="muted">No open eligibility questions.</p>}
+        </div>
+      </section>
 
       {uploadIssues.length > 0 && (
         <section className="list-panel panel" style={{ marginTop: '1rem' }}>
@@ -67,50 +178,11 @@ export function BenefitDashboard() {
         </section>
       )}
 
-      <section style={{ marginTop: '1.25rem' }}>
-        <h2 className="savings-section-title">Benefits to review</h2>
-        <p className="muted" style={{ marginTop: 0 }}>
-          Each card has a clear next step. Nothing is claimed until you verify it.
-        </p>
-        <div className="savings-card-grid">
-          {actionable.map((f) => (
-            <article className="savings-card" key={f.ruleId}>
-              <div className="savings-card-top">
-                <h3>{f.shortName || f.name}</h3>
-                <span className={`badge ${statusBadge(f.status)}`}>
-                  {STATUS_LABELS[f.status] ?? f.status.replace(/_/g, ' ')}
-                </span>
-              </div>
-              <p className="savings-card-body">{f.explanation}</p>
-              <p className="savings-card-meta">
-                {CATEGORY_LABELS[f.category as BenefitCategory] ?? f.category}
-                {f.estimatedSavings > 0 ? ` · up to ${formatMoney(f.estimatedSavings)}` : ''}
-              </p>
-              <div className="savings-card-actions">
-                <Link
-                  className="btn btn-primary"
-                  to={interviewPath}
-                  onClick={() => actions.startBenefitCheck(f.ruleId)}
-                >
-                  Check if I qualify
-                </Link>
-                <Link className="btn btn-secondary" to={vaultPath}>
-                  Upload document
-                </Link>
-                <Link className="btn btn-ghost" to={interviewPath}>
-                  Answer questions
-                </Link>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
       <div className="grid-2" style={{ marginTop: '1.25rem' }}>
         <section className="list-panel panel">
           <h2>Next questions</h2>
           {questions.length === 0 ? (
-            <p className="muted">No open questions — upload more documents or continue to review.</p>
+            <p className="muted">No open questions.</p>
           ) : (
             questions.slice(0, 4).map((q) => (
               <div className="row-item" key={q.id}>
@@ -129,21 +201,15 @@ export function BenefitDashboard() {
                   ? 'Signed — filing gate unlocked'
                   : report?.auditComplete
                     ? 'Ready for approval'
-                    : `${report?.blockers.length ?? questions.length} items still open`}
+                    : `${report?.blockers.length ?? questions.length} items still open before e-file`}
               </span>
             </div>
             <Link to={reviewPath}>Review</Link>
           </div>
-          <Link className="btn btn-secondary" to={preparePath} style={{ marginTop: '0.75rem' }}>
-            Back to prepare workflow
-          </Link>
         </section>
 
         <section className="list-panel panel">
           <h2>Activity (safe audit trail)</h2>
-          <p className="muted" style={{ marginTop: 0 }}>
-            Document extraction, answers, and recalculations — without logging Social Security numbers.
-          </p>
           {auditEvents.length === 0 ? (
             <p className="muted">No events yet this session.</p>
           ) : (
@@ -164,19 +230,6 @@ export function BenefitDashboard() {
           )}
         </section>
       </div>
-
-      {report && report.comparisonNotes.length > 0 && (
-        <section className="list-panel panel" style={{ marginTop: '1rem' }}>
-          <h2>What NOVARA compared</h2>
-          {report.comparisonNotes.map((n) => (
-            <div className="row-item" key={n}>
-              <div>
-                <strong>{n}</strong>
-              </div>
-            </div>
-          ))}
-        </section>
-      )}
     </div>
   )
 }
