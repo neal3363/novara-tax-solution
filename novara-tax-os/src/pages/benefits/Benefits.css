@@ -1,0 +1,40 @@
+.benefit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.benefit-status-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.callout-success {
+  padding: 1rem;
+  border-radius: 14px;
+  background: var(--ok-soft);
+  display: grid;
+  gap: 0.45rem;
+}
+
+.checklist {
+  margin: 0 0 1rem;
+  padding-left: 1.15rem;
+  line-height: 1.55;
+  color: var(--slate);
+}
+
+.blockers {
+  margin: 0.75rem 0 1rem;
+}
+
+.blockers h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+}
+
+@media (min-width: 900px) {
+  .benefit-status-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

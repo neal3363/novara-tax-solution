@@ -1,14 +1,17 @@
 import { Link } from 'react-router-dom'
 import { actions, useAppStore } from '../../store/useAppStore'
 import { formatMoney } from '../../data/fees'
+import { RefundTracker } from '../../components/benefits/RefundTracker'
 import '../shared.css'
 
 export function PreparerHome() {
-  const { returns, entryPlanStatus, entryPlan, preEntryNotes } = useAppStore()
+  const { returns, entryPlanStatus, entryPlan, preEntryNotes, benefitReport } = useAppStore()
   const review = returns.filter((r) =>
     ['Preparer Review', 'Diagnostics', 'Extraction/Verification'].includes(r.state),
   )
   const unsigned = returns.filter((r) => r.state === 'Signature Pending')
+  const openBenefits =
+    benefitReport?.findings.filter((f) => f.status === 'needs_info' || f.status === 'eligible_unverified') ?? []
 
   return (
     <div className="page container">
@@ -17,9 +20,14 @@ export function PreparerHome() {
           <p className="eyebrow">Preparer inbox · Summit Tax Office</p>
           <h1>Returns ready for judgment</h1>
         </div>
-        <Link className="btn btn-primary" to="/app/preparer/entry-plan">
-          Review entry plan
-        </Link>
+        <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
+          <Link className="btn btn-secondary" to="/app/preparer/benefits">
+            Tax benefits
+          </Link>
+          <Link className="btn btn-primary" to="/app/preparer/return">
+            Open return
+          </Link>
+        </div>
       </header>
 
       <div className="stat-row rise">
@@ -32,8 +40,8 @@ export function PreparerHome() {
           <p className="value">{review.length}</p>
         </div>
         <div className="stat panel">
-          <p className="label">Plan lines</p>
-          <p className="value">{entryPlan.filter((l) => l.status !== 'removed').length}</p>
+          <p className="label">Benefit gaps</p>
+          <p className="value">{openBenefits.length}</p>
         </div>
         <div className="stat panel">
           <p className="label">Unsigned</p>
@@ -41,71 +49,50 @@ export function PreparerHome() {
         </div>
       </div>
 
-      <section className="list-panel panel" style={{ marginTop: '1rem' }}>
-        <h2>AI Tax Prep status</h2>
-        <p className="muted" style={{ marginTop: 0 }}>
-          Filed model: NOVARA reads documents, shows the plan, you approve, then fields are entered. Your team keeps
-          final sign-off.
-        </p>
-        <div className="row-item">
-          <div>
-            <strong>Pipeline</strong>
-            <span className="row-meta">{entryPlanStatus.replace('_', ' ')} · {preEntryNotes.length} pre-entry notes</span>
-          </div>
-          <Link to="/app/preparer/entry-plan">Open</Link>
-        </div>
-        <div className="row-item">
-          <div>
-            <strong>Binder</strong>
-            <span className="row-meta">Docs · Forms · Notes with source provenance</span>
-          </div>
-          <Link to="/app/preparer/workspace">Open</Link>
-        </div>
-        <div className="row-item">
-          <div>
-            <strong>TP personal fee</strong>
-            <span className="row-meta">Approved Addendum F</span>
-          </div>
-          <strong>{formatMoney(89.99)}</strong>
-        </div>
-      </section>
+      <div style={{ marginTop: '1rem' }}>
+        <RefundTracker report={benefitReport} />
+      </div>
 
-      <section className="list-panel panel" style={{ marginTop: '1rem' }}>
-        <h2>Client return inbox</h2>
-        <div className="table-wrap">
-          <table className="data">
-            <thead>
-              <tr>
-                <th>Client</th>
-                <th>Type</th>
-                <th>State</th>
-                <th>Ready</th>
-                <th>Fee</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {returns.map((r) => (
-                <tr key={r.id}>
-                  <td>{r.clientName}</td>
-                  <td>{r.returnType}</td>
-                  <td>{r.state}</td>
-                  <td>{r.readiness}%</td>
-                  <td>{r.feeSnapshot.map((f) => formatMoney(f.amount)).join(', ')}</td>
-                  <td>
-                    <Link
-                      to="/app/preparer/workspace"
-                      onClick={() => actions.setActiveReturn(r.id)}
-                    >
-                      Binder
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      <div className="grid-2" style={{ marginTop: '1rem' }}>
+        <section className="list-panel panel">
+          <h2>Live tax-preparation queue</h2>
+          {returns.slice(0, 5).map((r) => (
+            <div className="row-item" key={r.id}>
+              <div>
+                <strong>{r.clientName}</strong>
+                <span className="row-meta">
+                  {r.returnType} · {r.state} · {r.readiness}%
+                </span>
+              </div>
+              <Link to="/app/preparer/return" onClick={() => actions.setActiveReturn(r.id)}>
+                Open
+              </Link>
+            </div>
+          ))}
+        </section>
+        <section className="list-panel panel">
+          <h2>AI recommendations</h2>
+          {openBenefits.slice(0, 4).map((f) => (
+            <div className="row-item" key={f.ruleId}>
+              <div>
+                <strong>{f.shortName}</strong>
+                <span className="row-meta">{f.explanation}</span>
+              </div>
+              <span className="badge badge-warn">{formatMoney(f.estimatedSavings)}</span>
+            </div>
+          ))}
+          {!openBenefits.length && <p className="muted">No open benefit recommendations on the working return.</p>}
+          <div className="row-item">
+            <div>
+              <strong>Entry plan</strong>
+              <span className="row-meta">
+                {entryPlanStatus.replace('_', ' ')} · {entryPlan.length} lines · {preEntryNotes.length} notes
+              </span>
+            </div>
+            <Link to="/app/preparer/entry-plan">Open</Link>
+          </div>
+        </section>
+      </div>
     </div>
   )
 }

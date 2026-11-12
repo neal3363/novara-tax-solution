@@ -112,6 +112,31 @@ export interface PreEntryNote {
   detail: string
 }
 
+export interface BenefitSnapshot {
+  taxYear: number
+  ruleVersion: string
+  baseRefund: number
+  projectedRefund: number
+  verifiedSavings: number
+  potentialSavings: number
+  auditComplete: boolean
+  blockers: string[]
+  comparisonNotes: string[]
+  findings: {
+    ruleId: string
+    name: string
+    shortName: string
+    category: string
+    status: string
+    estimatedSavings: number
+    explanation: string
+    missingAnswers: string[]
+    missingDocs: string[]
+    ruleCitation: string
+  }[]
+  lastRunAt: string
+}
+
 export interface AppState {
   currentUser: UserAccount | null
   documents: DocumentRecord[]
@@ -125,4 +150,8 @@ export interface AppState {
   preEntryNotes: PreEntryNote[]
   activeReturnId: string | null
   binderTab: 'docs' | 'forms' | 'notes'
+  /** Working return profile for benefit engine + preparer return editor */
+  taxProfile: import('../engine/benefitOptimizer').TaxpayerProfile
+  benefitReport: BenefitSnapshot | null
+  benefitReviewSigned: boolean
 }

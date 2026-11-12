@@ -13,11 +13,48 @@ import type {
   UserAccount,
 } from '../data/types'
 import { CONSUMER_PRICES, TP_FEES } from '../data/fees'
+import {
+  applyAnswer,
+  defaultProfile,
+  runBenefitOptimization,
+  type TaxpayerProfile,
+} from '../engine/benefitOptimizer'
+import type { BenefitSnapshot } from '../data/types'
 
 /** Role preference only — never store tax demo payloads in localStorage */
 const ROLE_KEY = 'novara-tax-os-role'
 /** Session-scoped demo state (clears when the tab closes) */
-const SESSION_KEY = 'novara-tax-os-session-v2'
+const SESSION_KEY = 'novara-tax-os-session-v3'
+
+function toSnapshot(profile: TaxpayerProfile): BenefitSnapshot {
+  const report = runBenefitOptimization(profile)
+  return {
+    taxYear: report.taxYear,
+    ruleVersion: report.ruleVersion,
+    baseRefund: report.baseRefund,
+    projectedRefund: report.projectedRefund,
+    verifiedSavings: report.verifiedSavings,
+    potentialSavings: report.potentialSavings,
+    auditComplete: report.auditComplete,
+    blockers: report.blockers,
+    comparisonNotes: report.comparisonNotes,
+    findings: report.findings,
+    lastRunAt: new Date().toISOString(),
+  }
+}
+
+function syncReturnRefund(report: BenefitSnapshot) {
+  return state.returns.map((r) =>
+    r.id === state.activeReturnId || (r.clientId === (state.currentUser?.id ?? 'u-tax') && r.taxYear === 2025)
+      ? {
+          ...r,
+          refundOrOwe: report.projectedRefund,
+          readiness: report.auditComplete ? Math.max(r.readiness, 96) : Math.max(r.readiness, 55),
+          updatedAt: new Date().toISOString(),
+        }
+      : r,
+  )
+}
 
 type Store = AppState & {
   hydrated: boolean
@@ -133,6 +170,9 @@ let state: Store = {
   preEntryNotes: DEFAULT_NOTES,
   activeReturnId: SEED_RETURNS.find((r) => r.state === 'Preparer Review')?.id ?? SEED_RETURNS[0].id,
   binderTab: 'forms',
+  taxProfile: defaultProfile(),
+  benefitReport: null,
+  benefitReviewSigned: false,
   hydrated: false,
 }
 
@@ -163,26 +203,36 @@ function hydrate() {
   try {
     // Migrate away from older plaintext localStorage payload
     localStorage.removeItem('novara-tax-os-v1')
+    sessionStorage.removeItem('novara-tax-os-session-v2')
 
     const role = localStorage.getItem(ROLE_KEY) as Role | null
     const sessionRaw = sessionStorage.getItem(SESSION_KEY)
     if (sessionRaw) {
       const parsed = JSON.parse(sessionRaw) as Omit<AppState, 'currentUser'>
+      const taxProfile = parsed.taxProfile ?? defaultProfile()
+      const benefitReport = parsed.benefitReport ?? toSnapshot(taxProfile)
       state = {
         ...state,
         ...parsed,
+        taxProfile,
+        benefitReport,
+        benefitReviewSigned: parsed.benefitReviewSigned ?? false,
         currentUser: role ? (DEMO_USERS.find((u) => u.role === role) ?? null) : null,
         hydrated: true,
       }
     } else {
+      const taxProfile = defaultProfile()
       state = {
         ...state,
+        taxProfile,
+        benefitReport: toSnapshot(taxProfile),
         currentUser: role ? (DEMO_USERS.find((u) => u.role === role) ?? null) : null,
         hydrated: true,
       }
     }
   } catch {
-    state = { ...state, hydrated: true }
+    const taxProfile = defaultProfile()
+    state = { ...state, taxProfile, benefitReport: toSnapshot(taxProfile), hydrated: true }
   }
   emit()
 }
@@ -506,9 +556,108 @@ export const actions = {
     }
     emit()
   },
+  runBenefitScan() {
+    const benefitReport = toSnapshot(state.taxProfile)
+    state = {
+      ...state,
+      benefitReport,
+      benefitReviewSigned: false,
+      returns: syncReturnRefund(benefitReport),
+    }
+    emit()
+    actions.addMessage(
+      'assistant',
+      `Tax Benefit Optimization rerun complete (${benefitReport.ruleVersion}). Verified savings ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(benefitReport.verifiedSavings)}; potential ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(benefitReport.potentialSavings)}.`,
+    )
+  },
+  answerBenefitQuestion(mapsTo: string, value: string | number | boolean) {
+    const taxProfile = applyAnswer(state.taxProfile, mapsTo, value)
+    const benefitReport = toSnapshot(taxProfile)
+    state = {
+      ...state,
+      taxProfile,
+      benefitReport,
+      benefitReviewSigned: false,
+      returns: syncReturnRefund(benefitReport),
+    }
+    emit()
+  },
+  markBenefitUnresolved(mapsTo: string) {
+    const taxProfile = {
+      ...state.taxProfile,
+      answers: { ...state.taxProfile.answers, [mapsTo]: 'unresolved' },
+      unresolvedKeys: Array.from(new Set([...state.taxProfile.unresolvedKeys, mapsTo])),
+    }
+    const benefitReport = toSnapshot(taxProfile)
+    state = { ...state, taxProfile, benefitReport, benefitReviewSigned: false }
+    emit()
+  },
+  verifyBenefit(ruleId: string) {
+    const taxProfile = {
+      ...state.taxProfile,
+      answers: { ...state.taxProfile.answers, [`${ruleId}_verified`]: 'yes', [`${ruleId}_uncertain`]: undefined },
+    }
+    const benefitReport = toSnapshot(taxProfile)
+    state = {
+      ...state,
+      taxProfile,
+      benefitReport,
+      benefitReviewSigned: false,
+      returns: syncReturnRefund(benefitReport),
+    }
+    emit()
+  },
+  flagBenefitReview(ruleId: string) {
+    const taxProfile = {
+      ...state.taxProfile,
+      answers: { ...state.taxProfile.answers, [`${ruleId}_uncertain`]: 'yes', [`${ruleId}_verified`]: undefined },
+    }
+    const benefitReport = toSnapshot(taxProfile)
+    state = { ...state, taxProfile, benefitReport, benefitReviewSigned: false }
+    emit()
+  },
+  updateTaxProfile(patch: Partial<TaxpayerProfile>) {
+    const taxProfile = { ...state.taxProfile, ...patch, answers: { ...state.taxProfile.answers, ...(patch.answers ?? {}) } }
+    const benefitReport = toSnapshot(taxProfile)
+    state = {
+      ...state,
+      taxProfile,
+      benefitReport,
+      benefitReviewSigned: false,
+      returns: syncReturnRefund(benefitReport),
+    }
+    emit()
+  },
+  completeBenefitReview() {
+    const benefitReport = toSnapshot(state.taxProfile)
+    if (!benefitReport.auditComplete) {
+      actions.addMessage(
+        'system',
+        'Final benefit review blocked: unresolved eligibility questions or unverified benefits remain. NOVARA will not claim all benefits are secured.',
+      )
+      state = { ...state, benefitReport }
+      emit()
+      return false
+    }
+    state = {
+      ...state,
+      benefitReport,
+      benefitReviewSigned: true,
+      returns: state.returns.map((r) =>
+        r.id === state.activeReturnId
+          ? { ...r, state: 'Ready to File' as ReturnState, readiness: 100, refundOrOwe: benefitReport.projectedRefund, updatedAt: new Date().toISOString() }
+          : r,
+      ),
+    }
+    emit()
+    actions.addMessage('system', 'Mandatory tax-benefit audit passed. Preparer/taxpayer approvals recorded for demo. Ready to file gate unlocked.')
+    return true
+  },
   resetDemo() {
     localStorage.removeItem('novara-tax-os-v1')
     sessionStorage.removeItem(SESSION_KEY)
+    sessionStorage.removeItem('novara-tax-os-session-v2')
+    const taxProfile = defaultProfile()
     state = {
       currentUser: state.currentUser,
       documents: SEED_DOCS,
@@ -517,7 +666,7 @@ export const actions = {
         {
           id: 'm0',
           role: 'assistant',
-          text: 'Demo reset. Upload documents — I’ll build an entry plan for preparer approval.',
+          text: 'Demo reset. Upload documents — then run Tax Benefit Optimization. Filing stops only after the benefit review is complete.',
           at: new Date().toISOString(),
         },
       ],
@@ -529,6 +678,9 @@ export const actions = {
       preEntryNotes: DEFAULT_NOTES,
       activeReturnId: SEED_RETURNS.find((r) => r.state === 'Preparer Review')?.id ?? SEED_RETURNS[0].id,
       binderTab: 'forms',
+      taxProfile,
+      benefitReport: toSnapshot(taxProfile),
+      benefitReviewSigned: false,
       hydrated: true,
     }
     emit()

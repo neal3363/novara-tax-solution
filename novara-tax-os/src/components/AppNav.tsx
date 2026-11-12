@@ -23,15 +23,15 @@ export function AppNav() {
       ? [
           { to: '/app/taxpayer', label: 'Home' },
           { to: '/app/taxpayer/prepare', label: 'Prepare' },
-          { to: '/app/taxpayer/vault', label: 'Tax Vault' },
-          { to: '/app/taxpayer/ai', label: 'Tax AI' },
+          { to: '/app/taxpayer/benefits', label: 'Savings' },
+          { to: '/app/taxpayer/vault', label: 'Vault' },
         ]
       : currentUser.role === 'preparer'
         ? [
             { to: '/app/preparer', label: 'Inbox' },
-            { to: '/app/preparer/entry-plan', label: 'Entry plan' },
-            { to: '/app/preparer/workspace', label: 'Binder' },
-            { to: '/app/preparer/clients', label: 'Clients' },
+            { to: '/app/preparer/return', label: 'Return' },
+            { to: '/app/preparer/benefits', label: 'Benefits' },
+            { to: '/app/preparer/entry-plan', label: 'Entry' },
           ]
         : currentUser.role === 'efin_owner'
           ? [
