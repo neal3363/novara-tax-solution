@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { actions, useAppStore } from '../../store/useAppStore'
 import { formatMoney } from '../../data/fees'
 import { RefundTracker } from '../../components/benefits/RefundTracker'
+import { AnswerHistory, InterviewChoice } from '../../components/interview/InterviewChoice'
 import {
   extractConfirmedFields,
   knownFactsSummary,
@@ -23,10 +24,12 @@ const STEPS = [
 ]
 
 export function Prepare() {
-  const { documents, prepStep, returns, currentUser, taxProfile, benefitReport, interviewChat } = useAppStore()
+  const { documents, prepStep, returns, currentUser, taxProfile, benefitReport, interviewChat, interviewAnswers } =
+    useAppStore()
   const mine = returns.find((r) => r.clientId === currentUser?.id && r.taxYear === 2025)
   const inputRef = useRef<HTMLInputElement>(null)
   const [drag, setDrag] = useState(false)
+  const [saving, setSaving] = useState(false)
   const fields = useMemo(() => extractConfirmedFields(documents), [documents])
   const known = useMemo(() => knownFactsSummary(documents, taxProfile), [documents, taxProfile])
 
@@ -38,6 +41,28 @@ export function Prepare() {
     e.preventDefault()
     setDrag(false)
     if (e.dataTransfer.files?.length) actions.uploadFiles(e.dataTransfer.files)
+  }
+
+  async function confirmTurn(value: string | number) {
+    if (!activeTurn || saving) return
+    setSaving(true)
+    try {
+      actions.answerSmartInterview(activeTurn.mapsTo, value, activeTurn.prompt)
+      await new Promise((r) => setTimeout(r, 160))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function skipTurn() {
+    if (!activeTurn || saving) return
+    setSaving(true)
+    try {
+      actions.markBenefitUnresolved(activeTurn.mapsTo, activeTurn.prompt)
+      await new Promise((r) => setTimeout(r, 160))
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -54,7 +79,7 @@ export function Prepare() {
 
       <p className="muted prepare-lead">
         Upload → AI extracts → you confirm → filing-status questions → tax-benefit discovery → calculation → review →
-        signature → e-file. NOVARA asks once, reuses answers, and never invents deductions.
+        signature → e-file. One question. One clear selection. One confirmed answer.
       </p>
 
       <div className="stepper" aria-label="Preparation steps">
@@ -136,7 +161,7 @@ export function Prepare() {
                 </div>
               ))}
               <div style={{ marginTop: '1rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <button className="btn btn-primary" type="button" onClick={() => actions.confirmExtractionsDetails()}>
+                <button className="btn btn-primary" type="button" onClick={() => actions.confirmExtracedDetails()}>
                   Looks good — start smart interview
                 </button>
               </div>
@@ -151,7 +176,7 @@ export function Prepare() {
             <div className="list-panel panel interview-chat">
               <h2>Conversational tax interview</h2>
               <p className="muted" style={{ marginTop: 0 }}>
-                Feels like an experienced tax pro — dynamic follow-ups only, based on your documents and prior answers.
+                Select YES or NO, confirm Your answer, then press Continue. Answers are not saved until you continue.
               </p>
               <div className="chat-log" role="log" aria-live="polite">
                 {interviewChat.map((m) => (
@@ -166,39 +191,17 @@ export function Prepare() {
                   <p className="turn-label">
                     {activeTurn.phase === 'filing_status' ? 'Filing status' : 'Tax benefit discovery'}
                   </p>
-                  <div className="answer-row">
-                    {activeTurn.kind === 'choice' || activeTurn.kind === 'yesno'
-                      ? (activeTurn.choices ?? ['Yes', 'No']).map((c) => (
-                          <button
-                            key={c}
-                            type="button"
-                            className="btn btn-secondary"
-                            onClick={() => actions.answerSmartInterview(activeTurn.mapsTo, c)}
-                          >
-                            {c}
-                          </button>
-                        ))
-                      : null}
-                    {activeTurn.kind === 'number' && (
-                      <button
-                        type="button"
-                        className="btn btn-primary"
-                        onClick={() => {
-                          const raw = window.prompt('Enter amount (USD)', '4500')
-                          if (raw != null) actions.answerSmartInterview(activeTurn.mapsTo, Number(raw) || 0)
-                        }}
-                      >
-                        Enter amount
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      className="btn btn-ghost"
-                      onClick={() => actions.markBenefitUnresolved(activeTurn.mapsTo)}
-                    >
-                      Skip / unresolved
-                    </button>
-                  </div>
+                  <InterviewChoice
+                    key={activeTurn.id}
+                    questionId={activeTurn.id}
+                    prompt={activeTurn.prompt}
+                    kind={activeTurn.kind}
+                    choices={activeTurn.choices}
+                    saving={saving}
+                    secondaryLabel="Skip / unresolved"
+                    onSecondary={() => void skipTurn()}
+                    onConfirm={(value) => confirmTurn(value)}
+                  />
                 </div>
               ) : (
                 <div className="answer-row">
@@ -207,6 +210,8 @@ export function Prepare() {
                   </button>
                 </div>
               )}
+
+              <AnswerHistory items={interviewAnswers} onEdit={(mapsTo) => actions.editInterviewAnswer(mapsTo)} />
             </div>
 
             <div className="side-stack">
@@ -301,6 +306,9 @@ export function Prepare() {
                 </div>
                 <Link to="/app/taxpayer/benefits/review">Open</Link>
               </div>
+              <AnswerHistory items={interviewAnswers} onEdit={(mapsTo) => {
+                actions.editInterviewAnswer(mapsTo)
+              }} />
               <button className="btn btn-primary" type="button" style={{ marginTop: '0.75rem' }} onClick={() => actions.signAndFile()}>
                 Approve, sign &amp; e-file
               </button>

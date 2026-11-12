@@ -156,4 +156,12 @@ export interface AppState {
   benefitReviewSigned: boolean
   /** Conversational AI Smart Tax Interview inside Prepare workflow */
   interviewChat: { id: string; role: 'assistant' | 'user' | 'system'; text: string; at: string }[]
+  /** Confirmed questionnaire answers for visible history + edits */
+  interviewAnswers: {
+    id: string
+    mapsTo: string
+    prompt: string
+    answer: string | number
+    at: string
+  }[]
 }
