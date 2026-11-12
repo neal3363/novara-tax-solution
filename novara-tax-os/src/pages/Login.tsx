@@ -74,8 +74,8 @@ export function Login() {
           <div>
             <h1 className="brand">NOVARA</h1>
             <p>
-              {heading}. Sample data only — session storage on this device. Existing dashboards open after you pick a
-              role.
+              {heading}. Demo roles only — access is checked in this browser session (not a production identity
+              provider). Sample tax data stays in session storage on this device.
             </p>
           </div>
         </div>

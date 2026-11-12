@@ -6,6 +6,8 @@ export type BenefitCategory =
   | 'employment_income'
   | 'homeownership'
   | 'business'
+  | 'health'
+  | 'state'
   | 'other'
 
 export type BenefitStatus =
@@ -32,7 +34,7 @@ export interface BenefitRule {
   incompatibleWith?: string[]
 }
 
-export const BENEFIT_RULE_VERSION = '2025.federal.demo.v1'
+export const BENEFIT_RULE_VERSION = '2025.federal+state.demo.v2'
 
 export const BENEFIT_CATALOG_2025: BenefitRule[] = [
   {
@@ -274,6 +276,47 @@ export const BENEFIT_CATALOG_2025: BenefitRule[] = [
     requiredDocs: ['Expense receipts'],
     estimatedSavingsHint: 75,
   },
+  {
+    id: 'property_tax',
+    taxYear: 2025,
+    category: 'homeownership',
+    name: 'State and local property tax deduction (SALT)',
+    shortName: 'Property taxes',
+    description: 'Itemized deduction for eligible property taxes, subject to SALT limitation and standard-deduction comparison.',
+    ruleCitation: 'IRC §164 · SALT cap',
+    triggerFacts: ['owns_home', 'property_taxes'],
+    requiredAnswers: ['property_tax_amount', 'itemize_vs_standard'],
+    requiredDocs: ['Property tax statement / Form 1098'],
+    estimatedSavingsHint: 600,
+  },
+  {
+    id: 'ptc',
+    taxYear: 2025,
+    category: 'health',
+    name: 'Premium Tax Credit (Marketplace health insurance)',
+    shortName: 'Health insurance credit',
+    description: 'Credit for eligible Marketplace health coverage; reconcile advance payments on Form 8962.',
+    ruleCitation: 'IRC §36B · Form 8962',
+    triggerFacts: ['marketplace_coverage'],
+    requiredAnswers: ['had_marketplace', 'advance_ptc', 'household_income_band'],
+    requiredDocs: ['Form 1095-A'],
+    estimatedSavingsHint: 1400,
+    refundable: true,
+  },
+  {
+    id: 'state_eitc',
+    taxYear: 2025,
+    category: 'state',
+    name: 'State earned-income credit (where enacted)',
+    shortName: 'State EITC',
+    description: 'State-level EITC patterned on federal eligibility when the filing state offers a credit. Demo evaluates Texas residency as not offering a general EITC and flags other states for review.',
+    ruleCitation: 'State conformity · TY2025',
+    triggerFacts: ['has_earned_income'],
+    requiredAnswers: ['filing_state', 'federal_eitc_eligible'],
+    requiredDocs: ['State residency evidence if requested'],
+    estimatedSavingsHint: 400,
+    refundable: true,
+  },
 ]
 
 export const CATEGORY_LABELS: Record<BenefitCategory, string> = {
@@ -282,5 +325,17 @@ export const CATEGORY_LABELS: Record<BenefitCategory, string> = {
   employment_income: 'Employment & income',
   homeownership: 'Homeownership & housing',
   business: 'Business & self-employment',
+  health: 'Health insurance',
+  state: 'State tax benefits',
   other: 'Other potential benefits',
+}
+
+/** Plain-language status labels for Savings cards */
+export const STATUS_LABELS: Record<string, string> = {
+  needs_info: 'Needs a few answers or documents',
+  eligible_unverified: 'Looks possible — needs verification',
+  applied: 'Applied to your estimate',
+  flagged_review: 'Needs human review',
+  ineligible: 'Does not appear to apply',
+  identified: 'Identified',
 }

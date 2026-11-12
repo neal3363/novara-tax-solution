@@ -28,12 +28,27 @@ export type DocType =
   | '1099-NEC'
   | '1099-INT'
   | '1098'
+  | '1098-T'
+  | '1098-E'
+  | 'Childcare'
+  | 'Property Tax'
   | 'ID'
   | 'Bank Statement'
   | 'Prior Return'
   | 'P&L'
   | 'Trial Balance'
   | 'Other'
+
+export interface AuditEvent {
+  id: string
+  at: string
+  actorId: string
+  actorRole: Role | 'system'
+  action: string
+  /** Safe summary — never include full SSN or raw account numbers */
+  summary: string
+  meta?: Record<string, string | number | boolean>
+}
 
 export type EntryPlanStatus = 'draft' | 'awaiting_approval' | 'approved' | 'entering' | 'entered' | 'rejected_item'
 
@@ -135,6 +150,8 @@ export interface BenefitSnapshot {
     ruleCitation: string
   }[]
   lastRunAt: string
+  /** Plain-language explanation of the latest recalculation */
+  lastChangeNote?: string
 }
 
 export interface AppState {
@@ -163,5 +180,13 @@ export interface AppState {
     prompt: string
     answer: string | number
     at: string
+  }[]
+  auditEvents: AuditEvent[]
+  uploadIssues: {
+    kind: 'duplicate' | 'conflict' | 'missing'
+    severity: 'high' | 'medium' | 'low'
+    title: string
+    detail: string
+    docIds: string[]
   }[]
 }

@@ -55,9 +55,14 @@ export function RefundTracker({ report }: { report: BenefitSnapshot | null }) {
           }}
         />
       </div>
+      {report.lastChangeNote && (
+        <p className="tracker-change" aria-live="polite">
+          {report.lastChangeNote}
+        </p>
+      )}
       <p className="muted tracker-note">
-        Example: disclose qualifying childcare after dependents → Child & Dependent Care Credit is evaluated and the
-        projection moves. NOVARA stops only after the comprehensive benefit review is complete.
+        Verified benefits are included in the current projection. Possible savings stay separate until documents and
+        answers confirm them. NOVARA does not invent refunds.
       </p>
       <p className="row-meta">Ruleset {report.ruleVersion} · last run {new Date(report.lastRunAt).toLocaleString()}</p>
     </section>

@@ -19,10 +19,13 @@ export function TaxpayerHome() {
     <div className="page container">
       <header className="page-header">
         <div>
-          <p className="eyebrow">Year-round home</p>
+          <p className="eyebrow">Upload → Answer → Review → Approve</p>
           <h1>Hi, {currentUser?.name.split(' ')[0]}</h1>
         </div>
         <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
+          <Link className="btn btn-secondary" to="/app/taxpayer/vault">
+            Upload documents
+          </Link>
           <Link className="btn btn-secondary" to="/app/taxpayer/benefits">
             Tax savings
           </Link>

@@ -67,7 +67,12 @@ export function syncProfileFromDocuments(profile: TaxpayerProfile, documents: Do
   let wages = 0
   let withholding = 0
   let se = 0
+  let interest = 0
   let mortgage = 0
+  let propertyTax = 0
+  let tuition = 0
+  let studentLoan = 0
+  let childcare = 0
   let hasId = false
   let hasW2 = false
   let has1099 = false
@@ -81,15 +86,47 @@ export function syncProfileFromDocuments(profile: TaxpayerProfile, documents: Do
         if (/withheld|withholding/i.test(f.label)) withholding += parseMoney(f.value)
       })
     }
-    if (d.type === '1099-NEC' || d.type === '1099-INT') {
+    if (d.type === '1099-NEC') {
       has1099 = true
       d.facts.forEach((f) => {
-        if (/compensation|income|interest/i.test(f.label)) se += parseMoney(f.value)
+        if (/compensation|income/i.test(f.label)) se += parseMoney(f.value)
+      })
+    }
+    if (d.type === '1099-INT') {
+      d.facts.forEach((f) => {
+        if (/interest|income/i.test(f.label)) interest += parseMoney(f.value)
       })
     }
     if (d.type === '1098') {
       d.facts.forEach((f) => {
-        if (/mortgage|interest/i.test(f.label)) mortgage += parseMoney(f.value)
+        if (/mortgage interest/i.test(f.label) || (/mortgage|interest/i.test(f.label) && !/property/i.test(f.label))) {
+          mortgage += parseMoney(f.value)
+        }
+        if (/property tax/i.test(f.label)) propertyTax += parseMoney(f.value)
+      })
+    }
+    if (d.type === '1098-T') {
+      d.facts.forEach((f) => {
+        if (/tuition/i.test(f.label)) tuition += parseMoney(f.value)
+      })
+    }
+    if (d.type === '1098-E') {
+      d.facts.forEach((f) => {
+        if (/loan interest|student loan/i.test(f.label)) studentLoan += parseMoney(f.value)
+      })
+    }
+    if (d.type === 'Childcare') {
+      d.facts.forEach((f) => {
+        if (/childcare|care paid/i.test(f.label)) childcare += parseMoney(f.value)
+        if (/provider/i.test(f.label) && !/ein/i.test(f.label)) {
+          next.careProvider = f.value
+          next.answers.care_provider = 'yes'
+        }
+      })
+    }
+    if (d.type === 'Property Tax') {
+      d.facts.forEach((f) => {
+        if (/property tax/i.test(f.label)) propertyTax += parseMoney(f.value)
       })
     }
   })
@@ -100,15 +137,41 @@ export function syncProfileFromDocuments(profile: TaxpayerProfile, documents: Do
     next.selfEmploymentIncome = Math.max(next.selfEmploymentIncome, se)
     next.answers.self_employed = 'yes'
   }
+  // Bank interest is not self-employment; keep SE from NEC only
+  if (interest > 0) next.answers.has_interest_income = 'yes'
   if (mortgage > 0) {
     next.mortgageInterest = mortgage
     next.answers.owns_home = 'yes'
+    next.answers.mortgage_interest_paid = 'yes'
+  }
+  if (propertyTax > 0) {
+    next.propertyTax = propertyTax
+    next.answers.owns_home = 'yes'
+    next.answers.property_taxes = 'yes'
+    next.answers.property_tax_amount = propertyTax
+  }
+  if (tuition > 0) {
+    next.tuitionPaid = tuition
+    next.answers.education_expenses = 'yes'
+    next.answers.tuition_paid = tuition
+  }
+  if (studentLoan > 0) {
+    next.studentLoanInterest = studentLoan
+    next.answers.student_loan_interest = 'yes'
+    next.answers.loan_interest_paid = studentLoan
+  }
+  if (childcare > 0) {
+    next.childcarePaid = childcare
+    next.answers.paid_childcare = 'yes'
+    next.answers.childcare_amount = childcare
+    if (!next.answers.has_child) next.answers.has_child = 'yes'
+    if (!next.answers.has_dependents) next.answers.has_dependents = 'yes'
   }
   if (hasW2) next.answers.has_earned_income = 'yes'
   if (hasId) next.answers.id_on_file = 'yes'
   if (has1099 && se > 0) next.answers.schedule_c_signal = 'yes'
 
-  // Do not overwrite filing status or dependents from docs alone in this demo
+  // Do not overwrite filing status from docs alone
   return next
 }
 

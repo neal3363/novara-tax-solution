@@ -2,8 +2,8 @@ import { useSyncExternalStore } from 'react'
 import { DEMO_USERS, SEED_DOCS, SEED_RETURNS, SMART_QUESTIONS } from '../data/seed'
 import type {
   AppState,
+  AuditEvent,
   DocumentRecord,
-  DocType,
   EntryPlanLine,
   Message,
   PreEntryNote,
@@ -26,12 +26,36 @@ import {
   nextFilingStatusTurn,
   syncProfileFromDocuments,
 } from '../engine/smartInterview'
+import {
+  classifyDocumentName,
+  detectDocumentConflicts,
+  extractFactsForType,
+  findDuplicateUploads,
+  plainLanguageExtractionSummary,
+} from '../engine/documentProcessing'
 import type { BenefitSnapshot } from '../data/types'
 
 /** Role preference only — never store tax demo payloads in localStorage */
 const ROLE_KEY = 'novara-tax-os-role'
 /** Session-scoped demo state (clears when the tab closes) */
-const SESSION_KEY = 'novara-tax-os-session-v5'
+const SESSION_KEY = 'novara-tax-os-session-v6'
+
+function money(n: number) {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n)
+}
+
+function appendAudit(action: string, summary: string, meta?: AuditEvent['meta']) {
+  const evt: AuditEvent = {
+    id: uid('aud'),
+    at: new Date().toISOString(),
+    actorId: state.currentUser?.id ?? 'system',
+    actorRole: state.currentUser?.role ?? 'system',
+    action,
+    summary,
+    meta,
+  }
+  return [...state.auditEvents, evt].slice(-200)
+}
 
 function recordInterviewAnswer(mapsTo: string, prompt: string, answer: string | number) {
   const existing = state.interviewAnswers.filter((a) => a.mapsTo !== mapsTo)
@@ -93,8 +117,15 @@ function clearAnswerTree(mapsTo: string) {
   }
 }
 
-function toSnapshot(profile: TaxpayerProfile): BenefitSnapshot {
+function toSnapshot(profile: TaxpayerProfile, reason?: string): BenefitSnapshot {
   const report = runBenefitOptimization(profile)
+  const prev = state.benefitReport
+  const delta = report.projectedRefund - (prev?.projectedRefund ?? report.baseRefund)
+  let lastChangeNote = reason ?? 'Tax benefits rechecked against your latest documents and answers.'
+  if (prev) {
+    const direction = delta === 0 ? 'stayed the same' : delta > 0 ? `went up by ${money(delta)}` : `went down by ${money(Math.abs(delta))}`
+    lastChangeNote = `${reason ? reason + ' ' : ''}Your estimated refund ${direction}. Verified savings ${money(report.verifiedSavings)}; possible (not yet verified) ${money(report.potentialSavings)}.`
+  }
   return {
     taxYear: report.taxYear,
     ruleVersion: report.ruleVersion,
@@ -107,6 +138,7 @@ function toSnapshot(profile: TaxpayerProfile): BenefitSnapshot {
     comparisonNotes: report.comparisonNotes,
     findings: report.findings,
     lastRunAt: new Date().toISOString(),
+    lastChangeNote,
   }
 }
 
@@ -249,6 +281,8 @@ let state: Store = {
     },
   ],
   interviewAnswers: [],
+  auditEvents: [],
+  uploadIssues: [],
   hydrated: false,
 }
 
@@ -282,6 +316,7 @@ function hydrate() {
     sessionStorage.removeItem('novara-tax-os-session-v2')
     sessionStorage.removeItem('novara-tax-os-session-v3')
     sessionStorage.removeItem('novara-tax-os-session-v4')
+    sessionStorage.removeItem('novara-tax-os-session-v5')
 
     const role = localStorage.getItem(ROLE_KEY) as Role | null
     const sessionRaw = sessionStorage.getItem(SESSION_KEY)
@@ -297,6 +332,8 @@ function hydrate() {
         benefitReviewSigned: parsed.benefitReviewSigned ?? false,
         interviewChat: parsed.interviewChat?.length ? parsed.interviewChat : state.interviewChat,
         interviewAnswers: parsed.interviewAnswers ?? [],
+        auditEvents: parsed.auditEvents ?? [],
+        uploadIssues: parsed.uploadIssues ?? [],
         currentUser: role ? (DEMO_USERS.find((u) => u.role === role) ?? null) : null,
         hydrated: true,
       }
@@ -328,20 +365,6 @@ function getSnapshot() {
 function subscribe(listener: () => void) {
   listeners.add(listener)
   return () => listeners.delete(listener)
-}
-
-function classifyName(name: string): DocType {
-  const n = name.toLowerCase()
-  if (n.includes('w-2') || n.includes('w2')) return 'W-2'
-  if (n.includes('1099')) return '1099-NEC'
-  if (n.includes('1098') || n.includes('tuition') || n.includes('1098-t')) return '1098'
-  if (n.includes('pl') || n.includes('p&l') || n.includes('profit')) return 'P&L'
-  if (n.includes('trial')) return 'Trial Balance'
-  if (n.includes('bank')) return 'Bank Statement'
-  if (n.includes('ssn') || n.includes('social') || n.includes('id') || n.includes('license') || n.includes('passport') || n.includes('dependent'))
-    return 'ID'
-  if (n.includes('1040') || n.includes('prior')) return 'Prior Return'
-  return 'Other'
 }
 
 function uid(prefix: string) {
@@ -413,109 +436,59 @@ export const actions = {
     const list = Array.from(files)
     const now = new Date().toISOString()
     const ownerId = state.currentUser?.id ?? 'u-tax'
-    const docs: DocumentRecord[] = list.map((file) => {
-      const type = classifyName(file.name)
-      return {
-        id: uid('d'),
-        name: file.name,
-        type,
-        taxYear: 2025,
-        sizeLabel:
-          file.size > 1024 * 1024
-            ? `${(file.size / 1024 / 1024).toFixed(1)} MB`
-            : `${Math.max(1, Math.round(file.size / 1024))} KB`,
-        uploadedAt: now,
-        status: 'scanning',
-        confidence: 0,
-        ownerId,
-        facts: [],
-      }
-    })
+    const classified = list.map((file) => ({
+      file,
+      type: classifyDocumentName(file.name),
+      name: file.name,
+    }))
+    const dupes = findDuplicateUploads(state.documents, classified)
+
+    const docs: DocumentRecord[] = classified.map(({ file, type }) => ({
+      id: uid('d'),
+      name: file.name,
+      type,
+      taxYear: 2025,
+      sizeLabel:
+        file.size > 1024 * 1024
+          ? `${(file.size / 1024 / 1024).toFixed(1)} MB`
+          : `${Math.max(1, Math.round(file.size / 1024))} KB`,
+      uploadedAt: now,
+      status: 'scanning',
+      confidence: 0,
+      ownerId,
+      facts: [],
+    }))
+
     state = {
       ...state,
       documents: [...docs, ...state.documents],
+      uploadIssues: [...dupes, ...state.uploadIssues].slice(0, 40),
       prepStep: Math.max(state.prepStep, 1),
       entryPlanStatus: 'draft',
+      auditEvents: appendAudit(
+        'document_upload',
+        `Uploaded ${docs.length} file(s): ${docs.map((d) => d.type).join(', ')}. No full SSN values are stored in the audit log.`,
+        { count: docs.length },
+      ),
     }
     emit()
-    actions.addMessage('assistant', `Received ${docs.length} file${docs.length === 1 ? '' : 's'}. Reading every document…`)
+    actions.addMessage(
+      'assistant',
+      `Received ${docs.length} file${docs.length === 1 ? '' : 's'}. Identifying document types and extracting tax fields…${
+        dupes.length ? ` Flagged ${dupes.length} possible duplicate(s) for review.` : ''
+      }`,
+    )
 
     docs.forEach((doc, i) => {
       setTimeout(() => {
-        const confidence = 0.84 + Math.random() * 0.14
-        const facts =
-          doc.type === 'W-2'
-            ? [
-                { id: uid('f'), label: 'Wages (Box 1)', value: '$64,200.00', sourcePage: 1, confidence, verified: false },
-                {
-                  id: uid('f'),
-                  label: 'Federal withheld',
-                  value: '$7,110.00',
-                  sourcePage: 1,
-                  confidence: confidence - 0.02,
-                  verified: false,
-                },
-              ]
-            : doc.type === '1099-NEC'
-              ? [
-                  {
-                    id: uid('f'),
-                    label: 'Nonemployee compensation',
-                    value: '$3,800.00',
-                    sourcePage: 1,
-                    confidence,
-                    verified: false,
-                  },
-                ]
-              : doc.type === 'ID'
-                ? [
-                    {
-                      id: uid('f'),
-                      label: 'Full name',
-                      value: state.currentUser?.name ?? 'Jordan Blake',
-                      sourcePage: 1,
-                      confidence: 0.96,
-                      verified: false,
-                    },
-                    {
-                      id: uid('f'),
-                      label: 'Date of birth',
-                      value: '03/14/1988',
-                      sourcePage: 1,
-                      confidence: 0.94,
-                      verified: false,
-                    },
-                    {
-                      id: uid('f'),
-                      label: 'Address',
-                      value: '1842 Harbor Ave, Austin, TX',
-                      sourcePage: 1,
-                      confidence: 0.91,
-                      verified: false,
-                    },
-                  ]
-                : doc.type === '1098'
-                  ? [
-                      {
-                        id: uid('f'),
-                        label: 'Mortgage interest',
-                        value: '$8,500.00',
-                        sourcePage: 1,
-                        confidence,
-                        verified: false,
-                      },
-                    ]
-                  : [
-                      {
-                        id: uid('f'),
-                        label: 'Detected label',
-                        value: doc.name.replace(/\.[^.]+$/, ''),
-                        sourcePage: 1,
-                        confidence,
-                        verified: false,
-                      },
-                    ]
-
+        const confidence = 0.86 + (doc.name.length % 10) / 100
+        const facts = extractFactsForType(
+          doc.type,
+          doc.name,
+          confidence,
+          uid,
+          state.currentUser?.name ?? 'Jordan Blake',
+        )
         const documents = state.documents.map((d) =>
           d.id === doc.id
             ? {
@@ -526,39 +499,57 @@ export const actions = {
               }
             : d,
         )
+        const conflicts = detectDocumentConflicts(documents)
         const taxProfile = syncProfileFromDocuments(state.taxProfile, documents)
-        const benefitReport = toSnapshot(taxProfile)
+        const benefitReport = toSnapshot(
+          taxProfile,
+          `Uploaded ${doc.type} and filled matching return fields. ${plainLanguageExtractionSummary({ ...doc, facts })}.`,
+        )
         state = {
           ...state,
           documents,
           taxProfile,
           benefitReport,
+          uploadIssues: [...conflicts, ...state.uploadIssues.filter((u) => u.kind === 'duplicate')].slice(0, 40),
           entryPlan: buildEntryPlan(documents),
           entryPlanStatus: 'awaiting_approval',
+          returns: syncReturnRefund(benefitReport),
+          auditEvents: appendAudit(
+            'document_extract',
+            `Extracted ${doc.type} fields into the return draft. Sensitive IDs masked.`,
+            { docType: doc.type },
+          ),
         }
         emit()
         if (i === docs.length - 1) {
           const chat = {
             id: uid('iv'),
             role: 'assistant' as const,
-            text: 'Extraction complete. Confirm the details below — I won’t ask you to re-type wages, withholding, or names already on your documents. Correct only what’s missing or wrong.',
+            text: 'Extraction complete. Confirm the details below — I won’t ask you to re-type wages, withholding, tuition, or childcare amounts already on your documents. Correct only what’s missing or wrong.',
             at: new Date().toISOString(),
           }
           state = { ...state, interviewChat: [...state.interviewChat, chat], prepStep: Math.max(state.prepStep, 1) }
           emit()
-          actions.addMessage('assistant', chat.text)
+          actions.addMessage('assistant', `${chat.text} ${benefitReport.lastChangeNote ?? ''}`)
         }
-      }, 900 + i * 500)
+      }, 700 + i * 450)
     })
   },
   verifyFact(docId: string, factId: string) {
+    const documents = state.documents.map((d) =>
+      d.id === docId
+        ? { ...d, facts: d.facts.map((f) => (f.id === factId ? { ...f, verified: true } : f)), status: 'verified' as const }
+        : d,
+    )
+    const taxProfile = syncProfileFromDocuments(state.taxProfile, documents)
+    const benefitReport = toSnapshot(taxProfile, 'A document field was verified.')
     state = {
       ...state,
-      documents: state.documents.map((d) =>
-        d.id === docId
-          ? { ...d, facts: d.facts.map((f) => (f.id === factId ? { ...f, verified: true } : f)), status: 'verified' }
-          : d,
-      ),
+      documents,
+      taxProfile,
+      benefitReport,
+      returns: syncReturnRefund(benefitReport),
+      auditEvents: appendAudit('fact_verified', 'Taxpayer confirmed an extracted field (value not logged).'),
     }
     emit()
   },
@@ -605,13 +596,18 @@ export const actions = {
     const questionPrompt = prompt ?? state.interviewAnswers.find((a) => a.mapsTo === mapsTo)?.prompt ?? mapsTo
 
     const reply = conversationalReply(mapsTo, strVal, taxProfile)
-    const benefitReport = toSnapshot(taxProfile)
+    const benefitReport = toSnapshot(taxProfile, `You confirmed “${strVal}” for a tax interview question.`)
 
     const filingNext = nextFilingStatusTurn(taxProfile)
     const benefitNext = filingNext ? null : nextBenefitDiscoveryTurn(taxProfile)
 
     const assistantMsgs = [
-      { id: uid('iv'), role: 'assistant' as const, text: reply, at: new Date().toISOString() },
+      {
+        id: uid('iv'),
+        role: 'assistant' as const,
+        text: `${reply} ${benefitReport.lastChangeNote ?? ''}`,
+        at: new Date().toISOString(),
+      },
     ]
 
     if (filingNext) {
@@ -653,6 +649,9 @@ export const actions = {
       returns: syncReturnRefund(benefitReport),
       interviewChat: [...state.interviewChat, userMsg, ...assistantMsgs],
       interviewAnswers: recordInterviewAnswer(mapsTo, questionPrompt, value),
+      auditEvents: appendAudit('interview_answer', `Confirmed interview answer for ${mapsTo} (answer text omitted from audit when sensitive).`, {
+        mapsTo,
+      }),
       prepStep: filingNext || benefitNext ? 2 : state.prepStep,
     }
     emit()
@@ -819,17 +818,19 @@ export const actions = {
     emit()
   },
   runBenefitScan() {
-    const benefitReport = toSnapshot(state.taxProfile)
+    const benefitReport = toSnapshot(state.taxProfile, 'Full tax-benefit discovery scan completed.')
     state = {
       ...state,
       benefitReport,
       benefitReviewSigned: false,
       returns: syncReturnRefund(benefitReport),
+      auditEvents: appendAudit('benefit_scan', `Benefit scan ${benefitReport.ruleVersion}`),
     }
     emit()
     actions.addMessage(
       'assistant',
-      `Tax Benefit Optimization rerun complete (${benefitReport.ruleVersion}). Verified savings ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(benefitReport.verifiedSavings)}; potential ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(benefitReport.potentialSavings)}.`,
+      benefitReport.lastChangeNote ??
+        `Tax Benefit Optimization rerun complete (${benefitReport.ruleVersion}).`,
     )
   },
   answerBenefitQuestion(mapsTo: string, value: string | number | boolean, prompt?: string) {
@@ -840,7 +841,7 @@ export const actions = {
           ? 'No'
           : value
     const taxProfile = applyAnswer(state.taxProfile, mapsTo, value)
-    const benefitReport = toSnapshot(taxProfile)
+    const benefitReport = toSnapshot(taxProfile, `You confirmed “${String(display)}” on a savings follow-up.`)
     const questionPrompt = prompt ?? mapsTo
     state = {
       ...state,
@@ -849,6 +850,19 @@ export const actions = {
       benefitReviewSigned: false,
       returns: syncReturnRefund(benefitReport),
       interviewAnswers: recordInterviewAnswer(mapsTo, questionPrompt, display as string | number),
+      auditEvents: appendAudit('benefit_answer', `Confirmed benefit follow-up for ${mapsTo}.`, { mapsTo }),
+    }
+    emit()
+  },
+  startBenefitCheck(ruleId: string) {
+    // Soft-verify path: open interview / mark probe answers for this rule
+    const finding = state.benefitReport?.findings.find((f) => f.ruleId === ruleId)
+    if (!finding) return
+    state = {
+      ...state,
+      auditEvents: appendAudit('benefit_check_started', `Started eligibility check for ${finding.shortName}.`, {
+        ruleId,
+      }),
     }
     emit()
   },
@@ -978,6 +992,8 @@ export const actions = {
         },
       ],
       interviewAnswers: [],
+      auditEvents: [],
+      uploadIssues: [],
       hydrated: true,
     }
     emit()
