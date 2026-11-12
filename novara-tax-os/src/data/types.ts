@@ -149,6 +149,28 @@ export interface TaxReturn {
   feeSnapshot: { label: string; amount: number; status: string }[]
   appliedBenefits: AppliedBenefitLine[]
   updatedAt: string
+  /** Original vs amended */
+  filingMode?: 'original' | 'amended'
+  /** IRS notices received for this year */
+  hasIrsNotice?: boolean
+  /** Document folder key for this year/return */
+  documentFolderId?: string
+  /** Estimated IRS penalties/interest (never mixed into NOVARA fees) */
+  irsPenaltyInterestEstimate?: number
+  filingMethod?: 'efile' | 'paper' | 'unavailable'
+  refundClaimWarning?: string
+}
+
+/** Client order selecting one or more tax years before prep */
+export interface MultiYearEngagement {
+  id: string
+  taxYear: number
+  filingMode: 'original' | 'amended'
+  kind: 'personal' | 'business' | 'both'
+  hasIrsNotice: boolean
+  returnIds: string[]
+  documentFolderId: string
+  status: 'selected' | 'in_progress' | 'ready_to_file' | 'filed'
 }
 
 export interface Message {
@@ -288,4 +310,8 @@ export interface AppState {
   officeStaff: OfficeStaffMember[]
   /** Document-first household identification workflow */
   householdIntake: import('../engine/documentIntakeEngine').HouseholdIntakeState
+  /** Multi-year engagements in the active client order */
+  multiYearEngagements: MultiYearEngagement[]
+  /** Active tax year for prepare / vault focus */
+  activeTaxYear: number
 }
