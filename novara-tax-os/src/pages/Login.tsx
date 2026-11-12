@@ -1,40 +1,60 @@
 import { useMemo } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { BrandMark } from '../components/BrandMark'
 import { actions } from '../store/useAppStore'
 import type { Role } from '../data/types'
+import {
+  OFFICE_BUSINESS_FEE,
+  OFFICE_PERSONAL_FEE,
+  OFFICE_SUBSCRIPTION_FLOOR,
+  OFFICE_SUBSCRIPTION_HIGH,
+  TC_BUSINESS_FEE,
+  TC_PERSONAL_FEE,
+  TP_BUSINESS_FEE,
+  TP_PERSONAL_FEE,
+  TP_REGISTRATION_FEE,
+  UNLIMITED_CLIENTS_COPY,
+  formatMoney,
+} from '../data/fees'
 import './Login.css'
 
-const ROLES: { role: Role; title: string; blurb: string; path: string; finds: string; intents: string[] }[] = [
+const ROLES: {
+  role: Role
+  title: string
+  blurb: string
+  path: string
+  finds: string
+  intents: string[]
+}[] = [
   {
     role: 'taxpayer',
-    title: 'Direct taxpayer',
-    blurb: 'Start filing with document upload and the AI Smart Tax Interview.',
-    finds: 'Prepare → Savings → Refund Opportunity Tracker',
+    title: 'TC — Tax Client',
+    blurb: `Personal ${formatMoney(TC_PERSONAL_FEE)} · Business ${formatMoney(TC_BUSINESS_FEE)}. AI interview, dependents, and auto-applied benefits.`,
+    finds: 'Prepare → Dependents → Savings',
     path: '/app/taxpayer',
-    intents: ['taxpayer', 'file', 'start'],
+    intents: ['taxpayer', 'file', 'start', 'tc'],
   },
   {
     role: 'preparer',
-    title: 'Tax preparer (TP)',
-    blurb: 'Return editor, Benefits engine, Filed-style Entry plan, live queue.',
-    finds: 'Use Return / Benefits / Entry tabs',
+    title: 'TP — Tax Preparer',
+    blurb: `Upfront ${formatMoney(TP_REGISTRATION_FEE)} · Personal ${formatMoney(TP_PERSONAL_FEE)} · Business ${formatMoney(TP_BUSINESS_FEE)}. ${UNLIMITED_CLIENTS_COPY}.`,
+    finds: 'Return / Benefits / Entry',
     path: '/app/preparer',
-    intents: ['professional', 'preparer', 'pro'],
+    intents: ['professional', 'preparer', 'pro', 'tp'],
   },
   {
     role: 'efin_owner',
-    title: 'EFIN office owner',
-    blurb: 'Office dashboard, pipeline, staff, and professional pricing transparency.',
-    finds: 'Open Pricing for $899 floor, calculator, and FAQ',
+    title: 'Office — Tax Office',
+    blurb: `Subscription ${formatMoney(OFFICE_SUBSCRIPTION_FLOOR)}–${formatMoney(OFFICE_SUBSCRIPTION_HIGH)} · Personal ${formatMoney(OFFICE_PERSONAL_FEE)} · Business ${formatMoney(OFFICE_BUSINESS_FEE)}. ${UNLIMITED_CLIENTS_COPY}.`,
+    finds: 'Staff, pipeline, pricing',
     path: '/app/office',
     intents: ['office', 'professional', 'pricing', 'efin'],
   },
   {
     role: 'admin',
-    title: 'Platform admin',
-    blurb: 'Tenants, fee catalog, feature flags, system health.',
-    finds: 'Fee Catalog includes approved vs provisional terms',
+    title: 'NOVARA administrator',
+    blurb: 'Tenants, fee catalog, feature flags, audited platform access.',
+    finds: 'Fee Catalog mirrors centralized pricing',
     path: '/app/admin',
     intents: ['admin'],
   },
@@ -58,13 +78,13 @@ export function Login() {
   }, [intent])
 
   const heading =
-    intent === 'taxpayer' || intent === 'file' || intent === 'start'
-      ? 'Start your tax return'
+    intent === 'taxpayer' || intent === 'file' || intent === 'start' || intent === 'tc'
+      ? 'TC — start your tax return'
       : intent === 'office' || intent === 'pricing'
-        ? 'Open your tax office'
-        : intent === 'professional' || intent === 'preparer' || intent === 'pro'
-          ? 'Continue as a tax professional'
-          : 'Choose a demo role'
+        ? 'Office — open your tax office'
+        : intent === 'professional' || intent === 'preparer' || intent === 'pro' || intent === 'tp'
+          ? 'TP — continue as a tax preparer'
+          : 'Sign in or choose a demo role'
 
   return (
     <div className="login-page">
@@ -74,8 +94,8 @@ export function Login() {
           <div>
             <h1 className="brand">NOVARA</h1>
             <p>
-              {heading}. Demo roles only — access is checked in this browser session (not a production identity
-              provider). Sample tax data stays in session storage on this device.
+              {heading}. Demo roles only — session access in this browser. Prefer the{' '}
+              <Link to="/register">registration</Link> flow for tier pricing and test-mode checkout.
             </p>
           </div>
         </div>
@@ -98,6 +118,9 @@ export function Login() {
             </button>
           ))}
         </div>
+        <p className="muted" style={{ margin: 0 }}>
+          New here? <Link to="/register">Create a TC, TP, or Office account</Link>
+        </p>
       </div>
     </div>
   )

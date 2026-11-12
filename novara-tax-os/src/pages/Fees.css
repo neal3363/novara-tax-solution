@@ -4,6 +4,39 @@
   line-height: 1.5;
 }
 
+.fee-table {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.fee-table-row {
+  display: grid;
+  grid-template-columns: 1.4fr repeat(3, 1fr);
+  gap: 0.5rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  align-items: center;
+  font-size: 0.92rem;
+}
+
+.fee-table-row.head {
+  background: transparent;
+  border: none;
+  font-weight: 700;
+  font-family: var(--font-brand);
+}
+
+@media (max-width: 720px) {
+  .fee-table-row {
+    grid-template-columns: 1fr 1fr;
+  }
+  .fee-table-row.head {
+    display: none;
+  }
+}
+
 .how-steps {
   padding: 1.15rem 1.2rem 1.25rem;
 }

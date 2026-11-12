@@ -1,14 +1,23 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
-  CONSUMER_PRICES,
+  BANKING_FEES_NOTE,
+  OFFICE_BUSINESS_FEE,
+  OFFICE_FEES,
+  OFFICE_PERSONAL_FEE,
   OFFICE_SUBSCRIPTION_FLOOR,
+  OFFICE_SUBSCRIPTION_HIGH,
   OFFICE_TIERS,
+  PRICING,
   STARTER_INCLUDES,
-  TP_BUSINESS_BASE,
-  TP_BUSINESS_SURCHARGE,
-  TP_BUSINESS_TOTAL,
+  TC_BUSINESS_FEE,
+  TC_FEES,
+  TC_PERSONAL_FEE,
+  TP_BUSINESS_FEE,
   TP_FEES,
   TP_PERSONAL_FEE,
+  TP_REGISTRATION_FEE,
+  UNLIMITED_CLIENTS_COPY,
   estimateNovaraAnnualCharges,
   formatMoney,
 } from '../data/fees'
@@ -17,152 +26,115 @@ import './Fees.css'
 
 const FAQ = [
   {
-    q: 'Is $899 a monthly or annual fee?',
-    a: 'Annual.',
+    q: 'Is the office subscription monthly or annual?',
+    a: `Billing frequency is configurable until finalized. This demo displays ${PRICING.Office.subscriptionBillingFrequency} amounts of ${formatMoney(OFFICE_SUBSCRIPTION_FLOOR)} and ${formatMoney(OFFICE_SUBSCRIPTION_HIGH)}.`,
   },
   {
-    q: 'Does the $899 include unlimited returns?',
-    a: 'Return allowances and charges depend on the subscription terms. Unlimited returns are not currently included in the published Starter Office terms.',
+    q: 'Do TP or Office accounts limit clients or returns?',
+    a: `No. ${UNLIMITED_CLIENTS_COPY}. Only approved per-return software fees apply for standard usage.`,
   },
   {
-    q: 'Can I have multiple preparers?',
-    a: 'NOVARA supports staff and preparer management. Any tier-specific seat limits must be clearly displayed.',
-  },
-  {
-    q: 'Can I set my own customer preparation fees?',
-    a: 'Yes, subject to applicable law and NOVARA’s agreements.',
+    q: 'Can an office have multiple preparers?',
+    a: 'Yes. Office owners add preparers with individual logins under the office tenant. Unauthorized EFIN use is blocked.',
   },
   {
     q: 'Are bank-product fees included?',
     a: 'No. They are separate and disclosed before authorization.',
+  },
+  {
+    q: 'Does a TP also pay the TC retail price?',
+    a: 'No. TC retail fees and TP/Office software fees are separate billing relationships. Do not stack them on the same charge line.',
   },
 ]
 
 export function Fees() {
   const [individualReturns, setIndividualReturns] = useState(300)
   const [businessReturns, setBusinessReturns] = useState(0)
+  const [schedule, setSchedule] = useState<'Office' | 'TP'>('Office')
+  const [subAmount, setSubAmount] = useState<number>(OFFICE_SUBSCRIPTION_FLOOR)
   const [openFaq, setOpenFaq] = useState<number | null>(0)
 
   const estimate = useMemo(
     () =>
       estimateNovaraAnnualCharges({
-        subscriptionAnnual: OFFICE_SUBSCRIPTION_FLOOR,
+        subscriptionAnnual: schedule === 'Office' ? subAmount : TP_REGISTRATION_FEE,
         individualReturns: Math.max(0, individualReturns),
         businessReturns: Math.max(0, businessReturns),
+        schedule,
       }),
-    [individualReturns, businessReturns],
+    [individualReturns, businessReturns, schedule, subAmount],
   )
-
-  const exampleIndividual = 300
-  const examplePerReturn = exampleIndividual * TP_PERSONAL_FEE
-  const exampleTotal = OFFICE_SUBSCRIPTION_FLOOR + examplePerReturn
 
   return (
     <div className="page container pricing-page">
       <header className="page-header">
         <div>
-          <p className="eyebrow">Pricing transparency</p>
-          <h1>How NOVARA Pricing Works</h1>
+          <p className="eyebrow">Three-tier pricing</p>
+          <h1>NOVARA Pricing — TC · TP · Office</h1>
         </div>
-        <span className="badge badge-ok">Approved floor &amp; TP fees</span>
+        <Link className="btn btn-primary" to="/register">
+          Register
+        </Link>
       </header>
 
       <p className="pricing-intro muted rise">
-        For tax office owners and independent preparers: annual subscriptions, per-return platform charges, and
-        bank-product fees are separate. Only approved amounts are shown as final.
+        All screens read from one pricing catalog. Banking-product fees are separate. Existing AI tax preparation is
+        unchanged across tiers.
       </p>
 
       <section className="panel how-steps rise">
-        <h2>How NOVARA Pricing Works</h2>
-        <div className="how-grid">
-          {[
-            ['1', 'Subscribe to NOVARA Tax OS', `Starting at ${formatMoney(OFFICE_SUBSCRIPTION_FLOOR)} annually for Starter Office.`],
-            ['2', 'Add your authorized tax preparers', 'Staff and preparer management under your sponsoring office EFIN.'],
-            ['3', 'Pay applicable per-return and bank-product fees', 'Platform per-return fees and any bank/partner charges are billed separately.'],
-          ].map(([n, title, body]) => (
-            <div className="how-step" key={n}>
-              <span>{n}</span>
-              <div>
-                <strong>{title}</strong>
-                <p>{body}</p>
-              </div>
-            </div>
-          ))}
+        <h2>Official fee table</h2>
+        <div className="fee-table" role="table">
+          <div className="fee-table-row head" role="row">
+            <span>Fee</span>
+            <span>TC</span>
+            <span>TP</span>
+            <span>Office</span>
+          </div>
+          <div className="fee-table-row" role="row">
+            <span>Registration / subscription</span>
+            <span>{formatMoney(0)}</span>
+            <span>{formatMoney(TP_REGISTRATION_FEE)}</span>
+            <span>
+              {formatMoney(OFFICE_SUBSCRIPTION_FLOOR)}–{formatMoney(OFFICE_SUBSCRIPTION_HIGH)}
+            </span>
+          </div>
+          <div className="fee-table-row" role="row">
+            <span>Personal tax return</span>
+            <span>{formatMoney(TC_PERSONAL_FEE)}</span>
+            <span>{formatMoney(TP_PERSONAL_FEE)}</span>
+            <span>{formatMoney(OFFICE_PERSONAL_FEE)}</span>
+          </div>
+          <div className="fee-table-row" role="row">
+            <span>Business tax return</span>
+            <span>{formatMoney(TC_BUSINESS_FEE)}</span>
+            <span>{formatMoney(TP_BUSINESS_FEE)}</span>
+            <span>{formatMoney(OFFICE_BUSINESS_FEE)}</span>
+          </div>
         </div>
       </section>
 
-      <section className="list-panel panel rise rise-delay-1" style={{ marginTop: '1rem' }}>
+      <section className="list-panel panel rise" style={{ marginTop: '1rem' }}>
         <div className="section-head">
-          <h2>1. Tax Office Subscription — Starting at {formatMoney(OFFICE_SUBSCRIPTION_FLOOR)} Annually</h2>
-          <span className="badge badge-ok">Approved floor</span>
+          <h2>1. TC — Tax Client</h2>
+          <span className="badge badge-ok">Approved</span>
         </div>
-        <h3 className="subhead">What does my {formatMoney(OFFICE_SUBSCRIPTION_FLOOR)} pay for?</h3>
-        <p className="muted">
-          Your annual subscription provides access to the NOVARA Tax OS professional platform and the features included
-          in your selected subscription tier. These may include:
-        </p>
-        <ul className="check-list">
-          {STARTER_INCLUDES.map((item) => (
-            <li key={item}>{item}</li>
-          ))}
-        </ul>
-        <div className="callout warn">
-          <strong>Important:</strong> The annual subscription and per-return processing charges are separate. A
-          subscription does not automatically mean unlimited free tax returns.
-        </div>
-        <div className="tier-list">
-          {OFFICE_TIERS.map((t) => (
-            <div className="row-item" key={t.id}>
-              <div>
-                <strong>{t.name}</strong>
-                <span className="row-meta">{t.blurb}</span>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <strong>
-                  {t.annual != null
-                    ? `${formatMoney(t.annual)}/yr`
-                    : t.status === 'provisional'
-                      ? 'TBD'
-                      : 'Custom'}
-                </strong>
-                <div>
-                  <span className={`badge ${t.status === 'approved' ? 'badge-ok' : 'badge-warn'}`}>
-                    {t.status === 'approved' ? 'approved' : 'not final'}
-                  </span>
-                </div>
-              </div>
+        <p className="muted">Direct registration. NOVARA calculates and applies allowable benefits automatically.</p>
+        {TC_FEES.map((f) => (
+          <div className="row-item" key={f.id}>
+            <div>
+              <strong>{f.label}</strong>
+              <span className="row-meta">{f.note}</span>
             </div>
-          ))}
-        </div>
+            <strong>{formatMoney(f.amount)}</strong>
+          </div>
+        ))}
       </section>
 
       <section className="list-panel panel" style={{ marginTop: '1rem' }}>
         <div className="section-head">
-          <h2>2. Independent Tax Preparers</h2>
-          <span className="badge badge-ok">Approved</span>
-        </div>
-        <h3 className="subhead">What happens when a preparer files under my office’s EFIN?</h3>
-        <p className="muted">
-          An independent preparer authorized to operate under a sponsoring tax office’s EFIN is charged:
-        </p>
-        <div className="fee-cards">
-          <div className="fee-card">
-            <span className="badge badge-ok">Approved</span>
-            <p className="fee-label">Individual tax return</p>
-            <p className="fee-amount">{formatMoney(TP_PERSONAL_FEE)}</p>
-            <p className="muted">NOVARA platform fee per return</p>
-          </div>
-          <div className="fee-card">
-            <span className="badge badge-ok">Approved</span>
-            <p className="fee-label">Business tax return</p>
-            <p className="fee-amount">{formatMoney(TP_BUSINESS_TOTAL)}</p>
-            <p className="muted">
-              {formatMoney(TP_BUSINESS_BASE)} base + {formatMoney(TP_BUSINESS_SURCHARGE)} business surcharge
-            </p>
-          </div>
-        </div>
-        <div className="callout">
-          These are <strong>NOVARA platform fees</strong>, not the tax preparation fees charged to the customer.
+          <h2>2. TP — Tax Preparer</h2>
+          <span className="badge badge-ok">{UNLIMITED_CLIENTS_COPY}</span>
         </div>
         {TP_FEES.map((f) => (
           <div className="row-item" key={f.id}>
@@ -177,67 +149,66 @@ export function Fees() {
 
       <section className="list-panel panel" style={{ marginTop: '1rem' }}>
         <div className="section-head">
-          <h2>3. Bank Products</h2>
-          <span className="badge badge-warn">Partner pending</span>
+          <h2>3. Office — Tax Office</h2>
+          <span className="badge badge-ok">{UNLIMITED_CLIENTS_COPY}</span>
         </div>
-        <p className="muted" style={{ marginTop: 0 }}>
-          Bank-product fees are separate from the NOVARA subscription and per-return fees.
-        </p>
-        <p>
-          Any applicable bank, refund-transfer, or partner charges must be disclosed and itemized before the taxpayer
-          authorizes the transaction.
-        </p>
-        <div className="callout warn">
-          Partner bank fees are not set by NOVARA and are never shown here as finalized NOVARA subscription terms.
+        <ul className="check-list">
+          {STARTER_INCLUDES.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+        <div className="tier-list">
+          {OFFICE_TIERS.map((t) => (
+            <div className="row-item" key={t.id}>
+              <div>
+                <strong>{t.name}</strong>
+                <span className="row-meta">{t.blurb}</span>
+              </div>
+              <strong>{formatMoney(t.annual!)}/yr</strong>
+            </div>
+          ))}
         </div>
+        {OFFICE_FEES.filter((f) => f.id.startsWith('office-p') || f.id.startsWith('office-b')).map((f) => (
+          <div className="row-item" key={f.id}>
+            <div>
+              <strong>{f.label}</strong>
+            </div>
+            <strong>{formatMoney(f.amount)}</strong>
+          </div>
+        ))}
       </section>
 
       <section className="list-panel panel" style={{ marginTop: '1rem' }}>
-        <h2>4. Pricing Example</h2>
-        <p className="muted" style={{ marginTop: 0 }}>
-          An office subscribes to NOVARA for {formatMoney(OFFICE_SUBSCRIPTION_FLOOR)} annually. The office has three
-          independent preparers. Each preparer completes 100 individual returns.
-        </p>
-        <div className="example-math">
-          <div className="row-item">
-            <div>
-              <strong>
-                {exampleIndividual} returns × {formatMoney(TP_PERSONAL_FEE)}
-              </strong>
-              <span className="row-meta">Independent preparer individual-return fees</span>
-            </div>
-            <strong>{formatMoney(examplePerReturn)}</strong>
-          </div>
-          <div className="row-item">
-            <div>
-              <strong>Annual office subscription</strong>
-              <span className="row-meta">Starter Office floor</span>
-            </div>
-            <strong>{formatMoney(OFFICE_SUBSCRIPTION_FLOOR)}</strong>
-          </div>
-          <div className="row-item total-row">
-            <div>
-              <strong>Total NOVARA platform charges</strong>
-              <span className="row-meta">Subscription + per-return platform fees</span>
-            </div>
-            <strong>{formatMoney(exampleTotal)}</strong>
-          </div>
+        <div className="section-head">
+          <h2>4. Bank products</h2>
+          <span className="badge badge-warn">Not live</span>
         </div>
-        <p className="muted">
-          This example assumes all {exampleIndividual} returns are subject to the independent preparer fee. Tax
-          preparation revenue collected from customers and any bank-product fees are separate.
+        <p className="muted" style={{ marginTop: 0 }}>
+          {BANKING_FEES_NOTE}
         </p>
       </section>
 
       <section className="list-panel panel calculator" style={{ marginTop: '1rem' }}>
-        <h2>Fee calculator — estimated annual NOVARA charges</h2>
-        <p className="muted" style={{ marginTop: 0 }}>
-          Uses the approved Starter Office floor ({formatMoney(OFFICE_SUBSCRIPTION_FLOOR)}/yr) and approved independent
-          preparer per-return fees. Bank-product fees are excluded.
-        </p>
+        <h2>Fee calculator</h2>
         <div className="calc-grid">
           <div className="field">
-            <label htmlFor="ind">Individual returns (TP fee {formatMoney(TP_PERSONAL_FEE)})</label>
+            <label htmlFor="sched">Fee schedule</label>
+            <select id="sched" value={schedule} onChange={(e) => setSchedule(e.target.value as 'Office' | 'TP')}>
+              <option value="Office">Office software fees</option>
+              <option value="TP">TP software fees</option>
+            </select>
+          </div>
+          {schedule === 'Office' && (
+            <div className="field">
+              <label htmlFor="sub">Subscription</label>
+              <select id="sub" value={subAmount} onChange={(e) => setSubAmount(Number(e.target.value))}>
+                <option value={OFFICE_SUBSCRIPTION_FLOOR}>{formatMoney(OFFICE_SUBSCRIPTION_FLOOR)} Standard</option>
+                <option value={OFFICE_SUBSCRIPTION_HIGH}>{formatMoney(OFFICE_SUBSCRIPTION_HIGH)} Plus</option>
+              </select>
+            </div>
+          )}
+          <div className="field">
+            <label htmlFor="ind">Personal returns</label>
             <input
               id="ind"
               type="number"
@@ -247,7 +218,7 @@ export function Fees() {
             />
           </div>
           <div className="field">
-            <label htmlFor="biz">Business returns (TP fee {formatMoney(TP_BUSINESS_TOTAL)})</label>
+            <label htmlFor="biz">Business returns</label>
             <input
               id="biz"
               type="number"
@@ -260,16 +231,17 @@ export function Fees() {
         <div className="example-math" style={{ marginTop: '0.75rem' }}>
           <div className="row-item">
             <div>
-              <strong>Subscription</strong>
-              <span className="row-meta">Starter Office annual floor</span>
+              <strong>{schedule === 'Office' ? 'Subscription' : 'TP registration (year-one model)'}</strong>
             </div>
-            <strong>{formatMoney(OFFICE_SUBSCRIPTION_FLOOR)}</strong>
+            <strong>
+              {formatMoney(schedule === 'Office' ? subAmount : TP_REGISTRATION_FEE)}
+            </strong>
           </div>
           <div className="row-item">
             <div>
-              <strong>Individual return fees</strong>
+              <strong>Personal return fees</strong>
               <span className="row-meta">
-                {individualReturns} × {formatMoney(TP_PERSONAL_FEE)}
+                {individualReturns} × {formatMoney(estimate.personalRate)}
               </span>
             </div>
             <strong>{formatMoney(estimate.individualFees)}</strong>
@@ -278,15 +250,15 @@ export function Fees() {
             <div>
               <strong>Business return fees</strong>
               <span className="row-meta">
-                {businessReturns} × {formatMoney(TP_BUSINESS_TOTAL)}
+                {businessReturns} × {formatMoney(estimate.businessRate)}
               </span>
             </div>
             <strong>{formatMoney(estimate.businessFees)}</strong>
           </div>
           <div className="row-item total-row">
             <div>
-              <strong>Estimated annual NOVARA platform charges</strong>
-              <span className="row-meta">Does not include customer prep fees or bank products</span>
+              <strong>Estimated NOVARA platform charges</strong>
+              <span className="row-meta">Excludes customer prep markups and bank products</span>
             </div>
             <strong>{formatMoney(estimate.total)}</strong>
           </div>
@@ -313,30 +285,6 @@ export function Fees() {
             )
           })}
         </div>
-      </section>
-
-      <section className="list-panel panel" style={{ marginTop: '1rem' }}>
-        <div className="section-head">
-          <h2>Direct consumer prices</h2>
-          <span className="badge badge-warn">Not finalized</span>
-        </div>
-        <p className="muted" style={{ marginTop: 0 }}>
-          Provisional proposals only — not approved subscription or TP terms. Shown for internal reference; do not treat
-          as published final prices.
-        </p>
-        {CONSUMER_PRICES.map((f) => (
-          <div className="row-item" key={f.id}>
-            <div>
-              <strong>{f.label}</strong>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <strong>From {formatMoney(f.amount)}</strong>
-              <div>
-                <span className="badge badge-warn">provisional</span>
-              </div>
-            </div>
-          </div>
-        ))}
       </section>
     </div>
   )

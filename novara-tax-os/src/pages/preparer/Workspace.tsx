@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { actions, useAppStore } from '../../store/useAppStore'
 import { AiPanel } from '../../components/AiPanel'
-import { formatMoney } from '../../data/fees'
+import { TP_BUSINESS_FEE, UNLIMITED_CLIENTS_COPY, formatMoney } from '../../data/fees'
 import type { ReturnType } from '../../data/types'
 import '../shared.css'
 import './Workspace.css'
@@ -171,7 +171,8 @@ export function Workspace() {
         <section className="list-panel panel">
           <h2>Create business return</h2>
           <p className="muted" style={{ marginTop: 0 }}>
-            Charges exactly {formatMoney(239.98)} ($89.99 + $149.99 business AI). Never collect the base twice.
+            Charges the centralized business software fee ({formatMoney(TP_BUSINESS_FEE)}). {UNLIMITED_CLIENTS_COPY} —
+            no volume caps. Never also charge the TC retail price on this line.
           </p>
           <form onSubmit={createBiz} style={{ display: 'grid', gap: '0.75rem' }}>
             <div className="field">
@@ -187,7 +188,7 @@ export function Workspace() {
               </select>
             </div>
             <button className="btn btn-primary" type="submit">
-              Create with business AI surcharge
+              Create business return
             </button>
           </form>
         </section>

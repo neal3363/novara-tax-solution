@@ -3,6 +3,7 @@ import { RequireAuth } from './components/RequireAuth'
 import { RoleGate } from './components/RoleGate'
 import { Landing } from './pages/Landing'
 import { Login } from './pages/Login'
+import { RegisterFlow, RegisterHub } from './pages/Register'
 import { Fees } from './pages/Fees'
 import { TaxpayerHome } from './pages/taxpayer/TaxpayerHome'
 import { Prepare } from './pages/taxpayer/Prepare'
@@ -29,6 +30,8 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<RegisterHub />} />
+      <Route path="/register/:tier" element={<RegisterFlow />} />
       <Route path="/app" element={<RequireAuth />}>
         <Route path="taxpayer" element={<RoleGate roles={['taxpayer']}><TaxpayerHome /></RoleGate>} />
         <Route path="taxpayer/prepare" element={<RoleGate roles={['taxpayer']}><Prepare /></RoleGate>} />

@@ -222,4 +222,14 @@ export interface AppState {
     detail: string
     docIds: string[]
   }[]
+  /** Active billing tier for this session (TC / TP / Office) */
+  accountTier?: 'TC' | 'TP' | 'Office'
+  registrationPayments?: {
+    id: string
+    label: string
+    amount: number
+    tier: 'TC' | 'TP' | 'Office'
+    at: string
+    mode: 'test' | 'live'
+  }[]
 }

@@ -1,4 +1,10 @@
 import type { DocumentRecord, TaxReturn, UserAccount } from './types'
+import {
+  OFFICE_PERSONAL_FEE,
+  TC_PERSONAL_FEE,
+  TP_BUSINESS_FEE,
+  TP_PERSONAL_FEE,
+} from './fees'
 
 export const DEMO_USERS: UserAccount[] = [
   {
@@ -44,7 +50,7 @@ export const SEED_RETURNS: TaxReturn[] = [
     refundOrOwe: 0,
     preparerId: 'u-prep',
     isBusiness: false,
-    feeSnapshot: [{ label: 'Consumer basic W-2', amount: 149, status: 'provisional' }],
+    feeSnapshot: [{ label: 'Personal tax return (TC)', amount: TC_PERSONAL_FEE, status: 'approved' }],
     appliedBenefits: [],
     updatedAt: new Date().toISOString(),
   },
@@ -59,7 +65,7 @@ export const SEED_RETURNS: TaxReturn[] = [
     refundOrOwe: 2140,
     preparerId: 'u-prep',
     isBusiness: false,
-    feeSnapshot: [{ label: 'TP personal return', amount: 89.99, status: 'approved' }],
+    feeSnapshot: [{ label: 'Personal tax return (TP software)', amount: TP_PERSONAL_FEE, status: 'approved' }],
     appliedBenefits: [],
     updatedAt: new Date().toISOString(),
   },
@@ -74,7 +80,7 @@ export const SEED_RETURNS: TaxReturn[] = [
     refundOrOwe: 0,
     preparerId: 'u-prep',
     isBusiness: true,
-    feeSnapshot: [{ label: 'TP business return', amount: 239.98, status: 'approved' }],
+    feeSnapshot: [{ label: 'Business tax return (TP software)', amount: TP_BUSINESS_FEE, status: 'approved' }],
     appliedBenefits: [],
     updatedAt: new Date().toISOString(),
   },
@@ -89,7 +95,7 @@ export const SEED_RETURNS: TaxReturn[] = [
     refundOrOwe: -480,
     preparerId: 'u-prep',
     isBusiness: false,
-    feeSnapshot: [{ label: 'TP personal return', amount: 89.99, status: 'approved' }],
+    feeSnapshot: [{ label: 'Personal tax return (Office software)', amount: OFFICE_PERSONAL_FEE, status: 'approved' }],
     appliedBenefits: [],
     updatedAt: new Date().toISOString(),
   },
@@ -104,7 +110,7 @@ export const SEED_RETURNS: TaxReturn[] = [
     refundOrOwe: 1785,
     preparerId: 'u-prep',
     isBusiness: false,
-    feeSnapshot: [{ label: 'TP personal return', amount: 89.99, status: 'approved' }],
+    feeSnapshot: [{ label: 'Personal tax return (TP software)', amount: TP_PERSONAL_FEE, status: 'approved' }],
     appliedBenefits: [],
     updatedAt: new Date(Date.now() - 86400000 * 40).toISOString(),
   },

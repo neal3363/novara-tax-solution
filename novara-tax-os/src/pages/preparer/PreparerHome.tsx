@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { actions, useAppStore } from '../../store/useAppStore'
-import { formatMoney } from '../../data/fees'
+import { UNLIMITED_CLIENTS_COPY, formatMoney } from '../../data/fees'
 import { RefundTracker } from '../../components/benefits/RefundTracker'
 import '../shared.css'
 
@@ -17,7 +17,7 @@ export function PreparerHome() {
     <div className="page container">
       <header className="page-header">
         <div>
-          <p className="eyebrow">Preparer inbox · Summit Tax Office</p>
+          <p className="eyebrow">TP inbox · {UNLIMITED_CLIENTS_COPY}</p>
           <h1>Returns ready for judgment</h1>
         </div>
         <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>

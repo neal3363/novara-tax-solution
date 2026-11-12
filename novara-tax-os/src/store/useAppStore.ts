@@ -12,7 +12,13 @@ import type {
   TaxReturn,
   UserAccount,
 } from '../data/types'
-import { CONSUMER_PRICES, TP_FEES } from '../data/fees'
+import {
+  TC_PERSONAL_FEE,
+  dedupeFeeLines,
+  returnSoftwareFee,
+  roleToTier,
+  type AccountTier,
+} from '../data/fees'
 import {
   applyAnswer,
   defaultProfile,
@@ -332,6 +338,8 @@ let state: Store = {
   interviewAnswers: [],
   auditEvents: [],
   uploadIssues: [],
+  accountTier: undefined,
+  registrationPayments: [],
   hydrated: false,
 }
 
@@ -390,6 +398,8 @@ function hydrate() {
         interviewAnswers: parsed.interviewAnswers ?? [],
         auditEvents: parsed.auditEvents ?? [],
         uploadIssues: parsed.uploadIssues ?? [],
+        registrationPayments: parsed.registrationPayments ?? [],
+        accountTier: parsed.accountTier ?? roleToTier(role ?? '') ?? undefined,
         returns: (parsed.returns ?? state.returns).map((r) => ({
           ...r,
           appliedBenefits: r.appliedBenefits ?? [],
@@ -435,7 +445,7 @@ function uid(prefix: string) {
 export const actions = {
   loginAs(role: Role) {
     const user = DEMO_USERS.find((u) => u.role === role) ?? DEMO_USERS[0]
-    state = { ...state, currentUser: user }
+    state = { ...state, currentUser: user, accountTier: roleToTier(role) ?? state.accountTier }
     emit()
   },
   logout() {
@@ -816,7 +826,11 @@ export const actions = {
             state: 'Client Review' as ReturnState,
             readiness: benefitReport.auditComplete ? 96 : 88,
             refundOrOwe: benefitReport.projectedRefund,
-            feeSnapshot: [{ label: 'Consumer basic W-2', amount: CONSUMER_PRICES[0].amount, status: 'provisional' }],
+            feeSnapshot: dedupeFeeLines(r.feeSnapshot, {
+              label: 'Personal tax return (TC)',
+              amount: TC_PERSONAL_FEE,
+              status: 'approved',
+            }),
             updatedAt: new Date().toISOString(),
           }
         : r,
@@ -875,7 +889,8 @@ export const actions = {
     emit()
   },
   createBusinessReturn(clientName: string, returnType: TaxReturn['returnType']) {
-    const fee = TP_FEES.find((f) => f.id === 'tp-business')!
+    const tier: AccountTier = roleToTier(state.currentUser?.role ?? 'preparer') ?? 'TP'
+    const fee = returnSoftwareFee(tier, true)
     const ret: TaxReturn = {
       id: uid('r'),
       clientName,
@@ -891,7 +906,64 @@ export const actions = {
       appliedBenefits: [],
       updatedAt: new Date().toISOString(),
     }
-    state = { ...state, returns: [ret, ...state.returns], activeReturnId: ret.id }
+    state = {
+      ...state,
+      returns: [ret, ...state.returns],
+      activeReturnId: ret.id,
+      auditEvents: appendAudit('return_created', `Business return created with ${fee.label} (${fee.amount}).`, {
+        feeId: fee.id,
+      }),
+    }
+    emit()
+  },
+  recordRegistrationPayment(input: {
+    tier: AccountTier
+    lines: { id: string; label: string; amount: number }[]
+    planAmount: number
+  }) {
+    const prior = state.registrationPayments ?? []
+    const deduped = [...prior]
+    input.lines.forEach((line) => {
+      if (!deduped.some((p) => p.id === line.id && p.tier === input.tier)) {
+        deduped.push({ ...line, tier: input.tier, at: new Date().toISOString(), mode: 'test' })
+      }
+    })
+    state = {
+      ...state,
+      registrationPayments: deduped,
+      accountTier: input.tier,
+      auditEvents: appendAudit(
+        'registration_payment',
+        `Test-mode registration payment for ${input.tier}: ${input.planAmount}`,
+        { tier: input.tier, amount: input.planAmount },
+      ),
+    }
+    emit()
+  },
+  chargeReturnSoftwareFee(returnId: string, isBusiness: boolean) {
+    const tier: AccountTier =
+      state.accountTier ?? roleToTier(state.currentUser?.role ?? 'taxpayer') ?? 'TC'
+    const fee = returnSoftwareFee(tier, isBusiness)
+    state = {
+      ...state,
+      returns: state.returns.map((r) =>
+        r.id === returnId
+          ? {
+              ...r,
+              feeSnapshot: dedupeFeeLines(r.feeSnapshot, {
+                label: fee.label,
+                amount: fee.amount,
+                status: fee.status,
+              }),
+              updatedAt: new Date().toISOString(),
+            }
+          : r,
+      ),
+      auditEvents: appendAudit('software_fee', `Applied ${fee.label} without duplicate charge.`, {
+        returnId,
+        amount: fee.amount,
+      }),
+    }
     emit()
   },
   updateEntryLine(id: string, patch: Partial<EntryPlanLine>) {
@@ -1157,6 +1229,8 @@ export const actions = {
       interviewAnswers: [],
       auditEvents: [],
       uploadIssues: [],
+      accountTier: roleToTier(state.currentUser?.role ?? '') ?? undefined,
+      registrationPayments: [],
       hydrated: true,
     }
     emit()
