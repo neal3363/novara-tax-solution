@@ -11,22 +11,29 @@ export interface FeeItem {
   audience: 'tp' | 'office' | 'consumer' | 'bank'
 }
 
+/** Approved Addendum F amounts */
+export const OFFICE_SUBSCRIPTION_FLOOR = 899
+export const TP_PERSONAL_FEE = 89.99
+export const TP_BUSINESS_BASE = 89.99
+export const TP_BUSINESS_SURCHARGE = 149.99
+export const TP_BUSINESS_TOTAL = 239.98
+
 export const TP_FEES: FeeItem[] = [
   {
     id: 'tp-personal',
-    label: 'Personal return (1040)',
-    amount: 89.99,
+    label: 'Individual tax return',
+    amount: TP_PERSONAL_FEE,
     status: 'approved',
     audience: 'tp',
-    note: 'NOVARA charge per return',
+    note: 'NOVARA platform fee when a preparer files under a sponsoring office EFIN.',
   },
   {
     id: 'tp-business',
-    label: 'Business return (1065 / 1120-S / 1120)',
-    amount: 239.98,
+    label: 'Business tax return',
+    amount: TP_BUSINESS_TOTAL,
     status: 'approved',
     audience: 'tp',
-    note: '$89.99 base + $149.99 business AI surcharge. Never collect base twice.',
+    note: '$89.99 base + $149.99 business surcharge. Never collect the base twice.',
   },
 ]
 
@@ -34,10 +41,10 @@ export const OFFICE_TIERS = [
   {
     id: 'starter',
     name: 'Starter Office',
-    annual: 899,
+    annual: OFFICE_SUBSCRIPTION_FLOOR,
     businessReturns: false,
     status: 'approved' as const,
-    blurb: 'Personal-return features per published tier scope. Floor pricing.',
+    blurb: 'Lowest published annual tax-office subscription. Personal-return features per tier scope. Does not include unlimited free returns.',
   },
   {
     id: 'personal-pro',
@@ -45,7 +52,7 @@ export const OFFICE_TIERS = [
     annual: 1299,
     businessReturns: false,
     status: 'provisional' as const,
-    blurb: 'Personal-only professional platform. Proposed, not final.',
+    blurb: 'Proposed only — not an approved final price.',
   },
   {
     id: 'complete-pro',
@@ -53,7 +60,7 @@ export const OFFICE_TIERS = [
     annual: null as number | null,
     businessReturns: true,
     status: 'provisional' as const,
-    blurb: 'Competitor comparable price less $150. Final amount TBD.',
+    blurb: 'Competitor comparable price less $150. Final amount not yet verified or approved.',
   },
   {
     id: 'enterprise',
@@ -61,8 +68,18 @@ export const OFFICE_TIERS = [
     annual: null as number | null,
     businessReturns: true,
     status: 'provisional' as const,
-    blurb: 'Custom commercial agreement.',
+    blurb: 'Custom commercial agreement — not a published fixed price.',
   },
+]
+
+export const STARTER_INCLUDES = [
+  'Tax office dashboard',
+  'Office and staff management',
+  'Client management',
+  'Tax preparation workflows',
+  'AI-assisted tax benefit discovery',
+  'Return tracking and electronic signature workflows',
+  'E-file management, where enabled',
 ]
 
 export const CONSUMER_PRICES: FeeItem[] = [
@@ -79,4 +96,16 @@ export const CONSUMER_PRICES: FeeItem[] = [
 
 export function formatMoney(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n)
+}
+
+export function estimateNovaraAnnualCharges(input: {
+  subscriptionAnnual: number
+  individualReturns: number
+  businessReturns: number
+}) {
+  const individualFees = input.individualReturns * TP_PERSONAL_FEE
+  const businessFees = input.businessReturns * TP_BUSINESS_TOTAL
+  const perReturnTotal = individualFees + businessFees
+  const total = input.subscriptionAnnual + perReturnTotal
+  return { individualFees, businessFees, perReturnTotal, total }
 }

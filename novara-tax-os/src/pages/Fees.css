@@ -1,0 +1,180 @@
+.pricing-page .pricing-intro {
+  margin: -0.35rem 0 1.1rem;
+  max-width: 46rem;
+  line-height: 1.5;
+}
+
+.how-steps {
+  padding: 1.15rem 1.2rem 1.25rem;
+}
+
+.how-steps h2 {
+  margin: 0 0 0.9rem;
+  font-size: 1.2rem;
+}
+
+.how-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.how-step {
+  display: flex;
+  gap: 0.85rem;
+  align-items: flex-start;
+  padding: 0.85rem 0.9rem;
+  border-radius: 14px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+}
+
+.how-step span {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--ink);
+  color: white;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.how-step strong {
+  display: block;
+  margin-bottom: 0.2rem;
+}
+
+.how-step p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+.section-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem;
+  align-items: flex-start;
+  margin-bottom: 0.35rem;
+}
+
+.section-head h2 {
+  margin: 0;
+  max-width: 42rem;
+}
+
+.subhead {
+  margin: 0.85rem 0 0.35rem;
+  font-size: 1.02rem;
+  font-family: var(--font-brand);
+}
+
+.check-list {
+  margin: 0.5rem 0 0.85rem;
+  padding-left: 1.15rem;
+  color: var(--slate);
+  line-height: 1.55;
+}
+
+.callout {
+  margin: 0.75rem 0 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  background: var(--teal-soft);
+  color: var(--ink-soft);
+  line-height: 1.45;
+}
+
+.callout.warn {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.fee-cards {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0.75rem 0 0.5rem;
+}
+
+.fee-card {
+  padding: 1rem;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.fee-label {
+  margin: 0.55rem 0 0.15rem;
+  font-weight: 600;
+  color: var(--slate);
+}
+
+.fee-amount {
+  margin: 0;
+  font-family: var(--font-brand);
+  font-size: 1.85rem;
+  line-height: 1.1;
+}
+
+.example-math .total-row {
+  border-top: 1px solid var(--line-strong);
+  margin-top: 0.25rem;
+  padding-top: 0.95rem;
+}
+
+.example-math .total-row strong {
+  color: var(--teal);
+}
+
+.calc-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.faq-list {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.faq-item {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--paper);
+}
+
+.faq-q {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: center;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  padding: 0.9rem 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.faq-a {
+  margin: 0;
+  padding: 0 1rem 0.95rem;
+  color: var(--slate);
+  line-height: 1.45;
+}
+
+@media (min-width: 720px) {
+  .how-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .fee-cards,
+  .calc-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

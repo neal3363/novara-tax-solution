@@ -93,7 +93,10 @@ export function Landing() {
       <section className="section" style={{ paddingTop: 0 }}>
         <div className="container">
           <h2>Approved fees (Addendum F)</h2>
-          <p className="section-lead">Approved amounts are requirements. Other figures remain configurable pending approval.</p>
+          <p className="section-lead">
+            Subscriptions start at $899/year. Per-return and bank-product fees are separate — a subscription does not
+            mean unlimited free returns. Only approved amounts are shown as final.
+          </p>
           <div className="price-grid">
             {TP_FEES.map((f) => (
               <article className="price-item panel" key={f.id}>
