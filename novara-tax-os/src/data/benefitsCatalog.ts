@@ -37,7 +37,7 @@ export interface BenefitRule {
   incompatibleWith?: string[]
 }
 
-export const BENEFIT_RULE_VERSION = '2025.federal+state.demo.v4'
+export const BENEFIT_RULE_VERSION = '2025.federal+state.demo.v5-dependents'
 
 export const BENEFIT_CATALOG_2025: BenefitRule[] = [
   {

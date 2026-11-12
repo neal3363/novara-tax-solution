@@ -15,18 +15,31 @@ export function RefundTracker({ report }: { report: BenefitSnapshot | null }) {
 
   const delta = report.projectedRefund - report.baseRefund
   const potential = report.projectedRefund + report.potentialSavings
+  const incomplete = Boolean(report.refundIncomplete)
 
   return (
     <section className="panel refund-tracker rise">
       <div className="refund-head">
         <div>
           <p className="eyebrow">Refund Opportunity Tracker</p>
-          <h2>Live refund projection</h2>
+          <h2>{incomplete ? 'Refund calculation incomplete' : 'Live refund projection'}</h2>
         </div>
         <span className={`badge ${report.auditComplete ? 'badge-ok' : 'badge-warn'}`}>
-          {report.auditComplete ? 'Benefit audit complete' : 'Review still open'}
+          {incomplete
+            ? 'Dependent information needed'
+            : report.auditComplete
+              ? 'Benefit audit complete'
+              : 'Review still open'}
         </span>
       </div>
+
+      {incomplete && (
+        <p className="tracker-change" role="status">
+          {report.refundIncompleteReason ?? 'Refund calculation incomplete — dependent information needed.'} Base wages
+          and withholding still show below; dependent credits are not treated as verified until each dependent is
+          reviewed.
+        </p>
+      )}
 
       <div className="refund-metrics">
         <div>
@@ -38,7 +51,7 @@ export function RefundTracker({ report }: { report: BenefitSnapshot | null }) {
           <p className="value positive">+{formatMoney(report.verifiedSavings)}</p>
         </div>
         <div>
-          <p className="label">Current projection</p>
+          <p className="label">{incomplete ? 'Provisional (deps open)' : 'Current projection'}</p>
           <p className="value accent">{formatMoney(report.projectedRefund)}</p>
         </div>
         <div>

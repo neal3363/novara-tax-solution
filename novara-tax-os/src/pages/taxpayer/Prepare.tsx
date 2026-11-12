@@ -12,6 +12,7 @@ import {
   nextBenefitDiscoveryTurn,
   nextFilingStatusTurn,
 } from '../../engine/smartInterview'
+import { nextDependentQuestion } from '../../engine/dependentsEngine'
 import '../shared.css'
 import './Prepare.css'
 
@@ -44,8 +45,20 @@ export function Prepare() {
   const known = useMemo(() => knownFactsSummary(documents, taxProfile), [documents, taxProfile])
 
   const filingTurn = nextFilingStatusTurn(taxProfile)
-  const benefitTurn = filingTurn ? null : nextBenefitDiscoveryTurn(taxProfile)
-  const activeTurn = filingTurn ?? benefitTurn
+  const depQ = filingTurn ? null : nextDependentQuestion(taxProfile.answers, taxProfile.dependents)
+  const dependentTurn = depQ
+    ? {
+        id: depQ.id,
+        phase: 'dependents' as const,
+        prompt: depQ.prompt,
+        kind: (depQ.kind === 'date' ? 'text' : depQ.kind) as 'yesno' | 'choice' | 'number' | 'text',
+        choices: depQ.choices,
+        mapsTo: depQ.mapsTo,
+        aiLead: 'We need exact dependent facts before any dependent credit can change a verified refund.',
+      }
+    : null
+  const benefitTurn = filingTurn || dependentTurn ? null : nextBenefitDiscoveryTurn(taxProfile)
+  const activeTurn = filingTurn ?? dependentTurn ?? benefitTurn
 
   function onDrop(e: DragEvent) {
     e.preventDefault()
@@ -57,7 +70,17 @@ export function Prepare() {
     if (!activeTurn || saving) return
     setSaving(true)
     try {
-      actions.answerSmartInterview(activeTurn.mapsTo, value, activeTurn.prompt)
+      if (activeTurn.phase === 'dependents' || activeTurn.mapsTo.startsWith('dep_') || activeTurn.mapsTo === 'dependent_count' || activeTurn.mapsTo === 'potential_dependents') {
+        const normalized =
+          typeof value === 'string' && value.toLowerCase() === 'yes'
+            ? 'yes'
+            : typeof value === 'string' && value.toLowerCase() === 'no'
+              ? 'no'
+              : value
+        actions.answerDependentQuestion(activeTurn.mapsTo, normalized, activeTurn.prompt)
+      } else {
+        actions.answerSmartInterview(activeTurn.mapsTo, value, activeTurn.prompt)
+      }
       await new Promise((r) => setTimeout(r, 160))
     } finally {
       setSaving(false)
@@ -66,6 +89,7 @@ export function Prepare() {
 
   async function skipTurn() {
     if (!activeTurn || saving) return
+    if (activeTurn.phase === 'dependents') return // do not skip mandatory dependent facts
     setSaving(true)
     try {
       actions.markBenefitUnresolved(activeTurn.mapsTo, activeTurn.prompt)
@@ -216,7 +240,11 @@ export function Prepare() {
               {activeTurn ? (
                 <div className="active-turn">
                   <p className="turn-label">
-                    {activeTurn.phase === 'filing_status' ? 'Filing status' : 'Tax benefit discovery'}
+                    {activeTurn.phase === 'filing_status'
+                      ? 'Filing status'
+                      : activeTurn.phase === 'dependents'
+                        ? 'Dependent verification'
+                        : 'Tax benefit discovery'}
                   </p>
                   <InterviewChoice
                     key={activeTurn.id}
@@ -225,13 +253,22 @@ export function Prepare() {
                     kind={activeTurn.kind}
                     choices={activeTurn.choices}
                     saving={saving}
-                    secondaryLabel="Skip / unresolved"
-                    onSecondary={() => void skipTurn()}
+                    secondaryLabel={activeTurn.phase === 'dependents' ? undefined : 'Skip / unresolved'}
+                    onSecondary={activeTurn.phase === 'dependents' ? undefined : () => void skipTurn()}
                     onConfirm={(value) => confirmTurn(value)}
                   />
+                  {activeTurn.phase === 'dependents' && (
+                    <p className="muted" style={{ marginTop: '0.75rem' }}>
+                      Or continue on the dedicated{' '}
+                      <Link to="/app/taxpayer/dependents">Dependents</Link> page (secure ID upload + checklist).
+                    </p>
+                  )}
                 </div>
               ) : (
                 <div className="answer-row">
+                  <Link className="btn btn-secondary" to="/app/taxpayer/dependents">
+                    Review dependents
+                  </Link>
                   <button className="btn btn-primary" type="button" onClick={() => actions.completeSmartInterview()}>
                     Calculate my result
                   </button>
@@ -286,9 +323,17 @@ export function Prepare() {
                 <div className="row-item">
                   <div>
                     <strong>Dependents</strong>
+                    <span className="row-meta">
+                      {benefitReport?.dependentInfoComplete
+                        ? 'Verified for credit calculation'
+                        : 'Interview incomplete — credits blocked'}
+                    </span>
                   </div>
                   <strong>{taxProfile.dependents.length}</strong>
                 </div>
+                <Link className="btn btn-secondary" to="/app/taxpayer/dependents">
+                  Open dependent interview
+                </Link>
               </section>
             </div>
           </div>

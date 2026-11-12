@@ -94,16 +94,19 @@ export function ReturnEditor() {
               value={taxProfile.dependents.filter((d) => d.age < 17).length}
               onChange={(e) => {
                 const n = Math.max(0, Number(e.target.value) || 0)
-                actions.updateTaxProfile({
-                  dependents: Array.from({ length: n }, (_, i) => ({
-                    name: `Child ${i + 1}`,
-                    age: 8,
-                    relationship: 'child',
-                  })),
-                  answers: { ...taxProfile.answers, has_dependents: n > 0 ? 'yes' : 'no', has_child: n > 0 ? 'yes' : 'no' },
-                })
+                // Count only — do not invent eligibility; finish facts on Dependents page
+                if (n === 0) {
+                  actions.answerDependentQuestion('potential_dependents', 'no', 'Do you have any children or other people who may qualify as your dependents?')
+                } else {
+                  actions.answerDependentQuestion('potential_dependents', 'yes', 'Do you have any children or other people who may qualify as your dependents?')
+                  actions.answerDependentQuestion('dependent_count', n, 'How many children or other potential dependents do you have?')
+                }
               }}
             />
+            <p className="muted" style={{ marginTop: '0.35rem' }}>
+              Open the Dependents interview to collect legal name, DOB, TIN last-4, residency, and eligibility tests for each
+              person — refund credits stay blocked until that interview is complete.
+            </p>
           </div>
           <div className="field">
             <label htmlFor="care">Qualifying childcare expenses</label>

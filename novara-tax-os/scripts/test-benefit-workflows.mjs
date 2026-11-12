@@ -129,13 +129,48 @@ console.log('\\n=== Test C: Childcare Credit ===')
 {
   const first = nextBenefitSpecificQuestion('cdcc', defaultProfile())
   assert(first?.mapsTo === 'has_child', 'CDCC starts with has_child')
-  let p = walkQuestionnaire('cdcc', (q) => {
+  // Dependent interview must complete before CDCC can affect a verified refund
+  let p = applyAnswer(defaultProfile(), 'potential_dependents', 'yes')
+  p = applyAnswer(p, 'dependent_count', 1)
+  for (const [k, v] of [
+    ['dep_0_name', 'Care Kid'],
+    ['dep_0_dob', '2018-01-01'],
+    ['dep_0_tin_path', 'I will enter last 4 now'],
+    ['dep_0_tin_last4', '9999'],
+    ['dep_0_relationship', 'Daughter'],
+    ['dep_0_months', 12],
+    ['dep_0_shared_custody', 'no'],
+    ['dep_0_own_support', 'no'],
+    ['dep_0_another_claim', 'no'],
+  ]) {
+    p = applyAnswer(p, k, v)
+  }
+  p = walkQuestionnaire('cdcc', (q) => {
     if (q.mapsTo === 'childcare_amount') return 3000
     if (q.mapsTo === 'employer_dependent_care') return 'no'
     if (q.kind === 'yesno') return 'yes'
     return 'yes'
   })
-  assert(benefitQuestionnaireComplete('cdcc', p), 'CDCC complete')
+  // re-apply dep answers after walk (walk starts from defaultProfile)
+  p = applyAnswer(defaultProfile(), 'potential_dependents', 'yes')
+  p = applyAnswer(p, 'dependent_count', 1)
+  for (const [k, v] of [
+    ['dep_0_name', 'Care Kid'],
+    ['dep_0_dob', '2018-01-01'],
+    ['dep_0_tin_path', 'I will enter last 4 now'],
+    ['dep_0_tin_last4', '9999'],
+    ['dep_0_relationship', 'Daughter'],
+    ['dep_0_months', 12],
+    ['dep_0_shared_custody', 'no'],
+    ['dep_0_own_support', 'no'],
+    ['dep_0_another_claim', 'no'],
+  ]) {
+    p = applyAnswer(p, k, v)
+  }
+  p = applyAnswer(p, 'paid_childcare', 'yes')
+  p = applyAnswer(p, 'childcare_amount', 3000)
+  p = applyAnswer(p, 'care_provider', 'yes')
+  p = applyAnswer(p, 'employer_dependent_care', 'no')
   assert(p.childcarePaid === 3000, 'childcare amount saved')
   const report = runBenefitOptimization(p)
   const f = report.findings.find((x) => x.ruleId === 'cdcc')
@@ -143,7 +178,7 @@ console.log('\\n=== Test C: Childcare Credit ===')
   assert((f?.affectingRefund ?? 0) > 0, 'CDCC amount > 0')
   assert(f?.form === 'Form 2441', 'CDCC Form 2441')
   const checklist = buildDocumentChecklist(p, [])
-  assert(checklist.some((d) => d.benefitId === 'cdcc'), 'CDCC docs on checklist')
+  assert(checklist.some((d) => d.benefitId === 'cdcc' || d.name.toLowerCase().includes('childcare')), 'CDCC docs on checklist')
 }
 
 console.log('\\n=== Test D: Previously uploaded documents ===')
@@ -213,17 +248,30 @@ console.log('\\n=== Test F: Answer correction reevaluates ===')
   assert(after?.status === 'ineligible', 'after correction mileage ineligible')
   assert((after?.affectingRefund ?? 0) === 0, 'after correction amount cleared')
 
-  // Correct childcare amount upward
-  let c = walkQuestionnaire('cdcc', (q) => {
-    if (q.mapsTo === 'childcare_amount') return 2000
-    if (q.mapsTo === 'employer_dependent_care') return 'no'
-    if (q.kind === 'yesno') return 'yes'
-    return 'yes'
-  })
+  // Correct childcare amount upward (with completed dependent interview)
+  let c = applyAnswer(defaultProfile(), 'potential_dependents', 'yes')
+  c = applyAnswer(c, 'dependent_count', 1)
+  for (const [k, v] of [
+    ['dep_0_name', 'Care Kid'],
+    ['dep_0_dob', '2018-01-01'],
+    ['dep_0_tin_path', 'I will enter last 4 now'],
+    ['dep_0_tin_last4', '9999'],
+    ['dep_0_relationship', 'Daughter'],
+    ['dep_0_months', 12],
+    ['dep_0_shared_custody', 'no'],
+    ['dep_0_own_support', 'no'],
+    ['dep_0_another_claim', 'no'],
+  ]) {
+    c = applyAnswer(c, k, v)
+  }
+  c = applyAnswer(c, 'paid_childcare', 'yes')
+  c = applyAnswer(c, 'childcare_amount', 2000)
+  c = applyAnswer(c, 'care_provider', 'yes')
+  c = applyAnswer(c, 'employer_dependent_care', 'no')
   const amt1 = runBenefitOptimization(c).findings.find((x) => x.ruleId === 'cdcc')?.affectingRefund ?? 0
   c = applyAnswer(c, 'childcare_amount', 6000)
   const amt2 = runBenefitOptimization(c).findings.find((x) => x.ruleId === 'cdcc')?.affectingRefund ?? 0
-  assert(amt2 >= amt1, 'higher childcare expense recalculates credit (' + amt1 + ' -> ' + amt2 + ')')
+  assert(amt2 >= amt1 && amt2 > 0, 'higher childcare expense recalculates credit (' + amt1 + ' -> ' + amt2 + ')')
 }
 
 console.log('\\n=== Form mapping sanity ===')

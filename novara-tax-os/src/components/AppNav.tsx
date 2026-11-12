@@ -23,6 +23,7 @@ export function AppNav() {
       ? [
           { to: '/app/taxpayer', label: 'Home' },
           { to: '/app/taxpayer/prepare', label: 'Prepare' },
+          { to: '/app/taxpayer/dependents', label: 'Dependents' },
           { to: '/app/taxpayer/benefits', label: 'Savings' },
           { to: '/app/taxpayer/documents', label: 'Documents' },
           { to: '/app/taxpayer/vault', label: 'Vault' },
@@ -31,6 +32,7 @@ export function AppNav() {
         ? [
             { to: '/app/preparer', label: 'Inbox' },
             { to: '/app/preparer/return', label: 'Return' },
+            { to: '/app/preparer/dependents', label: 'Dependents' },
             { to: '/app/preparer/benefits', label: 'Benefits' },
             { to: '/app/preparer/entry-plan', label: 'Entry' },
           ]
