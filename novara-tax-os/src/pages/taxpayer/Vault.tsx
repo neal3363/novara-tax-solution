@@ -26,6 +26,11 @@ export function Vault() {
 
   // Store already tenant-scopes documents; taxpayers only see their vault.
   const filtered = documents.filter((d) => vaultFilter === 'all' || d.type === vaultFilter)
+  const byCategory = filtered.reduce<Record<string, typeof filtered>>((acc, d) => {
+    const cat = d.vaultCategory ?? 'other'
+    ;(acc[cat] ??= []).push(d)
+    return acc
+  }, {})
 
   function openAuthorized(docId: string) {
     const token = actions.requestDocumentLink(docId)
@@ -120,29 +125,35 @@ export function Vault() {
 
       <section className="list-panel panel rise">
         <h2>
-          {filtered.length} file{filtered.length === 1 ? '' : 's'} · your account · tax year 2025
+          {filtered.length} file{filtered.length === 1 ? '' : 's'} · audit-ready vault · TY2025 · tenant{' '}
+          {currentUser?.tenantId ?? '—'}
         </h2>
         {filtered.length === 0 && <p className="muted">No documents in this filter yet.</p>}
-        {filtered.map((d) => (
-          <div className="row-item" key={d.id}>
-            <div>
-              <strong>{d.name}</strong>
-              <span className="row-meta">
-                {d.type} · TY{d.taxYear} · {d.sizeLabel} · {new Date(d.uploadedAt).toLocaleString()}
-                {'storagePath' in d && d.storagePath ? ` · ${d.storagePath}` : ''}
-              </span>
-              {d.facts.slice(0, 2).map((f) => (
-                <span className="row-meta" key={f.id}>
-                  {f.label}: {f.value}
-                </span>
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-              <button className="btn btn-secondary" type="button" onClick={() => openAuthorized(d.id)}>
-                Authorized link
-              </button>
-              <span className={`badge ${d.status === 'needs_review' ? 'badge-warn' : 'badge-ok'}`}>{d.status}</span>
-            </div>
+        {Object.entries(byCategory).map(([cat, docs]) => (
+          <div key={cat} style={{ marginBottom: '0.85rem' }}>
+            <p className="eyebrow">{cat.replace(/_/g, ' ')}</p>
+            {docs.map((d) => (
+              <div className="row-item" key={d.id}>
+                <div>
+                  <strong>{d.name}</strong>
+                  <span className="row-meta">
+                    {d.type} · {d.sizeLabel} · {new Date(d.uploadedAt).toLocaleString()}
+                    {d.storagePath ? ` · ${d.storagePath}` : ''}
+                  </span>
+                  {d.facts.slice(0, 2).map((f) => (
+                    <span className="row-meta" key={f.id}>
+                      {f.label}: {f.value}
+                    </span>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                  <button className="btn btn-secondary" type="button" onClick={() => openAuthorized(d.id)}>
+                    Authorized link
+                  </button>
+                  <span className={`badge ${d.status === 'needs_review' ? 'badge-warn' : 'badge-ok'}`}>{d.status}</span>
+                </div>
+              </div>
+            ))}
           </div>
         ))}
       </section>

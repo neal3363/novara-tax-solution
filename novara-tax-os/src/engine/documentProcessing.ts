@@ -31,7 +31,9 @@ export function classifyDocumentName(name: string): DocType {
     n.includes('id') ||
     n.includes('license') ||
     n.includes('passport') ||
-    n.includes('dependent')
+    n.includes('dependent') ||
+    n.includes('birth') ||
+    n.includes('itin')
   )
     return 'ID'
   if (n.includes('1040') || n.includes('prior')) return 'Prior Return'
@@ -42,6 +44,27 @@ function fact(id: string, label: string, value: string, confidence: number, page
   return { id, label, value, sourcePage: page, confidence, verified: false }
 }
 
+function nameFromFile(fileName: string, fallback: string): string {
+  const base = fileName.replace(/\.[^.]+$/, '')
+  const m = base.match(
+    /(?:id|license|passport|ssn|social|birth|cert|dependent|spouse|child|w2|w-2)[_\-\s]+(.+)/i,
+  )
+  if (m) {
+    const cleaned = m[1]
+      .replace(/[_\-.]+/g, ' ')
+      .replace(/\b(ssn|id|license|passport|birth|cert|card|w2|doc)\b/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+    if (cleaned.length > 2) {
+      return cleaned
+        .split(' ')
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+        .join(' ')
+    }
+  }
+  return fallback
+}
+
 /** Deterministic demo extraction from document type — values stay consistent for the same type. */
 export function extractFactsForType(
   type: DocType,
@@ -50,9 +73,11 @@ export function extractFactsForType(
   uid: (prefix: string) => string,
   ownerName: string,
 ): ExtractedFact[] {
+  const personName = nameFromFile(fileName, ownerName)
   switch (type) {
     case 'W-2':
       return [
+        fact(uid('f'), 'Employee name', personName, confidence),
         fact(uid('f'), 'Employer name', 'Acme Logistics LLC', confidence),
         fact(uid('f'), 'Wages (Box 1)', '$64,200.00', confidence),
         fact(uid('f'), 'Federal withheld', '$7,110.00', confidence - 0.02),
@@ -86,12 +111,21 @@ export function extractFactsForType(
       ]
     case 'Property Tax':
       return [fact(uid('f'), 'Property taxes', '$5,100.00', confidence)]
-    case 'ID':
+    case 'ID': {
+      const isChild =
+        /child|birth|dependent|emma|liam|sophia|noah/i.test(fileName) ||
+        /child|birth|dependent/i.test(personName)
+      const isSpouse = /spouse|mary|partner/i.test(fileName)
+      const dob = isChild ? '06/02/2016' : isSpouse ? '11/08/1990' : '03/14/1988'
+      // TIN stored as masked fact only — full value never placed on ordinary screens
+      const last4 = isChild ? '4412' : isSpouse ? '7781' : '9021'
       return [
-        fact(uid('f'), 'Full name', ownerName, 0.96),
-        fact(uid('f'), 'Date of birth', '03/14/1988', 0.94),
-        fact(uid('f'), 'Address', '1842 Harbor Ave, Austin, TX', 0.91),
+        fact(uid('f'), 'Full name', personName, 0.96),
+        fact(uid('f'), 'Date of birth', dob, 0.94),
+        fact(uid('f'), 'Tax ID (SSN/ITIN)', `***-**-${last4}`, 0.93),
+        fact(uid('f'), 'Address', '1842 Harbor Ave, Austin, TX', isChild ? 0.88 : 0.91),
       ]
+    }
     default:
       return [fact(uid('f'), 'Detected label', fileName.replace(/\.[^.]+$/, ''), confidence)]
   }

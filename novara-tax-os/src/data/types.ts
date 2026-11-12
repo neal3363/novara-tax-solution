@@ -107,6 +107,18 @@ export interface DocumentRecord {
   clientId?: string
   /** Logical storage path scoped to tenant */
   storagePath?: string
+  /** Audit-ready vault organization */
+  vaultCategory?:
+    | 'primary_taxpayer'
+    | 'spouse'
+    | 'dependents'
+    | 'income'
+    | 'credits_deductions'
+    | 'business'
+    | 'filing_authorizations'
+    | 'other'
+  /** Linked extracted household person id when known */
+  personId?: string
   facts: ExtractedFact[]
 }
 
@@ -274,4 +286,6 @@ export interface AppState {
   }[]
   /** Office staff rosters keyed by tenant — TP accounts never receive entries */
   officeStaff: OfficeStaffMember[]
+  /** Document-first household identification workflow */
+  householdIntake: import('../engine/documentIntakeEngine').HouseholdIntakeState
 }
