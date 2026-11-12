@@ -1,0 +1,61 @@
+.register-page .tier-pick-grid {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.tier-pick {
+  display: grid;
+  gap: 0.45rem;
+  text-decoration: none;
+  color: inherit;
+  padding: 1.25rem 1.3rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.tier-pick:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+}
+
+.tier-pick strong {
+  font-family: var(--font-brand);
+  font-size: 1.25rem;
+}
+
+.tier-price-block {
+  display: grid;
+  gap: 0.2rem;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.register-form {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1.25rem;
+}
+
+.register-form h2 {
+  margin: 0;
+}
+
+.plan-pick {
+  border: 1px solid rgba(15, 40, 38, 0.12);
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.plan-option {
+  display: flex;
+  gap: 0.55rem;
+  align-items: flex-start;
+  cursor: pointer;
+}
+
+@media (min-width: 900px) {
+  .register-page .tier-pick-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}

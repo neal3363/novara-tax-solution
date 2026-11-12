@@ -1,40 +1,86 @@
 import { useMemo } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { BrandMark } from '../components/BrandMark'
+import { DEMO_USERS } from '../data/seed'
 import { actions } from '../store/useAppStore'
 import type { Role } from '../data/types'
+import {
+  OFFICE_BUSINESS_FEE,
+  OFFICE_PERSONAL_FEE,
+  OFFICE_SUBSCRIPTION_FLOOR,
+  OFFICE_SUBSCRIPTION_HIGH,
+  TC_BUSINESS_FEE,
+  TC_PERSONAL_FEE,
+  TP_BUSINESS_FEE,
+  TP_PERSONAL_FEE,
+  TP_REGISTRATION_FEE,
+  UNLIMITED_CLIENTS_COPY,
+  formatMoney,
+} from '../data/fees'
 import './Login.css'
 
-const ROLES: { role: Role; title: string; blurb: string; path: string; finds: string; intents: string[] }[] = [
+type DemoAccount = {
+  userId: string
+  role: Role
+  title: string
+  blurb: string
+  path: string
+  finds: string
+  intents: string[]
+}
+
+const ACCOUNTS: DemoAccount[] = [
   {
+    userId: 'u-tax',
     role: 'taxpayer',
-    title: 'Direct taxpayer',
-    blurb: 'Start filing with document upload and the AI Smart Tax Interview.',
-    finds: 'Prepare → Savings → Refund Opportunity Tracker',
+    title: 'TC — Tax Client',
+    blurb: `Personal ${formatMoney(TC_PERSONAL_FEE)} · Business ${formatMoney(TC_BUSINESS_FEE)}. Private vault for this engagement only.`,
+    finds: 'Prepare → Dependents → Savings',
     path: '/app/taxpayer',
-    intents: ['taxpayer', 'file', 'start'],
+    intents: ['taxpayer', 'file', 'start', 'tc'],
   },
   {
+    userId: 'u-prep',
     role: 'preparer',
-    title: 'Tax preparer (TP)',
-    blurb: 'Return editor, Benefits engine, Filed-style Entry plan, live queue.',
-    finds: 'Use Return / Benefits / Entry tabs',
+    title: 'TP — Summit Tax (Alex)',
+    blurb: `Office staff login · ${UNLIMITED_CLIENTS_COPY}. Isolated Summit tenant only.`,
+    finds: 'Return / Benefits / Entry',
     path: '/app/preparer',
-    intents: ['professional', 'preparer', 'pro'],
+    intents: ['professional', 'preparer', 'pro', 'tp', 'summit'],
   },
   {
+    userId: 'u-prep-solo',
+    role: 'preparer',
+    title: 'TP — Solo preparer (Taylor Kim)',
+    blurb: `Upfront ${formatMoney(TP_REGISTRATION_FEE)} · Personal ${formatMoney(TP_PERSONAL_FEE)} · Business ${formatMoney(TP_BUSINESS_FEE)}. ${UNLIMITED_CLIENTS_COPY}. Private client database.`,
+    finds: 'Independent TP workspace',
+    path: '/app/preparer',
+    intents: ['professional', 'preparer', 'pro', 'tp', 'solo'],
+  },
+  {
+    userId: 'u-owner',
     role: 'efin_owner',
-    title: 'EFIN office owner',
-    blurb: 'Office dashboard, pipeline, staff, and professional pricing transparency.',
-    finds: 'Open Pricing for $899 floor, calculator, and FAQ',
+    title: 'Office — Summit Tax',
+    blurb: `Subscription ${formatMoney(OFFICE_SUBSCRIPTION_FLOOR)}–${formatMoney(OFFICE_SUBSCRIPTION_HIGH)} · Personal ${formatMoney(OFFICE_PERSONAL_FEE)} · Business ${formatMoney(OFFICE_BUSINESS_FEE)}. ${UNLIMITED_CLIENTS_COPY}.`,
+    finds: 'Staff, pipeline, pricing',
     path: '/app/office',
-    intents: ['office', 'professional', 'pricing', 'efin'],
+    intents: ['office', 'professional', 'pricing', 'efin', 'summit'],
   },
   {
+    userId: 'u-owner-lakes',
+    role: 'efin_owner',
+    title: 'Office — Lakeside Tax',
+    blurb: `Separate office tenant · ${UNLIMITED_CLIENTS_COPY}. Cannot see Summit clients or vault files.`,
+    finds: 'Isolated office workspace',
+    path: '/app/office',
+    intents: ['office', 'professional', 'pricing', 'efin', 'lakeside'],
+  },
+  {
+    userId: 'u-admin',
     role: 'admin',
-    title: 'Platform admin',
-    blurb: 'Tenants, fee catalog, feature flags, system health.',
-    finds: 'Fee Catalog includes approved vs provisional terms',
+    title: 'NOVARA administrator',
+    blurb: 'Subscriptions & flags only — no default access to taxpayer documents.',
+    finds: 'Fee Catalog mirrors centralized pricing',
     path: '/app/admin',
     intents: ['admin'],
   },
@@ -46,11 +92,11 @@ export function Login() {
   const intent = (params.get('intent') || '').toLowerCase()
 
   const ordered = useMemo(() => {
-    if (!intent) return ROLES
+    if (!intent) return ACCOUNTS
     if (intent === 'pricing') {
-      return [...ROLES].sort((a, b) => Number(b.role === 'efin_owner') - Number(a.role === 'efin_owner'))
+      return [...ACCOUNTS].sort((a, b) => Number(b.role === 'efin_owner') - Number(a.role === 'efin_owner'))
     }
-    return [...ROLES].sort((a, b) => {
+    return [...ACCOUNTS].sort((a, b) => {
       const as = a.intents.includes(intent) ? 1 : 0
       const bs = b.intents.includes(intent) ? 1 : 0
       return bs - as
@@ -58,13 +104,13 @@ export function Login() {
   }, [intent])
 
   const heading =
-    intent === 'taxpayer' || intent === 'file' || intent === 'start'
-      ? 'Start your tax return'
+    intent === 'taxpayer' || intent === 'file' || intent === 'start' || intent === 'tc'
+      ? 'TC — start your tax return'
       : intent === 'office' || intent === 'pricing'
-        ? 'Open your tax office'
-        : intent === 'professional' || intent === 'preparer' || intent === 'pro'
-          ? 'Continue as a tax professional'
-          : 'Choose a demo role'
+        ? 'Office — open your tax office'
+        : intent === 'professional' || intent === 'preparer' || intent === 'pro' || intent === 'tp'
+          ? 'TP — continue as a tax preparer'
+          : 'Sign in or choose a demo role'
 
   return (
     <div className="login-page">
@@ -74,30 +120,39 @@ export function Login() {
           <div>
             <h1 className="brand">NOVARA</h1>
             <p>
-              {heading}. Demo roles only — access is checked in this browser session (not a production identity
-              provider). Sample tax data stays in session storage on this device.
+              {heading}. Each demo account is a separate tenant — clients, returns, and vault files never cross. Prefer the{' '}
+              <Link to="/register">registration</Link> flow for tier pricing and test-mode checkout.
             </p>
           </div>
         </div>
         <div className="role-grid">
-          {ordered.map((r, i) => (
-            <button
-              key={r.role}
-              type="button"
-              className={`role-card panel rise rise-delay-${Math.min(i + 1, 3)} ${
-                intent && r.intents.includes(intent) ? 'suggested' : ''
-              }`}
-              onClick={() => {
-                actions.loginAs(r.role)
-                navigate(intent === 'pricing' && r.role === 'efin_owner' ? '/app/fees' : r.path)
-              }}
-            >
-              <strong>{r.title}</strong>
-              <span>{r.blurb}</span>
-              <em className="role-finds">{r.finds}</em>
-            </button>
-          ))}
+          {ordered.map((r, i) => {
+            const user = DEMO_USERS.find((u) => u.id === r.userId)
+            return (
+              <button
+                key={r.userId}
+                type="button"
+                className={`role-card panel rise rise-delay-${Math.min(i + 1, 3)} ${
+                  intent && r.intents.includes(intent) ? 'suggested' : ''
+                }`}
+                onClick={() => {
+                  actions.loginAs(r.role, r.userId)
+                  navigate(intent === 'pricing' && r.role === 'efin_owner' ? '/app/fees' : r.path)
+                }}
+              >
+                <strong>{r.title}</strong>
+                <span>{r.blurb}</span>
+                <em className="role-finds">
+                  {r.finds}
+                  {user ? ` · ${user.tenantId}` : ''}
+                </em>
+              </button>
+            )
+          })}
         </div>
+        <p className="muted" style={{ margin: 0 }}>
+          New here? <Link to="/register">Create a TC, TP, or Office account</Link>
+        </p>
       </div>
     </div>
   )

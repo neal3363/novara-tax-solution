@@ -1,10 +1,17 @@
 import { Link } from 'react-router-dom'
 import { BrandMark } from '../components/BrandMark'
 import {
+  OFFICE_BUSINESS_FEE,
+  OFFICE_PERSONAL_FEE,
   OFFICE_SUBSCRIPTION_FLOOR,
+  OFFICE_SUBSCRIPTION_HIGH,
   STARTER_INCLUDES,
-  TP_BUSINESS_TOTAL,
+  TC_BUSINESS_FEE,
+  TC_PERSONAL_FEE,
+  TP_BUSINESS_FEE,
   TP_PERSONAL_FEE,
+  TP_REGISTRATION_FEE,
+  UNLIMITED_CLIENTS_COPY,
   formatMoney,
 } from '../data/fees'
 import './Landing.css'
@@ -104,7 +111,7 @@ export function Landing() {
               <Link className="btn btn-secondary landing-ghost" to="/login?intent=professional">
                 Tax pros
               </Link>
-              <Link className="btn btn-primary hero-solid" to="/login?intent=taxpayer">
+              <Link className="btn btn-primary hero-solid" to="/register">
                 Start
               </Link>
             </div>
@@ -122,10 +129,10 @@ export function Landing() {
               potentially available tax benefit to help maximize your legal refund.
             </p>
             <div className="hero-actions rise rise-delay-3">
-              <Link className="btn btn-primary hero-solid" to="/login?intent=taxpayer">
+              <Link className="btn btn-primary hero-solid" to="/register/tc">
                 Start My Tax Return
               </Link>
-              <Link className="btn btn-secondary landing-ghost" to="/login?intent=professional">
+              <Link className="btn btn-secondary landing-ghost" to="/register">
                 I’m a Tax Professional
               </Link>
               <a className="btn btn-ghost landing-ghost" href="#features">
@@ -267,11 +274,14 @@ export function Landing() {
 
           <div className="pricing-band panel">
             <div>
-              <p className="landing-kicker">Approved floor</p>
-              <h3>Starting Office Subscription: {formatMoney(OFFICE_SUBSCRIPTION_FLOOR)} Annually</h3>
+              <p className="landing-kicker">Three tiers · one price catalog</p>
+              <h3>
+                Office {formatMoney(OFFICE_SUBSCRIPTION_FLOOR)}–{formatMoney(OFFICE_SUBSCRIPTION_HIGH)} · TP upfront{' '}
+                {formatMoney(TP_REGISTRATION_FEE)}
+              </h3>
               <p className="muted">
-                Subscription access and per-return platform charges are separate. Unlimited free returns are not included
-                in published Starter Office terms.
+                {UNLIMITED_CLIENTS_COPY} for TP and Office. Per-return software fees stay separate from banking-product
+                fees.
               </p>
               <ul className="mini-list">
                 {STARTER_INCLUDES.slice(0, 5).map((i) => (
@@ -279,13 +289,14 @@ export function Landing() {
                 ))}
               </ul>
               <p className="fee-line">
-                Independent preparer platform fees: individual {formatMoney(TP_PERSONAL_FEE)} · business{' '}
-                {formatMoney(TP_BUSINESS_TOTAL)}
+                TC personal {formatMoney(TC_PERSONAL_FEE)} / business {formatMoney(TC_BUSINESS_FEE)} · TP{' '}
+                {formatMoney(TP_PERSONAL_FEE)} / {formatMoney(TP_BUSINESS_FEE)} · Office{' '}
+                {formatMoney(OFFICE_PERSONAL_FEE)} / {formatMoney(OFFICE_BUSINESS_FEE)}
               </p>
             </div>
             <div className="pricing-band-actions">
-              <Link className="btn btn-primary" to="/login?intent=office">
-                Open a Tax Office
+              <Link className="btn btn-primary" to="/register">
+                Register — TC · TP · Office
               </Link>
               <Link className="btn btn-secondary" to="/login?intent=pricing">
                 View Professional Pricing
@@ -351,10 +362,10 @@ export function Landing() {
           <p>Let NOVARA handle the complicated work.</p>
           <p className="cta-steps">Upload. Answer. Optimize. Review. File.</p>
           <div className="hero-actions">
-            <Link className="btn btn-primary hero-solid" to="/login?intent=taxpayer">
-              Start Filing
-            </Link>
-            <Link className="btn btn-secondary landing-ghost" to="/login?intent=professional">
+              <Link className="btn btn-primary hero-solid" to="/register/tc">
+                Start Filing
+              </Link>
+            <Link className="btn btn-secondary landing-ghost" to="/register">
               Join as a Tax Professional
             </Link>
           </div>

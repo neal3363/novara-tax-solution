@@ -22,9 +22,19 @@ export function Vault() {
   const { documents, vaultFilter, currentUser, uploadIssues } = useAppStore()
   const inputRef = useRef<HTMLInputElement>(null)
   const [drag, setDrag] = useState(false)
+  const [linkNote, setLinkNote] = useState<string | null>(null)
 
-  const mine = documents.filter((d) => !currentUser || d.ownerId === currentUser.id || currentUser.role !== 'taxpayer')
-  const filtered = mine.filter((d) => vaultFilter === 'all' || d.type === vaultFilter)
+  // Store already tenant-scopes documents; taxpayers only see their vault.
+  const filtered = documents.filter((d) => vaultFilter === 'all' || d.type === vaultFilter)
+
+  function openAuthorized(docId: string) {
+    const token = actions.requestDocumentLink(docId)
+    if (!token) {
+      setLinkNote('Access denied — this file is outside your tenant vault.')
+      return
+    }
+    setLinkNote(`Authorized link issued (expires ${new Date(token.expiresAt).toLocaleTimeString()}). Path is tenant-scoped.`)
+  }
 
   function onDrop(e: DragEvent) {
     e.preventDefault()
@@ -36,13 +46,19 @@ export function Vault() {
     <div className="page container">
       <header className="page-header">
         <div>
-          <p className="eyebrow">Secure Cloud Tax Vault</p>
+          <p className="eyebrow">Secure Cloud Tax Vault · tenant {currentUser?.tenantId ?? '—'}</p>
           <h1>Your documents</h1>
         </div>
         <Link className="btn btn-secondary" to="/app/taxpayer/benefits">
           Back to Savings
         </Link>
       </header>
+
+      {linkNote && (
+        <p className="muted" style={{ marginBottom: '1rem' }}>
+          {linkNote}
+        </p>
+      )}
 
       <div
         className={`dropzone ${drag ? 'drag' : ''}`}
@@ -113,6 +129,7 @@ export function Vault() {
               <strong>{d.name}</strong>
               <span className="row-meta">
                 {d.type} · TY{d.taxYear} · {d.sizeLabel} · {new Date(d.uploadedAt).toLocaleString()}
+                {'storagePath' in d && d.storagePath ? ` · ${d.storagePath}` : ''}
               </span>
               {d.facts.slice(0, 2).map((f) => (
                 <span className="row-meta" key={f.id}>
@@ -120,7 +137,12 @@ export function Vault() {
                 </span>
               ))}
             </div>
-            <span className={`badge ${d.status === 'needs_review' ? 'badge-warn' : 'badge-ok'}`}>{d.status}</span>
+            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+              <button className="btn btn-secondary" type="button" onClick={() => openAuthorized(d.id)}>
+                Authorized link
+              </button>
+              <span className={`badge ${d.status === 'needs_review' ? 'badge-warn' : 'badge-ok'}`}>{d.status}</span>
+            </div>
           </div>
         ))}
       </section>

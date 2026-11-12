@@ -1,5 +1,6 @@
+import { Link } from 'react-router-dom'
 import { useAppStore } from '../../store/useAppStore'
-import { OFFICE_TIERS, formatMoney } from '../../data/fees'
+import { OFFICE_TIERS, UNLIMITED_CLIENTS_COPY, formatMoney } from '../../data/fees'
 import '../shared.css'
 
 export function OfficeHome() {
@@ -16,8 +17,12 @@ export function OfficeHome() {
           <p className="eyebrow">Tax Office AI</p>
           <h1>Summit Tax Office</h1>
         </div>
-        <span className="badge badge-ok">Tenant isolated</span>
+        <span className="badge badge-ok">{UNLIMITED_CLIENTS_COPY}</span>
       </header>
+      <p className="muted">
+        Tenant-isolated workspace. No client or return volume caps — only approved per-return software fees. Manage
+        preparers on <Link to="/app/office/staff">Staff</Link>.
+      </p>
 
       <div className="stat-row rise">
         <div className="stat panel">

@@ -12,7 +12,29 @@ import type {
   TaxReturn,
   UserAccount,
 } from '../data/types'
-import { CONSUMER_PRICES, TP_FEES } from '../data/fees'
+import {
+  TC_PERSONAL_FEE,
+  dedupeFeeLines,
+  returnSoftwareFee,
+  roleToTier,
+  type AccountTier,
+} from '../data/fees'
+import {
+  asScopedDocument,
+  asScopedReturn,
+  assertNoClientQuota,
+  assertNoReturnQuota,
+  canAccessDocument,
+  canAccessReturn,
+  filterDocumentsForActor,
+  filterReturnsForActor,
+  issueDocumentAccessToken,
+  logSensitiveAccess,
+  resolveWriteTenant,
+  vaultStoragePath,
+  type TenantScopedDocument,
+  type TenantScopedReturn,
+} from '../engine/tenantIsolation'
 import {
   applyAnswer,
   defaultProfile,
@@ -39,8 +61,9 @@ import type { BenefitSnapshot } from '../data/types'
 
 /** Role preference only — never store tax demo payloads in localStorage */
 const ROLE_KEY = 'novara-tax-os-role'
+const USER_KEY = 'novara-tax-os-user-id'
 /** Session-scoped demo state (clears when the tab closes) */
-const SESSION_KEY = 'novara-tax-os-session-v7'
+const SESSION_KEY = 'novara-tax-os-session-v8'
 
 function money(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n)
@@ -332,12 +355,20 @@ let state: Store = {
   interviewAnswers: [],
   auditEvents: [],
   uploadIssues: [],
+  accountTier: undefined,
+  registrationPayments: [],
   hydrated: false,
 }
 
 const listeners = new Set<() => void>()
 
+/** Authorized view cache — UI never sees cross-tenant rows. Raw state remains for writes. */
+let scopedSnapshot: Store | null = null
+let scopedSource: Store | null = null
+
 function emit() {
+  scopedSource = null
+  scopedSnapshot = null
   listeners.forEach((l) => l())
   persist()
 }
@@ -347,13 +378,40 @@ function persist() {
   try {
     if (state.currentUser) {
       localStorage.setItem(ROLE_KEY, state.currentUser.role)
+      localStorage.setItem(USER_KEY, state.currentUser.id)
     } else {
       localStorage.removeItem(ROLE_KEY)
+      localStorage.removeItem(USER_KEY)
     }
     const { hydrated: _, currentUser: __, ...sessionRest } = state
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(sessionRest))
   } catch {
     /* ignore quota */
+  }
+}
+
+function resolveDemoUser(role: Role | null, userId: string | null): UserAccount | null {
+  if (!role) return null
+  return (
+    (userId ? DEMO_USERS.find((u) => u.id === userId) : undefined) ??
+    DEMO_USERS.find((u) => u.role === role) ??
+    null
+  )
+}
+
+function ensureTenantFields(returns: TaxReturn[], documents: DocumentRecord[]) {
+  return {
+    returns: returns.map((r) => ({
+      ...r,
+      tenantId: r.tenantId || 'tenant-unknown',
+      appliedBenefits: r.appliedBenefits ?? [],
+    })),
+    documents: documents.map((d) => ({
+      ...d,
+      tenantId: d.tenantId || 'tenant-unknown',
+      clientId: d.clientId ?? d.ownerId,
+      storagePath: d.storagePath ?? vaultStoragePath(d.tenantId || 'tenant-unknown', d.ownerId, d.id),
+    })),
   }
 }
 
@@ -367,8 +425,10 @@ function hydrate() {
     sessionStorage.removeItem('novara-tax-os-session-v4')
     sessionStorage.removeItem('novara-tax-os-session-v5')
     sessionStorage.removeItem('novara-tax-os-session-v6')
+    sessionStorage.removeItem('novara-tax-os-session-v7')
 
     const role = localStorage.getItem(ROLE_KEY) as Role | null
+    const userId = localStorage.getItem(USER_KEY)
     const sessionRaw = sessionStorage.getItem(SESSION_KEY)
     if (sessionRaw) {
       const parsed = JSON.parse(sessionRaw) as Omit<AppState, 'currentUser'>
@@ -381,6 +441,7 @@ function hydrate() {
             lastApplications: rawReport.lastApplications ?? [],
           }
         : null
+      const scoped = ensureTenantFields(parsed.returns ?? state.returns, parsed.documents ?? state.documents)
       state = {
         ...state,
         ...parsed,
@@ -390,12 +451,12 @@ function hydrate() {
         interviewAnswers: parsed.interviewAnswers ?? [],
         auditEvents: parsed.auditEvents ?? [],
         uploadIssues: parsed.uploadIssues ?? [],
-        returns: (parsed.returns ?? state.returns).map((r) => ({
-          ...r,
-          appliedBenefits: r.appliedBenefits ?? [],
-        })),
+        registrationPayments: parsed.registrationPayments ?? [],
+        accountTier: parsed.accountTier ?? roleToTier(role ?? '') ?? undefined,
+        returns: scoped.returns,
+        documents: scoped.documents,
         benefitReport,
-        currentUser: role ? (DEMO_USERS.find((u) => u.role === role) ?? null) : null,
+        currentUser: resolveDemoUser(role, userId),
         hydrated: true,
       }
     } else {
@@ -404,7 +465,7 @@ function hydrate() {
         ...state,
         taxProfile,
         benefitReport: toSnapshot(taxProfile),
-        currentUser: role ? (DEMO_USERS.find((u) => u.role === role) ?? null) : null,
+        currentUser: resolveDemoUser(role, userId),
         hydrated: true,
       }
     }
@@ -420,7 +481,19 @@ if (typeof window !== 'undefined') {
 }
 
 function getSnapshot() {
-  return state
+  if (scopedSource === state && scopedSnapshot) return scopedSnapshot
+  const actor = state.currentUser
+  const returns = filterReturnsForActor(
+    actor,
+    state.returns.map((r) => asScopedReturn(r)),
+  )
+  const documents = filterDocumentsForActor(
+    actor,
+    state.documents.map((d) => asScopedDocument(d)),
+  )
+  scopedSource = state
+  scopedSnapshot = { ...state, returns, documents }
+  return scopedSnapshot
 }
 
 function subscribe(listener: () => void) {
@@ -433,10 +506,64 @@ function uid(prefix: string) {
 }
 
 export const actions = {
-  loginAs(role: Role) {
-    const user = DEMO_USERS.find((u) => u.role === role) ?? DEMO_USERS[0]
-    state = { ...state, currentUser: user }
+  loginAs(role: Role, userId?: string) {
+    const user =
+      (userId ? DEMO_USERS.find((u) => u.id === userId) : undefined) ??
+      DEMO_USERS.find((u) => u.role === role) ??
+      DEMO_USERS[0]
+    state = {
+      ...state,
+      currentUser: user,
+      accountTier: roleToTier(user.role) ?? state.accountTier,
+      activeReturnId:
+        filterReturnsForActor(
+          user,
+          state.returns.map((r) => asScopedReturn(r)),
+        )[0]?.id ?? state.activeReturnId,
+    }
     emit()
+  },
+  /** Tenant-scoped returns for the signed-in actor (authorization enforced). */
+  visibleReturns(): TenantScopedReturn[] {
+    return filterReturnsForActor(
+      state.currentUser,
+      state.returns.map((r) => asScopedReturn(r)),
+    )
+  },
+  visibleDocuments(): TenantScopedDocument[] {
+    return filterDocumentsForActor(
+      state.currentUser,
+      state.documents.map((d) => asScopedDocument(d)),
+    )
+  },
+  requestDocumentLink(docId: string) {
+    const actor = state.currentUser
+    if (!actor) return null
+    const doc = state.documents.map((d) => asScopedDocument(d)).find((d) => d.id === docId)
+    if (!doc) return null
+    const access = canAccessDocument(actor, doc)
+    state = {
+      ...state,
+      auditEvents: [
+        ...state.auditEvents,
+        logSensitiveAccess(actor, 'document_link', 'document', docId, access.allowed),
+      ],
+    }
+    emit()
+    if (!access.allowed) return null
+    return issueDocumentAccessToken(actor, doc)
+  },
+  assertReturnAccess(returnId: string) {
+    const actor = state.currentUser
+    const ret = state.returns.map((r) => asScopedReturn(r)).find((r) => r.id === returnId)
+    if (!actor || !ret) return false
+    const access = canAccessReturn(actor, ret)
+    state = {
+      ...state,
+      auditEvents: [...state.auditEvents, logSensitiveAccess(actor, 'return_open', 'return', returnId, access.allowed)],
+    }
+    emit()
+    return access.allowed
   },
   logout() {
     state = { ...state, currentUser: null }
@@ -543,29 +670,39 @@ export const actions = {
   uploadFiles(files: FileList | File[]) {
     const list = Array.from(files)
     const now = new Date().toISOString()
-    const ownerId = state.currentUser?.id ?? 'u-tax'
+    const actor = state.currentUser
+    const ownerId = actor?.id ?? 'u-tax'
+    const tenantId = actor ? resolveWriteTenant(actor) : 'tenant-novara-direct'
     const classified = list.map((file) => ({
       file,
       type: classifyDocumentName(file.name),
       name: file.name,
     }))
-    const dupes = findDuplicateUploads(state.documents, classified)
+    // Only scan duplicates within this tenant vault
+    const tenantDocs = state.documents.filter((d) => d.tenantId === tenantId)
+    const dupes = findDuplicateUploads(tenantDocs, classified)
 
-    const docs: DocumentRecord[] = classified.map(({ file, type }) => ({
-      id: uid('d'),
-      name: file.name,
-      type,
-      taxYear: 2025,
-      sizeLabel:
-        file.size > 1024 * 1024
-          ? `${(file.size / 1024 / 1024).toFixed(1)} MB`
-          : `${Math.max(1, Math.round(file.size / 1024))} KB`,
-      uploadedAt: now,
-      status: 'scanning',
-      confidence: 0,
-      ownerId,
-      facts: [],
-    }))
+    const docs: DocumentRecord[] = classified.map(({ file, type }) => {
+      const id = uid('d')
+      return {
+        id,
+        name: file.name,
+        type,
+        taxYear: 2025,
+        sizeLabel:
+          file.size > 1024 * 1024
+            ? `${(file.size / 1024 / 1024).toFixed(1)} MB`
+            : `${Math.max(1, Math.round(file.size / 1024))} KB`,
+        uploadedAt: now,
+        status: 'scanning' as const,
+        confidence: 0,
+        ownerId,
+        clientId: actor?.role === 'taxpayer' ? ownerId : ownerId,
+        tenantId,
+        storagePath: vaultStoragePath(tenantId, ownerId, id),
+        facts: [],
+      }
+    })
 
     state = {
       ...state,
@@ -816,7 +953,11 @@ export const actions = {
             state: 'Client Review' as ReturnState,
             readiness: benefitReport.auditComplete ? 96 : 88,
             refundOrOwe: benefitReport.projectedRefund,
-            feeSnapshot: [{ label: 'Consumer basic W-2', amount: CONSUMER_PRICES[0].amount, status: 'provisional' }],
+            feeSnapshot: dedupeFeeLines(r.feeSnapshot, {
+              label: 'Personal tax return (TC)',
+              amount: TC_PERSONAL_FEE,
+              status: 'approved',
+            }),
             updatedAt: new Date().toISOString(),
           }
         : r,
@@ -868,6 +1009,7 @@ export const actions = {
     }, 1600)
   },
   advanceReturn(id: string, next: ReturnState) {
+    if (!actions.assertReturnAccess(id)) return
     state = {
       ...state,
       returns: state.returns.map((r) => (r.id === id ? { ...r, state: next, updatedAt: new Date().toISOString() } : r)),
@@ -875,23 +1017,96 @@ export const actions = {
     emit()
   },
   createBusinessReturn(clientName: string, returnType: TaxReturn['returnType']) {
-    const fee = TP_FEES.find((f) => f.id === 'tp-business')!
+    const actor = state.currentUser
+    if (!actor || (actor.role !== 'preparer' && actor.role !== 'efin_owner')) return
+    const visible = filterReturnsForActor(
+      actor,
+      state.returns.map((r) => asScopedReturn(r)),
+    )
+    const clientCount = new Set(visible.map((r) => r.clientId)).size
+    assertNoClientQuota(actor, clientCount)
+    assertNoReturnQuota(actor, visible.length)
+    const tenantId = resolveWriteTenant(actor)
+    const tier: AccountTier = roleToTier(actor.role) ?? 'TP'
+    const fee = returnSoftwareFee(tier, true)
+    const clientId = uid('c')
     const ret: TaxReturn = {
       id: uid('r'),
       clientName,
-      clientId: uid('c'),
+      clientId,
       taxYear: 2025,
       returnType,
       state: 'Intake Started',
       readiness: 18,
       refundOrOwe: 0,
-      preparerId: state.currentUser?.id,
+      preparerId: actor.id,
+      tenantId,
+      assignedPreparerIds: actor.role === 'preparer' ? [actor.id] : undefined,
       isBusiness: true,
       feeSnapshot: [{ label: fee.label, amount: fee.amount, status: fee.status }],
       appliedBenefits: [],
       updatedAt: new Date().toISOString(),
     }
-    state = { ...state, returns: [ret, ...state.returns], activeReturnId: ret.id }
+    state = {
+      ...state,
+      returns: [ret, ...state.returns],
+      activeReturnId: ret.id,
+      auditEvents: appendAudit(
+        'return_created',
+        `Business return created in tenant ${tenantId} with ${fee.label} (${fee.amount}). Unlimited usage — no volume surcharge.`,
+        { feeId: fee.id, tenantId },
+      ),
+    }
+    emit()
+  },
+  recordRegistrationPayment(input: {
+    tier: AccountTier
+    lines: { id: string; label: string; amount: number }[]
+    planAmount: number
+  }) {
+    const prior = state.registrationPayments ?? []
+    const deduped = [...prior]
+    input.lines.forEach((line) => {
+      if (!deduped.some((p) => p.id === line.id && p.tier === input.tier)) {
+        deduped.push({ ...line, tier: input.tier, at: new Date().toISOString(), mode: 'test' })
+      }
+    })
+    state = {
+      ...state,
+      registrationPayments: deduped,
+      accountTier: input.tier,
+      auditEvents: appendAudit(
+        'registration_payment',
+        `Test-mode registration payment for ${input.tier}: ${input.planAmount}`,
+        { tier: input.tier, amount: input.planAmount },
+      ),
+    }
+    emit()
+  },
+  chargeReturnSoftwareFee(returnId: string, isBusiness: boolean) {
+    const tier: AccountTier =
+      state.accountTier ?? roleToTier(state.currentUser?.role ?? 'taxpayer') ?? 'TC'
+    const fee = returnSoftwareFee(tier, isBusiness)
+    state = {
+      ...state,
+      returns: state.returns.map((r) =>
+        r.id === returnId
+          ? {
+              ...r,
+              feeSnapshot: dedupeFeeLines(r.feeSnapshot, {
+                label: fee.label,
+                amount: fee.amount,
+                status: fee.status,
+              }),
+              updatedAt: new Date().toISOString(),
+            }
+          : r,
+      ),
+      auditEvents: appendAudit('software_fee', `Applied ${fee.label} without duplicate charge.`, {
+        returnId,
+        amount: fee.amount,
+      }),
+    }
     emit()
   },
   updateEntryLine(id: string, patch: Partial<EntryPlanLine>) {
@@ -1118,10 +1333,21 @@ export const actions = {
     actions.addMessage('system', 'Mandatory tax-benefit audit passed. Preparer/taxpayer approvals recorded for demo. Ready to file gate unlocked.')
     return true
   },
+  platformStats() {
+    const tenants = new Set(state.returns.map((r) => r.tenantId).filter(Boolean))
+    return {
+      returnCount: state.returns.length,
+      documentCount: state.documents.length,
+      tenantCount: tenants.size,
+      /** Admin sees aggregates only — not taxpayer content */
+      contentAccess: false as const,
+    }
+  },
   resetDemo() {
     localStorage.removeItem('novara-tax-os-v1')
     sessionStorage.removeItem(SESSION_KEY)
     sessionStorage.removeItem('novara-tax-os-session-v2')
+    sessionStorage.removeItem('novara-tax-os-session-v7')
     const taxProfile = defaultProfile()
     state = {
       currentUser: state.currentUser,
@@ -1157,6 +1383,8 @@ export const actions = {
       interviewAnswers: [],
       auditEvents: [],
       uploadIssues: [],
+      accountTier: roleToTier(state.currentUser?.role ?? '') ?? undefined,
+      registrationPayments: [],
       hydrated: true,
     }
     emit()
