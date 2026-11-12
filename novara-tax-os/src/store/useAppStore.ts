@@ -1,17 +1,31 @@
 import { useSyncExternalStore } from 'react'
-import { DEMO_USERS, SEED_DOCS, SEED_RETURNS, SMART_QUESTIONS } from '../data/seed'
+import { DEMO_USERS, SEED_DOCS, SEED_OFFICE_STAFF, SEED_RETURNS, SMART_QUESTIONS } from '../data/seed'
 import type {
+  AccountType,
   AppState,
   AuditEvent,
   DocumentRecord,
   EntryPlanLine,
   Message,
+  OfficeStaffMember,
   PreEntryNote,
   ReturnState,
   Role,
   TaxReturn,
   UserAccount,
 } from '../data/types'
+import {
+  canAssignClients,
+  canCreateClients,
+  canManageStaff,
+  canTransmitTaxReturn,
+  permissionSummary,
+} from '../engine/accountPermissions'
+import {
+  credentialPublicView,
+  submitCredential,
+  type EfileProviderAssociation,
+} from '../engine/credentials'
 import {
   TC_PERSONAL_FEE,
   dedupeFeeLines,
@@ -63,7 +77,7 @@ import type { BenefitSnapshot } from '../data/types'
 const ROLE_KEY = 'novara-tax-os-role'
 const USER_KEY = 'novara-tax-os-user-id'
 /** Session-scoped demo state (clears when the tab closes) */
-const SESSION_KEY = 'novara-tax-os-session-v8'
+const SESSION_KEY = 'novara-tax-os-session-v9'
 
 function money(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n)
@@ -357,6 +371,7 @@ let state: Store = {
   uploadIssues: [],
   accountTier: undefined,
   registrationPayments: [],
+  officeStaff: SEED_OFFICE_STAFF,
   hydrated: false,
 }
 
@@ -426,6 +441,7 @@ function hydrate() {
     sessionStorage.removeItem('novara-tax-os-session-v5')
     sessionStorage.removeItem('novara-tax-os-session-v6')
     sessionStorage.removeItem('novara-tax-os-session-v7')
+    sessionStorage.removeItem('novara-tax-os-session-v8')
 
     const role = localStorage.getItem(ROLE_KEY) as Role | null
     const userId = localStorage.getItem(USER_KEY)
@@ -453,6 +469,7 @@ function hydrate() {
         uploadIssues: parsed.uploadIssues ?? [],
         registrationPayments: parsed.registrationPayments ?? [],
         accountTier: parsed.accountTier ?? roleToTier(role ?? '') ?? undefined,
+        officeStaff: parsed.officeStaff?.length ? parsed.officeStaff : SEED_OFFICE_STAFF,
         returns: scoped.returns,
         documents: scoped.documents,
         benefitReport,
@@ -981,6 +998,19 @@ export const actions = {
     actions.completeSmartInterview()
   },
   signAndFile() {
+    const actor = state.currentUser
+    const gate = canTransmitTaxReturn(actor)
+    if (!gate.allowed) {
+      actions.addMessage('system', gate.detail ?? 'Filing blocked until credentials are verified.')
+      state = {
+        ...state,
+        auditEvents: appendAudit('transmit_blocked', gate.detail ?? 'signAndFile blocked', {
+          reason: gate.reason ?? 'unknown',
+        }),
+      }
+      emit()
+      return
+    }
     const returns = state.returns.map((r) =>
       r.clientId === (state.currentUser?.id ?? 'u-tax') && r.taxYear === 2025
         ? {
@@ -1010,6 +1040,10 @@ export const actions = {
   },
   advanceReturn(id: string, next: ReturnState) {
     if (!actions.assertReturnAccess(id)) return
+    if (next === 'Transmitted') {
+      actions.transmitReturn(id)
+      return
+    }
     state = {
       ...state,
       returns: state.returns.map((r) => (r.id === id ? { ...r, state: next, updatedAt: new Date().toISOString() } : r)),
@@ -1018,7 +1052,17 @@ export const actions = {
   },
   createBusinessReturn(clientName: string, returnType: TaxReturn['returnType']) {
     const actor = state.currentUser
-    if (!actor || (actor.role !== 'preparer' && actor.role !== 'efin_owner')) return
+    const createPerm = canCreateClients(actor)
+    if (!createPerm.allowed || !actor) {
+      state = {
+        ...state,
+        auditEvents: appendAudit('permission_denied', createPerm.detail ?? 'Cannot create clients', {
+          action: 'create_client',
+        }),
+      }
+      emit()
+      return
+    }
     const visible = filterReturnsForActor(
       actor,
       state.returns.map((r) => asScopedReturn(r)),
@@ -1027,7 +1071,12 @@ export const actions = {
     assertNoClientQuota(actor, clientCount)
     assertNoReturnQuota(actor, visible.length)
     const tenantId = resolveWriteTenant(actor)
-    const tier: AccountTier = roleToTier(actor.role) ?? 'TP'
+    const tier: AccountTier =
+      actor.accountType === 'office_owner' || actor.accountType === 'office_preparer'
+        ? 'Office'
+        : actor.accountType === 'independent_tp'
+          ? 'TP'
+          : roleToTier(actor.role) ?? 'TP'
     const fee = returnSoftwareFee(tier, true)
     const clientId = uid('c')
     const ret: TaxReturn = {
@@ -1041,7 +1090,10 @@ export const actions = {
       refundOrOwe: 0,
       preparerId: actor.id,
       tenantId,
-      assignedPreparerIds: actor.role === 'preparer' ? [actor.id] : undefined,
+      assignedPreparerIds:
+        actor.accountType === 'independent_tp' || actor.accountType === 'office_preparer'
+          ? [actor.id]
+          : undefined,
       isBusiness: true,
       feeSnapshot: [{ label: fee.label, amount: fee.amount, status: fee.status }],
       appliedBenefits: [],
@@ -1058,6 +1110,282 @@ export const actions = {
       ),
     }
     emit()
+  },
+  /** Office owner only — invite a preparer with individual login + PTIN (pending verification) */
+  inviteOfficePreparer(input: { name: string; email: string; ptin: string }) {
+    const actor = state.currentUser
+    const perm = canManageStaff(actor)
+    if (!actor || !perm.allowed) {
+      state = {
+        ...state,
+        auditEvents: appendAudit('permission_denied', perm.detail ?? 'Staff invite denied', {
+          action: 'invite_preparer',
+        }),
+      }
+      emit()
+      return { ok: false as const, error: perm.detail ?? 'Denied' }
+    }
+    const ptinResult = submitCredential('ptin', input.ptin)
+    if (!ptinResult.ok) return { ok: false as const, error: ptinResult.error }
+    const userId = uid('u-prep')
+    const staff: OfficeStaffMember = {
+      id: uid('staff'),
+      tenantId: actor.tenantId,
+      userId,
+      name: input.name.trim(),
+      email: input.email.trim().toLowerCase(),
+      kind: 'preparer',
+      status: 'invited',
+      invitedAt: new Date().toISOString(),
+      ptinDisplay: `····${ptinResult.credential.lastFour}`,
+      ptinStatus: ptinResult.credential.status,
+    }
+    state = {
+      ...state,
+      officeStaff: [...state.officeStaff, staff],
+      auditEvents: appendAudit(
+        'staff_invited',
+        `Invited preparer ${staff.name} under office tenant ${actor.tenantId}. PTIN pending verification — not treated as verified from manual entry.`,
+        { staffId: staff.id, tenantId: actor.tenantId },
+      ),
+    }
+    emit()
+    return { ok: true as const, staff }
+  },
+  removeOfficePreparer(staffId: string) {
+    const actor = state.currentUser
+    const perm = canManageStaff(actor)
+    if (!actor || !perm.allowed) {
+      state = {
+        ...state,
+        auditEvents: appendAudit('permission_denied', perm.detail ?? 'Staff remove denied', {
+          action: 'remove_preparer',
+        }),
+      }
+      emit()
+      return false
+    }
+    const target = state.officeStaff.find((s) => s.id === staffId)
+    if (!target || target.tenantId !== actor.tenantId || target.kind === 'owner') return false
+    state = {
+      ...state,
+      officeStaff: state.officeStaff.map((s) =>
+        s.id === staffId ? { ...s, status: 'removed' as const } : s,
+      ),
+      auditEvents: appendAudit('staff_removed', `Removed preparer ${target.name} from office roster.`, {
+        staffId,
+      }),
+    }
+    emit()
+    return true
+  },
+  /** Office owner only — assign/reassign a client return to a preparer */
+  assignClientToPreparer(returnId: string, preparerUserId: string) {
+    const actor = state.currentUser
+    const perm = canAssignClients(actor)
+    if (!actor || !perm.allowed) {
+      state = {
+        ...state,
+        auditEvents: appendAudit('permission_denied', perm.detail ?? 'Assign denied', {
+          action: 'assign_client',
+        }),
+      }
+      emit()
+      return false
+    }
+    const ret = state.returns.find((r) => r.id === returnId)
+    if (!ret || ret.tenantId !== actor.tenantId) return false
+    const staffOk = state.officeStaff.some(
+      (s) =>
+        s.tenantId === actor.tenantId &&
+        s.userId === preparerUserId &&
+        s.status === 'active' &&
+        s.kind === 'preparer',
+    )
+    if (!staffOk && preparerUserId !== actor.id) return false
+    state = {
+      ...state,
+      returns: state.returns.map((r) =>
+        r.id === returnId
+          ? {
+              ...r,
+              preparerId: preparerUserId,
+              assignedPreparerIds: [preparerUserId],
+              updatedAt: new Date().toISOString(),
+            }
+          : r,
+      ),
+      auditEvents: appendAudit(
+        'client_assigned',
+        `Assigned return ${returnId} to preparer ${preparerUserId} within tenant ${actor.tenantId}.`,
+        { returnId, preparerUserId },
+      ),
+    }
+    emit()
+    return true
+  },
+  /** Independent TP — always denied for staff/assign */
+  assertTpCannotManageStaff() {
+    return canManageStaff(state.currentUser)
+  },
+  permissions() {
+    return permissionSummary(state.currentUser)
+  },
+  officeStaffForTenant() {
+    const actor = state.currentUser
+    if (!actor || !canManageStaff(actor).allowed) return []
+    return state.officeStaff.filter((s) => s.tenantId === actor.tenantId && s.status !== 'removed')
+  },
+  transmitReturn(returnId: string) {
+    const actor = state.currentUser
+    const gate = canTransmitTaxReturn(actor)
+    if (!actor || !gate.allowed) {
+      state = {
+        ...state,
+        auditEvents: appendAudit(
+          'transmit_blocked',
+          gate.detail ?? 'Transmission blocked — credentials or e-file association incomplete.',
+          { returnId, reason: gate.reason ?? 'unknown' },
+        ),
+      }
+      emit()
+      return { ok: false as const, error: gate.detail ?? 'Blocked' }
+    }
+    if (!actions.assertReturnAccess(returnId)) {
+      return { ok: false as const, error: 'Access denied' }
+    }
+    state = {
+      ...state,
+      returns: state.returns.map((r) =>
+        r.id === returnId
+          ? { ...r, state: 'Transmitted' as ReturnState, readiness: 100, updatedAt: new Date().toISOString() }
+          : r,
+      ),
+      auditEvents: appendAudit('return_transmitted', `Return ${returnId} transmitted under verified credentials.`, {
+        returnId,
+      }),
+    }
+    emit()
+    return { ok: true as const }
+  },
+  completeTierRegistration(input: {
+    tier: AccountTier
+    legalName: string
+    email: string
+    phone?: string
+    businessName?: string
+    address?: string
+    ptin?: string
+    efin?: string
+    ein?: string
+    efileProviderName?: string
+    lines: { id: string; label: string; amount: number }[]
+    planAmount: number
+  }) {
+    const accountType: AccountType =
+      input.tier === 'TC' ? 'tc' : input.tier === 'TP' ? 'independent_tp' : 'office_owner'
+    const role: Role = input.tier === 'TC' ? 'taxpayer' : input.tier === 'TP' ? 'preparer' : 'efin_owner'
+    const tenantId =
+      input.tier === 'TC'
+        ? `tenant-direct-${uid('t')}`
+        : input.tier === 'TP'
+          ? `tenant-tp-${uid('t')}`
+          : `tenant-office-${uid('t')}`
+
+    const credentials: UserAccount['credentials'] = {
+      businessName: input.businessName,
+      businessAddress: input.address,
+    }
+
+    if (input.tier === 'TP') {
+      if (!input.ptin) return { ok: false as const, error: 'TP registration requires a PTIN.' }
+      const ptin = submitCredential('ptin', input.ptin)
+      if (!ptin.ok) return { ok: false as const, error: ptin.error }
+      credentials.ptin = ptin.credential
+      credentials.efileProvider = {
+        providerName: input.efileProviderName?.trim() || 'Pending authorized e-file provider',
+        status: input.efileProviderName?.trim() ? 'pending' : 'none',
+      } satisfies EfileProviderAssociation
+    }
+
+    if (input.tier === 'Office') {
+      if (!input.efin) return { ok: false as const, error: 'Office registration requires an EFIN.' }
+      if (!input.ein) return { ok: false as const, error: 'Office registration requires an EIN.' }
+      if (!input.businessName?.trim() || !input.address?.trim()) {
+        return { ok: false as const, error: 'Office registration requires business name and address.' }
+      }
+      const efin = submitCredential('efin', input.efin)
+      if (!efin.ok) return { ok: false as const, error: efin.error }
+      const ein = submitCredential('ein', input.ein)
+      if (!ein.ok) return { ok: false as const, error: ein.error }
+      credentials.efin = efin.credential
+      credentials.ein = ein.credential
+      credentials.efileProvider = { providerName: 'NOVARA MeF Adapter', status: 'pending' }
+    }
+
+    const user: UserAccount = {
+      id: uid('u'),
+      name: input.legalName.trim(),
+      email: input.email.trim().toLowerCase(),
+      role,
+      tenantId,
+      accountType,
+      ptin: credentials.ptin ? `····${credentials.ptin.lastFour}` : undefined,
+      credentials,
+    }
+
+    const prior = state.registrationPayments ?? []
+    const deduped = [...prior]
+    input.lines.forEach((line) => {
+      if (!deduped.some((p) => p.id === line.id && p.tier === input.tier)) {
+        deduped.push({ ...line, tier: input.tier, at: new Date().toISOString(), mode: 'test' })
+      }
+    })
+
+    let officeStaff = state.officeStaff
+    if (accountType === 'office_owner') {
+      officeStaff = [
+        ...officeStaff,
+        {
+          id: uid('staff'),
+          tenantId,
+          userId: user.id,
+          name: user.name,
+          email: user.email,
+          kind: 'owner',
+          status: 'active',
+          invitedAt: new Date().toISOString(),
+        },
+      ]
+    }
+
+    state = {
+      ...state,
+      currentUser: user,
+      accountTier: input.tier,
+      registrationPayments: deduped,
+      officeStaff,
+      auditEvents: appendAudit(
+        'registration_complete',
+        `${input.tier} registration recorded. Credentials stored encrypted; status pending verification (not auto-verified).`,
+        {
+          tier: input.tier,
+          amount: input.planAmount,
+          ptinStatus: credentials.ptin?.status ?? 'n/a',
+          efinStatus: credentials.efin?.status ?? 'n/a',
+        },
+      ),
+    }
+    emit()
+    return {
+      ok: true as const,
+      user,
+      credentialViews: {
+        ptin: credentialPublicView(credentials.ptin),
+        efin: credentialPublicView(credentials.efin),
+        ein: credentialPublicView(credentials.ein),
+      },
+    }
   },
   recordRegistrationPayment(input: {
     tier: AccountTier
@@ -1385,6 +1713,7 @@ export const actions = {
       uploadIssues: [],
       accountTier: roleToTier(state.currentUser?.role ?? '') ?? undefined,
       registrationPayments: [],
+      officeStaff: SEED_OFFICE_STAFF,
       hydrated: true,
     }
     emit()

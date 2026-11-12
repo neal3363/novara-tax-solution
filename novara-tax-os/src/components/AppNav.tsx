@@ -31,8 +31,9 @@ export function AppNav() {
       : currentUser.role === 'preparer'
         ? [
             { to: '/app/preparer', label: 'Inbox' },
+            { to: '/app/preparer/clients', label: 'Clients' },
+            { to: '/app/preparer/workspace', label: 'Workspace' },
             { to: '/app/preparer/return', label: 'Return' },
-            { to: '/app/preparer/dependents', label: 'Dependents' },
             { to: '/app/preparer/benefits', label: 'Benefits' },
             { to: '/app/preparer/entry-plan', label: 'Entry' },
           ]
@@ -70,7 +71,17 @@ export function AppNav() {
           <div className="top-user">
             <div className="user-chip">
               <span className="user-name">{currentUser.name}</span>
-              <span className="user-role">{currentUser.role.replace('_', ' ')}</span>
+              <span className="user-role">
+                {currentUser.accountType === 'independent_tp'
+                  ? 'TP · clients only'
+                  : currentUser.accountType === 'office_owner'
+                    ? 'Office owner'
+                    : currentUser.accountType === 'office_preparer'
+                      ? 'Office preparer'
+                      : currentUser.accountType === 'tc'
+                        ? 'Tax client'
+                        : currentUser.role.replace('_', ' ')}
+              </span>
             </div>
             <button
               className="btn btn-ghost"

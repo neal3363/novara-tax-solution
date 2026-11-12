@@ -12,6 +12,7 @@ import {
   formatMoney,
   type AccountTier,
 } from '../data/fees'
+import { isValidEfinFormat, isValidEinFormat, isValidPtinFormat } from '../engine/credentials'
 import { actions } from '../store/useAppStore'
 import './Login.css'
 import './Register.css'
@@ -26,7 +27,10 @@ export function RegisterHub() {
           <BrandMark size={52} />
           <div>
             <h1 className="brand">NOVARA</h1>
-            <p>Choose your account tier. Pricing is the same everywhere in NOVARA — one centralized catalog.</p>
+            <p>
+              Choose your account tier. TP requires a PTIN. Office requires an EFIN. Manually entered credentials are
+              never treated as verified without a validation process.
+            </p>
           </div>
         </div>
         <div className="tier-pick-grid">
@@ -74,7 +78,8 @@ export function RegisterFlow() {
   const card = TIER_REGISTRATION_CARDS.find((c) => c.tier === tier)
   const [step, setStep] = useState<Step>('form')
   const [officePlan, setOfficePlan] = useState<899 | 1250>(899)
-  const [paidIds, setPaidIds] = useState<string[]>([])
+  const [formError, setFormError] = useState<string | null>(null)
+  const [credNote, setCredNote] = useState<string | null>(null)
   const [form, setForm] = useState({
     legalName: '',
     email: '',
@@ -85,8 +90,7 @@ export function RegisterFlow() {
     address: '',
     ptin: '',
     efin: '',
-    sponsoringOffice: '',
-    ownerName: '',
+    efileProviderName: '',
   })
 
   const due = useMemo(() => {
@@ -120,22 +124,63 @@ export function RegisterFlow() {
 
   function submitForm(e: FormEvent) {
     e.preventDefault()
-    if (!form.legalName.trim() || !form.email.trim()) return
+    setFormError(null)
+    if (!form.legalName.trim() || !form.email.trim()) {
+      setFormError('Legal name and email are required.')
+      return
+    }
+    if (tier === 'TP') {
+      if (!isValidPtinFormat(form.ptin)) {
+        setFormError('TP registration requires a valid current-year PTIN (P + 8 digits).')
+        return
+      }
+    }
+    if (tier === 'Office') {
+      if (!form.businessName.trim() || !form.address.trim()) {
+        setFormError('Office registration requires business name and address.')
+        return
+      }
+      if (!isValidEinFormat(form.ein)) {
+        setFormError('Office registration requires a valid EIN.')
+        return
+      }
+      if (!isValidEfinFormat(form.efin)) {
+        setFormError('Office registration requires a valid EFIN (6 digits).')
+        return
+      }
+    }
     setStep('pay')
   }
 
   function payTestMode() {
-    // Demo checkout — payment-provider test mode; no live charges
-    const ids = due.map((d) => d.id)
-    if (ids.some((id) => paidIds.includes(id))) return
-    setPaidIds((p) => [...p, ...ids])
     if (!tier || !card) return
-    actions.recordRegistrationPayment({
+    const result = actions.completeTierRegistration({
       tier,
+      legalName: form.legalName,
+      email: form.email,
+      phone: form.phone,
+      businessName: form.businessName || form.dba,
+      address: form.address,
+      ptin: form.ptin,
+      efin: form.efin,
+      ein: form.ein,
+      efileProviderName: form.efileProviderName,
       lines: due,
       planAmount: tier === 'Office' ? officePlan : due[0]?.amount ?? 0,
     })
-    actions.loginAs(card.role)
+    if (!result.ok) {
+      setFormError(result.error)
+      setStep('form')
+      return
+    }
+    const parts: string[] = []
+    if (result.credentialViews.ptin) parts.push(result.credentialViews.ptin.displayHint)
+    if (result.credentialViews.efin) parts.push(result.credentialViews.efin.displayHint)
+    setCredNote(
+      parts.length
+        ? `${parts.join(' · ')}. Encrypted at rest — not verified until an authorized validation process completes.`
+        : 'No professional credentials required for TC.',
+    )
     setStep('done')
   }
 
@@ -155,8 +200,19 @@ export function RegisterFlow() {
               {card.title}
             </h1>
             <p>
-              {tier !== 'TC' && <strong>{UNLIMITED_CLIENTS_COPY}. </strong>}
-              Banking-product fees stay separate. Demo uses payment test mode — no live bank or IRS connections yet.
+              {tier === 'TC' && 'No PTIN or EFIN required. Prepare and manage your own tax return.'}
+              {tier === 'TP' && (
+                <>
+                  <strong>{UNLIMITED_CLIENTS_COPY}. </strong>
+                  PTIN required. No EFIN. Cannot add other preparers — clients only.
+                </>
+              )}
+              {tier === 'Office' && (
+                <>
+                  <strong>{UNLIMITED_CLIENTS_COPY}. </strong>
+                  EFIN required. Invite preparers (each with their own PTIN where applicable).
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -164,8 +220,13 @@ export function RegisterFlow() {
         {step === 'form' && (
           <form className="panel register-form rise" onSubmit={submitForm}>
             <h2>Registration details</h2>
+            {formError && (
+              <p className="callout warn" role="alert">
+                {formError}
+              </p>
+            )}
             <div className="field">
-              <label htmlFor="legalName">{tier === 'Office' ? 'Owner legal name' : 'Legal name'}</label>
+              <label htmlFor="legalName">{tier === 'Office' ? 'Authorized owner legal name' : 'Legal name'}</label>
               <input
                 id="legalName"
                 required
@@ -199,20 +260,28 @@ export function RegisterFlow() {
                   />
                 </div>
                 <div className="field">
-                  <label htmlFor="ptin">PTIN (where required)</label>
-                  <input id="ptin" value={form.ptin} onChange={(e) => update('ptin', e.target.value)} />
-                </div>
-                <div className="field">
-                  <label htmlFor="sponsoringOffice">Sponsoring tax office / authorized EFIN association</label>
+                  <label htmlFor="ptin">Current-year PTIN (required)</label>
                   <input
-                    id="sponsoringOffice"
+                    id="ptin"
                     required
-                    value={form.sponsoringOffice}
-                    onChange={(e) => update('sponsoringOffice', e.target.value)}
-                    placeholder="Office name or EFIN reference"
+                    placeholder="P12345678"
+                    value={form.ptin}
+                    onChange={(e) => update('ptin', e.target.value.toUpperCase())}
                   />
                 </div>
-                <p className="muted">Unauthorized use of another office’s EFIN is not permitted.</p>
+                <div className="field">
+                  <label htmlFor="efileProviderName">Authorized e-file provider (required before e-file)</label>
+                  <input
+                    id="efileProviderName"
+                    value={form.efileProviderName}
+                    onChange={(e) => update('efileProviderName', e.target.value)}
+                    placeholder="Provider name — association stays pending until verified"
+                  />
+                </div>
+                <p className="muted">
+                  No EFIN required for TP. TP = clients only — you cannot invite or manage other preparers. Entered PTIN
+                  is encrypted and stays <strong>pending verification</strong> until an authorized validation completes.
+                </p>
               </>
             )}
 
@@ -232,8 +301,14 @@ export function RegisterFlow() {
                   <input id="dba" value={form.dba} onChange={(e) => update('dba', e.target.value)} />
                 </div>
                 <div className="field">
-                  <label htmlFor="ein">EIN</label>
-                  <input id="ein" required value={form.ein} onChange={(e) => update('ein', e.target.value)} />
+                  <label htmlFor="ein">EIN (required)</label>
+                  <input
+                    id="ein"
+                    required
+                    placeholder="12-3456789"
+                    value={form.ein}
+                    onChange={(e) => update('ein', e.target.value)}
+                  />
                 </div>
                 <div className="field">
                   <label htmlFor="address">Business address</label>
@@ -245,8 +320,14 @@ export function RegisterFlow() {
                   />
                 </div>
                 <div className="field">
-                  <label htmlFor="efin">EFIN (verification required before live filing)</label>
-                  <input id="efin" value={form.efin} onChange={(e) => update('efin', e.target.value)} />
+                  <label htmlFor="efin">EFIN (required)</label>
+                  <input
+                    id="efin"
+                    required
+                    placeholder="123456"
+                    value={form.efin}
+                    onChange={(e) => update('efin', e.target.value)}
+                  />
                 </div>
                 <fieldset className="plan-pick">
                   <legend>Subscription selection</legend>
@@ -274,11 +355,19 @@ export function RegisterFlow() {
                     </span>
                   </label>
                 </fieldset>
+                <p className="muted">
+                  Office = preparers + clients. EFIN/EIN are encrypted and stay pending verification. Paid preparers you
+                  invite must supply their own PTIN where applicable.
+                </p>
               </>
             )}
 
+            {tier === 'TC' && (
+              <p className="muted">No PTIN or EFIN. You can prepare and upload documents for your own return only.</p>
+            )}
+
             <div className="callout">
-              <strong>Identity & payment:</strong> Collected for demo enrollment. Production will use verified identity
+              <strong>Identity & payment:</strong> Collected for demo enrollment. Production uses verified identity
               checks and a payment provider in test mode before go-live.
             </div>
             <div className="callout warn">
@@ -299,7 +388,7 @@ export function RegisterFlow() {
         {step === 'pay' && (
           <section className="panel register-form rise">
             <h2>Checkout (payment test mode)</h2>
-            <p className="muted">No live charges. Duplicate fee lines are blocked.</p>
+            <p className="muted">No live charges. Credential verification is a separate process after payment.</p>
             {due.map((line) => (
               <div className="row-item" key={line.id}>
                 <div>
@@ -332,6 +421,13 @@ export function RegisterFlow() {
               Your {card.subtitle} account is ready in this demo session
               {tier !== 'TC' ? ` with ${UNLIMITED_CLIENTS_COPY.toLowerCase()}` : ''}.
             </p>
+            {credNote && <p className="muted">{credNote}</p>}
+            {tier === 'TP' && (
+              <p className="muted">Electronic filing stays blocked until PTIN verification and e-file provider association complete.</p>
+            )}
+            {tier === 'Office' && (
+              <p className="muted">Electronic filing stays blocked until EFIN verification completes. Add preparers from Staff.</p>
+            )}
             <button className="btn btn-primary" type="button" onClick={enterApp}>
               Enter dashboard
             </button>

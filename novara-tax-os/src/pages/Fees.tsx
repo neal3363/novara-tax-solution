@@ -35,7 +35,11 @@ const FAQ = [
   },
   {
     q: 'Can an office have multiple preparers?',
-    a: 'Yes. Office owners add preparers with individual logins under the office tenant. Unauthorized EFIN use is blocked.',
+    a: 'Yes. Office owners invite preparers with individual logins and PTINs where applicable. Independent TP accounts cannot add preparers — TP = clients only. Unauthorized EFIN use is blocked.',
+  },
+  {
+    q: 'What credentials are required to register?',
+    a: 'TC: none. TP: current-year PTIN (no EFIN). Office: EFIN plus business EIN/address/owner. Manually entered PTIN/EFIN values stay pending until an authorized verification process completes — they are never auto-verified.',
   },
   {
     q: 'Are bank-product fees included?',

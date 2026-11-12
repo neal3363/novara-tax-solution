@@ -1,5 +1,10 @@
 export type Role = 'taxpayer' | 'preparer' | 'efin_owner' | 'admin'
 
+/** Product account type — finer than Role for TP vs Office staff */
+export type AccountType = 'tc' | 'independent_tp' | 'office_owner' | 'office_preparer' | 'admin'
+
+export type { ProfessionalCredential, EfileProviderAssociation } from '../engine/credentials'
+
 export type ReturnState =
   | 'Lead'
   | 'Client Created'
@@ -58,7 +63,32 @@ export interface UserAccount {
   email: string
   role: Role
   tenantId: string
+  accountType: AccountType
+  /** @deprecated Prefer credentials.ptin — kept for display fallbacks */
   ptin?: string
+  credentials?: {
+    ptin?: import('../engine/credentials').ProfessionalCredential
+    efin?: import('../engine/credentials').ProfessionalCredential
+    ein?: import('../engine/credentials').ProfessionalCredential
+    efileProvider?: import('../engine/credentials').EfileProviderAssociation
+    businessName?: string
+    businessAddress?: string
+  }
+}
+
+/** Office staff roster entry (Office accounts only) */
+export interface OfficeStaffMember {
+  id: string
+  tenantId: string
+  userId: string
+  name: string
+  email: string
+  kind: 'owner' | 'preparer'
+  status: 'active' | 'invited' | 'removed'
+  invitedAt: string
+  /** Public PTIN hint only — never full credential */
+  ptinDisplay?: string
+  ptinStatus?: import('../engine/credentials').CredentialStatus
 }
 
 export interface DocumentRecord {
@@ -242,4 +272,6 @@ export interface AppState {
     at: string
     mode: 'test' | 'live'
   }[]
+  /** Office staff rosters keyed by tenant — TP accounts never receive entries */
+  officeStaff: OfficeStaffMember[]
 }

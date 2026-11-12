@@ -1,4 +1,4 @@
-import type { DocumentRecord, TaxReturn, UserAccount } from './types'
+import type { DocumentRecord, OfficeStaffMember, TaxReturn, UserAccount } from './types'
 import {
   OFFICE_PERSONAL_FEE,
   TC_PERSONAL_FEE,
@@ -6,6 +6,7 @@ import {
   TP_PERSONAL_FEE,
 } from './fees'
 import { vaultStoragePath } from '../engine/tenantIsolation'
+import { seedVerifiedCredential } from '../engine/credentials'
 
 export const DEMO_USERS: UserAccount[] = [
   {
@@ -14,6 +15,7 @@ export const DEMO_USERS: UserAccount[] = [
     email: 'jordan@example.com',
     role: 'taxpayer',
     tenantId: 'tenant-novara-direct',
+    accountType: 'tc',
   },
   {
     id: 'u-prep',
@@ -21,7 +23,12 @@ export const DEMO_USERS: UserAccount[] = [
     email: 'alex@summit-tax.office',
     role: 'preparer',
     tenantId: 'tenant-summit',
+    accountType: 'office_preparer',
     ptin: 'P12345678',
+    credentials: {
+      ptin: seedVerifiedCredential('ptin', 'P12345678'),
+      efileProvider: { providerName: 'Summit Tax Office MeF', status: 'associated', associatedAt: new Date().toISOString() },
+    },
   },
   {
     id: 'u-prep-solo',
@@ -29,7 +36,13 @@ export const DEMO_USERS: UserAccount[] = [
     email: 'taylor@kimtax.prep',
     role: 'preparer',
     tenantId: 'tenant-kim-tp',
+    accountType: 'independent_tp',
     ptin: 'P87654321',
+    credentials: {
+      ptin: seedVerifiedCredential('ptin', 'P87654321'),
+      efileProvider: { providerName: 'Authorized E-File Partner (demo)', status: 'associated', associatedAt: new Date().toISOString() },
+      businessName: 'Kim Tax Preparation',
+    },
   },
   {
     id: 'u-owner',
@@ -37,6 +50,14 @@ export const DEMO_USERS: UserAccount[] = [
     email: 'morgan@summit-tax.office',
     role: 'efin_owner',
     tenantId: 'tenant-summit',
+    accountType: 'office_owner',
+    credentials: {
+      efin: seedVerifiedCredential('efin', '123456'),
+      ein: seedVerifiedCredential('ein', '12-3456789'),
+      businessName: 'Summit Tax Office LLC',
+      businessAddress: '100 Market St, Austin, TX',
+      efileProvider: { providerName: 'NOVARA MeF Adapter', status: 'associated', associatedAt: new Date().toISOString() },
+    },
   },
   {
     id: 'u-owner-lakes',
@@ -44,6 +65,14 @@ export const DEMO_USERS: UserAccount[] = [
     email: 'jamie@lakeside-tax.office',
     role: 'efin_owner',
     tenantId: 'tenant-lakeside',
+    accountType: 'office_owner',
+    credentials: {
+      efin: seedVerifiedCredential('efin', '654321'),
+      ein: seedVerifiedCredential('ein', '98-7654321'),
+      businessName: 'Lakeside Tax LLC',
+      businessAddress: '22 Harbor Rd, Chicago, IL',
+      efileProvider: { providerName: 'NOVARA MeF Adapter', status: 'associated', associatedAt: new Date().toISOString() },
+    },
   },
   {
     id: 'u-admin',
@@ -51,6 +80,42 @@ export const DEMO_USERS: UserAccount[] = [
     email: 'ops@novara.tax',
     role: 'admin',
     tenantId: 'platform',
+    accountType: 'admin',
+  },
+]
+
+export const SEED_OFFICE_STAFF: OfficeStaffMember[] = [
+  {
+    id: 'staff-summit-owner',
+    tenantId: 'tenant-summit',
+    userId: 'u-owner',
+    name: 'Morgan Lee',
+    email: 'morgan@summit-tax.office',
+    kind: 'owner',
+    status: 'active',
+    invitedAt: new Date(Date.now() - 86400000 * 90).toISOString(),
+  },
+  {
+    id: 'staff-summit-alex',
+    tenantId: 'tenant-summit',
+    userId: 'u-prep',
+    name: 'Alex Rivera',
+    email: 'alex@summit-tax.office',
+    kind: 'preparer',
+    status: 'active',
+    invitedAt: new Date(Date.now() - 86400000 * 60).toISOString(),
+    ptinDisplay: '····5678',
+    ptinStatus: 'verified',
+  },
+  {
+    id: 'staff-lakes-owner',
+    tenantId: 'tenant-lakeside',
+    userId: 'u-owner-lakes',
+    name: 'Jamie Brooks',
+    email: 'jamie@lakeside-tax.office',
+    kind: 'owner',
+    status: 'active',
+    invitedAt: new Date(Date.now() - 86400000 * 40).toISOString(),
   },
 ]
 
@@ -78,24 +143,24 @@ export const SEED_RETURNS: TaxReturn[] = [
     taxYear: 2025,
     returnType: '1040_Schedule_C',
     state: 'Preparer Review',
-    readiness: 88,
+    readiness: 78,
     refundOrOwe: 2140,
     preparerId: 'u-prep',
     tenantId: 'tenant-summit',
     assignedPreparerIds: ['u-prep'],
     isBusiness: false,
-    feeSnapshot: [{ label: 'Personal tax return (TP software)', amount: TP_PERSONAL_FEE, status: 'approved' }],
+    feeSnapshot: [{ label: 'Personal tax return (Office software)', amount: OFFICE_PERSONAL_FEE, status: 'approved' }],
     appliedBenefits: [],
     updatedAt: new Date().toISOString(),
   },
   {
     id: 'r-1003',
-    clientName: 'Harbor Craft LLC',
+    clientName: 'Harbor Goods LLC',
     clientId: 'c-harbor',
     taxYear: 2025,
     returnType: '1120-S',
-    state: 'Extraction/Verification',
-    readiness: 61,
+    state: 'Intake Started',
+    readiness: 22,
     refundOrOwe: 0,
     preparerId: 'u-prep',
     tenantId: 'tenant-summit',
@@ -139,7 +204,6 @@ export const SEED_RETURNS: TaxReturn[] = [
     appliedBenefits: [],
     updatedAt: new Date(Date.now() - 86400000 * 40).toISOString(),
   },
-  // Independent TP (Kim) — must never appear for Summit users
   {
     id: 'r-2001',
     clientName: 'Pat Morales',
@@ -157,7 +221,6 @@ export const SEED_RETURNS: TaxReturn[] = [
     appliedBenefits: [],
     updatedAt: new Date().toISOString(),
   },
-  // Separate office (Lakeside) — isolated from Summit
   {
     id: 'r-3001',
     clientName: 'Quinn Avery',
@@ -259,14 +322,6 @@ export const SMART_QUESTIONS = [
   },
   {
     id: 'q3',
-    prompt: 'Did anyone claim you as a dependent on their return?',
-  },
-  {
-    id: 'q4',
-    prompt: 'Did you pay for childcare or dependent care so you could work?',
-  },
-  {
-    id: 'q5',
-    prompt: 'Last year you had a 1099-INT from First Harbor Bank. Did that account close?',
+    prompt: 'Did anyone else claim you as a dependent?',
   },
 ]
