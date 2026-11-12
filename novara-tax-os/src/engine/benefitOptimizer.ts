@@ -5,6 +5,7 @@ import {
   type BenefitStatus,
   type DocSupportStatus,
 } from '../data/benefitsCatalog'
+import { answerPresent } from './benefitAnswers'
 import { buildAppliedFormLines, formMappingFor } from './returnForms'
 
 export type ProfileAnswers = Record<string, string | number | boolean | undefined>
@@ -125,7 +126,7 @@ function factMap(p: TaxpayerProfile): Record<string, boolean> {
     energy_improvements: p.energyImprovements > 0 || p.answers.energy_improvements === 'yes',
     self_employed: p.selfEmploymentIncome > 0 || p.answers.self_employed === 'yes',
     schedule_c: p.selfEmploymentIncome > 0,
-    se_health_premiums: p.seHealthPremiums > 0,
+    se_health_premiums: p.seHealthPremiums > 0 || p.answers.se_health_premiums_yes === 'yes',
     business_vehicle: p.businessMileage > 0 || p.answers.business_vehicle === 'yes',
     charitable_gifts: p.charitableGifts > 0 || p.answers.charitable_gifts === 'yes',
     high_medical: p.medicalExpenses > 0 || p.answers.high_medical === 'yes',
@@ -133,20 +134,6 @@ function factMap(p: TaxpayerProfile): Record<string, boolean> {
     marketplace_coverage: p.answers.marketplace_coverage === 'yes' || p.answers.had_marketplace === 'yes',
     unmarried_or_considered: p.filingStatus === 'single' || p.filingStatus === 'hoh' || p.answers.unmarried_or_considered === 'yes',
   }
-}
-
-function answerPresent(p: TaxpayerProfile, key: string) {
-  const v = p.answers[key]
-  if (key === 'childcare_amount') return p.childcarePaid > 0 || typeof v === 'number' || !!v
-  if (key === 'tuition_paid') return p.tuitionPaid > 0 || !!v
-  if (key === 'child_age') return p.dependents.some((d) => d.age >= 0) || v !== undefined
-  if (key === 'mortgage_interest_paid') return p.mortgageInterest > 0 || !!v
-  if (key === 'property_tax_amount') return p.propertyTax > 0 || !!v
-  if (key === 'loan_interest_paid') return p.studentLoanInterest > 0 || !!v
-  if (key === 'filing_status') return p.filingStatus !== 'unknown' || !!v
-  if (key === 'earned_income_band') return p.wages + p.selfEmploymentIncome > 0 || !!v
-  if (v === undefined || v === '' || v === 'unresolved') return false
-  return true
 }
 
 function kidsUnder17(p: TaxpayerProfile) {
@@ -268,6 +255,8 @@ function docsOnFile(rule: BenefitRule, p: TaxpayerProfile): boolean {
   if ((rule.id === 'aotc' || rule.id === 'llc') && p.tuitionPaid > 0) return true
   if (rule.id === 'student_loan' && p.studentLoanInterest > 0) return true
   if (rule.id === 'eitc' && p.wages + p.selfEmploymentIncome > 0) return true
+  // Mileage: taxpayer attestation of a log is not verified documentation — stay pending_verification
+  if (rule.id === 'mileage' && p.answers.mileage_docs === 'yes') return true
   return false
 }
 
@@ -294,7 +283,97 @@ function baseFinding(
   }
 }
 
+/** Explicit questionnaire “No” / disqualifying answers — never invent eligibility. */
+function disqualifiedByAnswers(rule: BenefitRule, p: TaxpayerProfile): string | null {
+  const a = p.answers
+  const no = (k: string) => a[k] === 'no' || a[k] === false
+  const yes = (k: string) => a[k] === 'yes' || a[k] === true
+  switch (rule.id) {
+    case 'mileage':
+      if (no('business_vehicle')) return 'You indicated you did not use a vehicle for qualifying business purposes.'
+      if (no('self_employed')) return 'Business mileage requires self-employment or a trade or business.'
+      break
+    case 'qbi':
+      if (no('self_employed')) return 'No self-employment or pass-through income was reported for QBI.'
+      break
+    case 'se_health':
+      if (no('self_employed')) return 'Self-employed health insurance requires self-employment.'
+      if (no('se_health_premiums_yes')) return 'No self-employed health insurance premiums were paid.'
+      if (yes('se_health_employer_eligible')) return 'Eligible employer coverage months generally disqualify this deduction.'
+      break
+    case 'ctc':
+      if (no('has_child')) return 'No qualifying child under 17 was indicated.'
+      if (no('child_lived_with') || no('child_support') || yes('another_claimant'))
+        return 'Child Tax Credit residency/support/claimant tests were not met.'
+      break
+    case 'eitc':
+      if (no('has_earned_income_q')) return 'No earned income was indicated for EITC.'
+      if (no('eitc_investment_ok') || a.eitc_investment_ok === 'No') return 'Investment income appears above the EITC limit.'
+      break
+    case 'cdcc':
+      if (no('has_child') || no('paid_childcare')) return 'No qualifying childcare expenses were indicated.'
+      break
+    case 'aotc':
+      if (no('education_expenses')) return 'No college tuition expenses were indicated.'
+      if (no('aotc_half_time_first4')) return 'Student does not meet AOTC half-time / first-four-years tests.'
+      if (yes('felony_drug')) return 'A felony drug conviction disqualifies the American Opportunity Credit.'
+      break
+    case 'llc':
+      if (no('education_expenses')) return 'No qualified education expenses were indicated.'
+      break
+    case 'student_loan':
+      if (no('student_loan_interest')) return 'No student loan interest was paid.'
+      break
+    case 'mortgage':
+      if (no('owns_home') || no('mortgage_interest_paid')) return 'No mortgage interest was indicated.'
+      break
+    case 'property_tax':
+      if (no('owns_home') || no('property_taxes')) return 'No property taxes were indicated.'
+      break
+    case 'charity':
+      if (no('charitable_gifts')) return 'No charitable gifts were indicated.'
+      break
+    case 'medical':
+      if (no('high_medical')) return 'No large medical expenses were indicated.'
+      break
+    case 'savers':
+      if (no('retirement_contributions')) return 'No retirement contributions were indicated.'
+      break
+    case 'energy':
+      if (no('energy_improvements')) return 'No qualifying energy improvements were indicated.'
+      break
+    case 'hsa':
+      if (no('hsa_contributions') || no('hdhp_coverage')) return 'HSA contribution or HDHP coverage was not indicated.'
+      break
+    case 'ptc':
+      if (no('had_marketplace')) return 'No Marketplace coverage was indicated.'
+      break
+    case 'educator':
+      if (no('is_educator')) return 'Not an eligible educator for this deduction.'
+      break
+    case 'hoh':
+      if (no('unmarried_or_considered') || no('has_qualifying_person') || no('maintained_home'))
+        return 'Head of Household tests were not met.'
+      break
+    case 'odc':
+      if (no('has_other_dependent') || no('other_dependent_qualifies')) return 'No other qualifying dependent was indicated.'
+      break
+    default:
+      break
+  }
+  return null
+}
+
 function evaluateRule(rule: BenefitRule, p: TaxpayerProfile, facts: Record<string, boolean>): BenefitFinding {
+  const dq = disqualifiedByAnswers(rule, p)
+  if (dq) {
+    return baseFinding(rule, {
+      status: 'ineligible',
+      estimatedSavings: 0,
+      explanation: `${rule.shortName}: not eligible. ${dq}`,
+    })
+  }
+
   const triggered = rule.triggerFacts.some((t) => facts[t])
   const missingAnswers = rule.requiredAnswers.filter((k) => !answerPresent(p, k))
   const softProbe =
@@ -312,6 +391,12 @@ function evaluateRule(rule: BenefitRule, p: TaxpayerProfile, facts: Record<strin
         'charitable_gifts',
         'high_medical',
         'student_loan_interest',
+        'business_vehicle',
+        'retirement_contributions',
+        'hsa_contributions',
+        'energy_improvements',
+        'is_educator',
+        'se_health_premiums',
       ].includes(t),
     )
 
@@ -731,29 +816,104 @@ export function applyAnswer(p: TaxpayerProfile, mapsTo: string, value: string | 
     else next.employerDependentCare = 0
   }
   if (mapsTo === 'education_expenses' && (value === 'yes' || value === true) && next.tuitionPaid === 0) {
-    next.tuitionPaid = 4000
+    // Amount comes from tuition_paid follow-up — don't invent a tuition figure here
+  }
+  if (mapsTo === 'tuition_paid') {
+    next.tuitionPaid = typeof value === 'number' ? value : Number(value) || 0
+    next.answers.education_expenses = 'yes'
   }
   if (mapsTo === 'retirement_contributions' && (value === 'yes' || value === true) && next.retirementContributions === 0) {
-    next.retirementContributions = 3000
+    // wait for amount
+  }
+  if (mapsTo === 'retirement_contribution_amount') {
+    next.retirementContributions = typeof value === 'number' ? value : Number(value) || 0
+    next.answers.retirement_contributions = 'yes'
   }
   if (mapsTo === 'self_employed' && (value === 'yes' || value === true) && next.selfEmploymentIncome === 0) {
     next.selfEmploymentIncome = 5000
   }
-  if (mapsTo === 'owns_home' && (value === 'yes' || value === true) && next.mortgageInterest === 0) {
-    next.mortgageInterest = 8500
-    next.propertyTax = 4200
+  if (mapsTo === 'business_vehicle' && (value === 'yes' || value === true)) {
+    next.answers.business_vehicle = 'yes'
+  }
+  if (mapsTo === 'business_miles') {
+    next.businessMileage = typeof value === 'number' ? value : Number(value) || 0
+    next.answers.business_vehicle = 'yes'
+  }
+  if (mapsTo === 'qbi_amount') {
+    const n = typeof value === 'number' ? value : Number(value) || 0
+    next.selfEmploymentIncome = Math.max(next.selfEmploymentIncome, n)
+    next.answers.self_employed = 'yes'
+  }
+  if (mapsTo === 'se_health_premium_amount') {
+    next.seHealthPremiums = typeof value === 'number' ? value : Number(value) || 0
+    next.answers.se_health_premiums_yes = 'yes'
+  }
+  if (mapsTo === 'se_health_premiums_yes' && (value === 'yes' || value === true)) {
+    next.answers.se_health_premiums = 'yes'
+  }
+  if (mapsTo === 'owns_home' && (value === 'yes' || value === true) && next.mortgageInterest === 0 && next.propertyTax === 0) {
+    // amounts from follow-ups
+  }
+  if (mapsTo === 'mortgage_interest_amount') {
+    next.mortgageInterest = typeof value === 'number' ? value : Number(value) || 0
+    next.answers.owns_home = 'yes'
+    next.answers.mortgage_interest_paid = 'yes'
+  }
+  if (mapsTo === 'property_tax_amount') {
+    next.propertyTax = typeof value === 'number' ? value : Number(value) || 0
+    next.answers.owns_home = 'yes'
+    next.answers.property_taxes = 'yes'
   }
   if (mapsTo === 'had_marketplace' && (value === 'yes' || value === true)) {
     next.answers.marketplace_coverage = 'yes'
   }
+  if (mapsTo === 'charitable_gift_amount') {
+    next.charitableGifts = typeof value === 'number' ? value : Number(value) || 0
+    next.answers.charitable_gifts = 'yes'
+  }
   if (mapsTo === 'charitable_gifts' && (value === 'yes' || value === true) && next.charitableGifts === 0) {
-    next.charitableGifts = 500
+    // wait for amount
+  }
+  if (mapsTo === 'medical_amount') {
+    next.medicalExpenses = typeof value === 'number' ? value : Number(value) || 0
+    next.answers.high_medical = 'yes'
   }
   if (mapsTo === 'high_medical' && (value === 'yes' || value === true) && next.medicalExpenses === 0) {
-    next.medicalExpenses = 9000
+    // wait for amount
+  }
+  if (mapsTo === 'loan_interest_paid') {
+    next.studentLoanInterest = typeof value === 'number' ? value : Number(value) || 0
+    next.answers.student_loan_interest = 'yes'
   }
   if (mapsTo === 'student_loan_interest' && (value === 'yes' || value === true) && next.studentLoanInterest === 0) {
-    next.studentLoanInterest = 780
+    // wait for amount
+  }
+  if (mapsTo === 'energy_improvement_amount') {
+    next.energyImprovements = typeof value === 'number' ? value : Number(value) || 0
+    next.answers.energy_improvements = 'yes'
+  }
+  if (mapsTo === 'hsa_amount') {
+    next.hsaContributions = typeof value === 'number' ? value : Number(value) || 0
+    next.answers.hsa_contributions = 'yes'
+  }
+  if (mapsTo === 'is_educator' && (value === 'yes' || value === true)) {
+    next.isEducator = true
+  }
+  if (mapsTo === 'educator_expenses') {
+    next.educatorExpenses = typeof value === 'number' ? value : Number(value) || 0
+    next.isEducator = true
+  }
+  if (mapsTo === 'has_earned_income_q' && (value === 'yes' || value === true)) {
+    next.answers.has_earned_income = 'yes'
+  }
+  if (mapsTo === 'has_other_dependent' && (value === 'yes' || value === true)) {
+    next.answers.has_dependents = 'yes'
+    if (!next.dependents.some((d) => d.age >= 17)) {
+      next.dependents = [...next.dependents, { name: 'Other dependent', age: 19, relationship: 'relative' }]
+    }
+  }
+  if (mapsTo === 'maintained_home' && (value === 'yes' || value === true)) {
+    next.filingStatus = 'hoh'
   }
   if (mapsTo === 'filing_state') {
     next.answers.filing_state = String(value)

@@ -24,6 +24,7 @@ export function AppNav() {
           { to: '/app/taxpayer', label: 'Home' },
           { to: '/app/taxpayer/prepare', label: 'Prepare' },
           { to: '/app/taxpayer/benefits', label: 'Savings' },
+          { to: '/app/taxpayer/documents', label: 'Documents' },
           { to: '/app/taxpayer/vault', label: 'Vault' },
         ]
       : currentUser.role === 'preparer'
