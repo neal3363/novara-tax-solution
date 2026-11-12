@@ -121,9 +121,15 @@ function factMap(p: TaxpayerProfile): Record<string, boolean> {
 
 function answerPresent(p: TaxpayerProfile, key: string) {
   const v = p.answers[key]
-  if (v === undefined || v === '' || v === 'unresolved') return false
   if (key === 'childcare_amount') return p.childcarePaid > 0 || typeof v === 'number' || !!v
   if (key === 'tuition_paid') return p.tuitionPaid > 0 || !!v
+  if (key === 'child_age') return p.dependents.some((d) => d.age >= 0) || v !== undefined
+  if (key === 'mortgage_interest_paid') return p.mortgageInterest > 0 || !!v
+  if (key === 'property_tax_amount') return p.propertyTax > 0 || !!v
+  if (key === 'loan_interest_paid') return p.studentLoanInterest > 0 || !!v
+  if (key === 'filing_status') return p.filingStatus !== 'unknown' || !!v
+  if (key === 'earned_income_band') return p.wages + p.selfEmploymentIncome > 0 || !!v
+  if (v === undefined || v === '' || v === 'unresolved') return false
   return true
 }
 
