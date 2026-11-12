@@ -62,6 +62,17 @@ export function Landing() {
           <div className="update-grid">
             <article className="update-card panel">
               <span className="badge badge-ok">New</span>
+              <h3>AI Smart Tax Interview</h3>
+              <p>
+                Document-first: upload → extract → confirm → filing status → benefit discovery → calculate → review →
+                e-file. Asks once; never re-types accurate extracted data.
+              </p>
+              <p className="update-path">
+                Sign in as <strong>Direct taxpayer</strong> → <strong>Prepare</strong>
+              </p>
+            </article>
+            <article className="update-card panel">
+              <span className="badge badge-ok">New</span>
               <h3>Tax Benefit Optimization Engine</h3>
               <p>
                 Discovers credits/deductions, asks follow-ups, compares legal options, and runs a mandatory benefit audit

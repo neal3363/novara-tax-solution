@@ -1,17 +1,38 @@
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import type { DragEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { actions, useAppStore } from '../../store/useAppStore'
 import { formatMoney } from '../../data/fees'
+import { RefundTracker } from '../../components/benefits/RefundTracker'
+import {
+  extractConfirmedFields,
+  knownFactsSummary,
+  nextBenefitDiscoveryTurn,
+  nextFilingStatusTurn,
+} from '../../engine/smartInterview'
 import '../shared.css'
+import './Prepare.css'
 
-const STEPS = ['Drop Zone', 'Verify', 'Questions', 'Your Result', 'Approve & Sign', 'Done']
+const STEPS = [
+  'Upload',
+  'Confirm',
+  'Smart interview',
+  'Tax calculation',
+  'Review & sign',
+  'E-file',
+]
 
 export function Prepare() {
-  const { documents, questions, prepStep, returns, currentUser } = useAppStore()
+  const { documents, prepStep, returns, currentUser, taxProfile, benefitReport, interviewChat } = useAppStore()
   const mine = returns.find((r) => r.clientId === currentUser?.id && r.taxYear === 2025)
   const inputRef = useRef<HTMLInputElement>(null)
   const [drag, setDrag] = useState(false)
+  const fields = useMemo(() => extractConfirmedFields(documents), [documents])
+  const known = useMemo(() => knownFactsSummary(documents, taxProfile), [documents, taxProfile])
+
+  const filingTurn = nextFilingStatusTurn(taxProfile)
+  const benefitTurn = filingTurn ? null : nextBenefitDiscoveryTurn(taxProfile)
+  const activeTurn = filingTurn ?? benefitTurn
 
   function onDrop(e: DragEvent) {
     e.preventDefault()
@@ -19,19 +40,22 @@ export function Prepare() {
     if (e.dataTransfer.files?.length) actions.uploadFiles(e.dataTransfer.files)
   }
 
-  const answered = questions.filter((q) => q.answer).length
-
   return (
     <div className="page container">
       <header className="page-header">
         <div>
-          <p className="eyebrow">Upload & Done</p>
-          <h1>Prepare your return</h1>
+          <p className="eyebrow">AI Smart Tax Interview</p>
+          <h1>Document-first preparation</h1>
         </div>
         <button className="btn btn-ghost" type="button" onClick={() => actions.resetDemo()}>
           Reset demo
         </button>
       </header>
+
+      <p className="muted prepare-lead">
+        Upload → AI extracts → you confirm → filing-status questions → tax-benefit discovery → calculation → review →
+        signature → e-file. NOVARA asks once, reuses answers, and never invents deductions.
+      </p>
 
       <div className="stepper" aria-label="Preparation steps">
         {STEPS.map((s, i) => (
@@ -56,9 +80,12 @@ export function Prepare() {
             tabIndex={0}
             onKeyDown={(e) => e.key === 'Enter' && inputRef.current?.click()}
           >
-            <span className="badge">Upload Anything Mode</span>
-            <h2>Drop your tax documents</h2>
-            <p>Photos, PDFs, screenshots, mixed bundles. We scan, classify, extract, and link every value to its source.</p>
+            <span className="badge">Upload documents first</span>
+            <h2>Drop ID, W-2s, 1099s, and supporting docs</h2>
+            <p>
+              Driver’s license / state ID, SSN or tax ID docs, W-2s, 1099s, dependent IDs, tuition statements, and more.
+              AI extracts names, DOB, IDs, addresses, wages, and withholding.
+            </p>
             <input
               ref={inputRef}
               type="file"
@@ -71,37 +98,46 @@ export function Prepare() {
 
           {documents.length > 0 && (
             <div className="list-panel panel" style={{ marginTop: '1rem' }}>
-              <h2>Extraction & verification</h2>
-              {documents.slice(0, 6).map((d) => (
-                <div className="row-item" key={d.id}>
+              <h2>Confirm extracted information</h2>
+              <p className="muted" style={{ marginTop: 0 }}>
+                Correct only missing, inconsistent, or unverified fields. Do not re-enter accurate extracted values.
+              </p>
+              {known.length > 0 && (
+                <div className="known-box">
+                  {known.map((k) => (
+                    <span key={k} className="badge badge-neutral">
+                      {k}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {fields.map((f) => (
+                <div className="row-item" key={f.id}>
                   <div>
                     <strong>
-                      {d.type} · {d.name}
+                      {f.label}: {f.value}
                     </strong>
-                    <span className="row-meta">
-                      Confidence {Math.round(d.confidence * 100) || '—'}% · {d.status}
-                    </span>
-                    <div style={{ marginTop: '0.45rem', display: 'grid', gap: '0.35rem' }}>
-                      {d.facts.map((f) => (
-                        <div key={f.id} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                          <span className="row-meta">
-                            {f.label}: <strong style={{ color: 'var(--ink)' }}>{f.value}</strong> (p.{f.sourcePage})
-                          </span>
-                          {!f.verified && d.status !== 'scanning' && (
-                            <button className="btn btn-secondary" style={{ padding: '0.35rem 0.7rem' }} type="button" onClick={() => actions.verifyFact(d.id, f.id)}>
-                              Verify
-                            </button>
-                          )}
-                          {f.verified && <span className="badge badge-ok">Verified</span>}
-                        </div>
-                      ))}
-                    </div>
+                    <span className="row-meta">{f.source}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                    {f.needsAttention && f.docId && f.factId && !f.confirmed && (
+                      <button
+                        className="btn btn-secondary"
+                        type="button"
+                        style={{ padding: '0.35rem 0.7rem' }}
+                        onClick={() => actions.verifyFact(f.docId!, f.factId!)}
+                      >
+                        Confirm
+                      </button>
+                    )}
+                    {(f.confirmed || !f.needsAttention) && <span className="badge badge-ok">Confirmed</span>}
+                    {f.needsAttention && !f.confirmed && <span className="badge badge-warn">Needs check</span>}
                   </div>
                 </div>
               ))}
-              <div style={{ marginTop: '1rem' }}>
-                <button className="btn btn-primary" type="button" onClick={() => actions.setPrepStep(2)}>
-                  Continue to smart questions
+              <div style={{ marginTop: '1rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <button className="btn btn-primary" type="button" onClick={() => actions.confirmExtractionsDetails()}>
+                  Looks good — start smart interview
                 </button>
               </div>
             </div>
@@ -110,43 +146,101 @@ export function Prepare() {
       )}
 
       {prepStep === 2 && (
-        <section className="rise">
-          <div className="list-panel panel">
-            <h2>Smart questions — only true gaps</h2>
-            <p className="muted" style={{ marginTop: 0 }}>
-              Target: 10 or fewer for W-2 filers. Plain-language answers tied to the Tax Data Graph.
-            </p>
-            <div className="question-list">
-              {questions.map((q) => (
-                <div className="question panel" key={q.id}>
-                  <p>{q.prompt}</p>
+        <section className="smart-interview rise">
+          <div className="interview-layout">
+            <div className="list-panel panel interview-chat">
+              <h2>Conversational tax interview</h2>
+              <p className="muted" style={{ marginTop: 0 }}>
+                Feels like an experienced tax pro — dynamic follow-ups only, based on your documents and prior answers.
+              </p>
+              <div className="chat-log" role="log" aria-live="polite">
+                {interviewChat.map((m) => (
+                  <div key={m.id} className={`chat-bubble ${m.role}`}>
+                    <p>{m.text}</p>
+                  </div>
+                ))}
+              </div>
+
+              {activeTurn ? (
+                <div className="active-turn">
+                  <p className="turn-label">
+                    {activeTurn.phase === 'filing_status' ? 'Filing status' : 'Tax benefit discovery'}
+                  </p>
                   <div className="answer-row">
-                    {['Yes', 'No', 'Not sure'].map((a) => (
+                    {activeTurn.kind === 'choice' || activeTurn.kind === 'yesno'
+                      ? (activeTurn.choices ?? ['Yes', 'No']).map((c) => (
+                          <button
+                            key={c}
+                            type="button"
+                            className="btn btn-secondary"
+                            onClick={() => actions.answerSmartInterview(activeTurn.mapsTo, c)}
+                          >
+                            {c}
+                          </button>
+                        ))
+                      : null}
+                    {activeTurn.kind === 'number' && (
                       <button
-                        key={a}
                         type="button"
-                        className={`btn ${q.answer === a ? 'btn-primary' : 'btn-secondary'}`}
-                        onClick={() => actions.answerQuestion(q.id, a)}
+                        className="btn btn-primary"
+                        onClick={() => {
+                          const raw = window.prompt('Enter amount (USD)', '4500')
+                          if (raw != null) actions.answerSmartInterview(activeTurn.mapsTo, Number(raw) || 0)
+                        }}
                       >
-                        {a}
+                        Enter amount
                       </button>
-                    ))}
+                    )}
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      onClick={() => actions.markBenefitUnresolved(activeTurn.mapsTo)}
+                    >
+                      Skip / unresolved
+                    </button>
                   </div>
                 </div>
-              ))}
+              ) : (
+                <div className="answer-row">
+                  <button className="btn btn-primary" type="button" onClick={() => actions.completeSmartInterview()}>
+                    Calculate my result
+                  </button>
+                </div>
+              )}
             </div>
-            <div style={{ marginTop: '1rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-              <button
-                className="btn btn-primary"
-                type="button"
-                disabled={answered < questions.length}
-                onClick={() => actions.completeQuestions()}
-              >
-                Calculate my result ({answered}/{questions.length})
-              </button>
-              <button className="btn btn-ghost" type="button" onClick={() => actions.setPrepStep(1)}>
-                Back
-              </button>
+
+            <div className="side-stack">
+              <RefundTracker report={benefitReport} />
+              <section className="list-panel panel">
+                <h2>Already on file</h2>
+                <div className="row-item">
+                  <div>
+                    <strong>Wages</strong>
+                    <span className="row-meta">From documents — not re-asked</span>
+                  </div>
+                  <strong>{formatMoney(taxProfile.wages)}</strong>
+                </div>
+                <div className="row-item">
+                  <div>
+                    <strong>Withholding</strong>
+                    <span className="row-meta">From documents — not re-asked</span>
+                  </div>
+                  <strong>{formatMoney(taxProfile.withholding)}</strong>
+                </div>
+                <div className="row-item">
+                  <div>
+                    <strong>Filing status</strong>
+                    <span className="row-meta">From interview when legally needed</span>
+                  </div>
+                  <strong>{taxProfile.filingStatus}</strong>
+                </div>
+                <div className="row-item">
+                  <div>
+                    <strong>Dependents</strong>
+                  </div>
+                  <strong>{taxProfile.dependents.length}</strong>
+                </div>
+              </section>
             </div>
           </div>
         </section>
@@ -155,34 +249,37 @@ export function Prepare() {
       {prepStep >= 3 && prepStep < 5 && (
         <section className="grid-2 rise">
           <div className="result-hero panel">
-            <span className="badge badge-ok">Deterministic engine result</span>
+            <span className="badge badge-ok">Tax calculation</span>
             <p className="eyebrow" style={{ marginTop: '0.8rem' }}>
-              Estimated refund
+              Estimated refund / balance
             </p>
-            <p className="amount">{formatMoney(mine?.refundOrOwe || 0)}</p>
+            <p className="amount">{formatMoney(benefitReport?.projectedRefund ?? mine?.refundOrOwe ?? 0)}</p>
             <p className="muted">
-              30-second why: wages and withholding from verified W-2 facts, plus screened credits. Tap-any-number provenance
-              is available on each extracted field. Not a guarantee — eligibility confirmed by versioned rules + review.
+              Base from confirmed documents {formatMoney(benefitReport?.baseRefund ?? 0)}. Verified benefits{' '}
+              {formatMoney(benefitReport?.verifiedSavings ?? 0)}. Potential still under review{' '}
+              {formatMoney(benefitReport?.potentialSavings ?? 0)}. Unsupported deductions are never applied.
             </p>
             <div style={{ margin: '1rem 0' }}>
               <div className="progress-track">
-                <div className="progress-fill" style={{ width: `${mine?.readiness ?? 90}%` }} />
+                <div className="progress-fill" style={{ width: `${mine?.readiness ?? 88}%` }} />
               </div>
-              <p className="row-meta" style={{ marginTop: '0.45rem' }}>
-                Return readiness {mine?.readiness ?? 90}% — Pre-Rejection Check clear
-              </p>
             </div>
             {prepStep === 3 && (
-              <button className="btn btn-primary" type="button" onClick={() => actions.setPrepStep(4)}>
-                Continue to Approve & Sign
-              </button>
+              <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
+                <button className="btn btn-primary" type="button" onClick={() => actions.setPrepStep(4)}>
+                  Continue to review &amp; sign
+                </button>
+                <Link className="btn btn-secondary" to="/app/taxpayer/benefits">
+                  Find more tax savings
+                </Link>
+              </div>
             )}
           </div>
           {prepStep === 4 && (
             <div className="list-panel panel">
-              <h2>Approve & Sign</h2>
+              <h2>Review → Signature → E-file</h2>
               <p className="muted">
-                Itemized estimate (provisional consumer pricing shown for demo). Bank products optional and partner-priced.
+                Professional review when required. Bank products optional and separately disclosed.
               </p>
               {(mine?.feeSnapshot ?? []).map((f) => (
                 <div className="row-item" key={f.label}>
@@ -195,13 +292,17 @@ export function Prepare() {
               ))}
               <div className="row-item">
                 <div>
-                  <strong>Consent & e-sign</strong>
-                  <span className="row-meta">Preparation use · AI processing · e-file authorization</span>
+                  <strong>Benefit audit</strong>
+                  <span className="row-meta">
+                    {benefitReport?.auditComplete
+                      ? 'Complete'
+                      : `${benefitReport?.blockers.length ?? 0} open items — filing should not claim unverified benefits`}
+                  </span>
                 </div>
-                <span className="badge">Required</span>
+                <Link to="/app/taxpayer/benefits/review">Open</Link>
               </div>
               <button className="btn btn-primary" type="button" style={{ marginTop: '0.75rem' }} onClick={() => actions.signAndFile()}>
-                Approve, sign & file
+                Approve, sign &amp; e-file
               </button>
             </div>
           )}
@@ -210,12 +311,9 @@ export function Prepare() {
 
       {prepStep >= 5 && (
         <section className="result-hero panel rise">
-          <span className="badge badge-ok">Accepted</span>
-          <h2 style={{ marginBottom: 0 }}>You’re done for filing — we’re not done for the year</h2>
-          <p className="muted">
-            Final records are in your Tax Vault. Live refund tracker is active. Next year’s organizer is drafting from this
-            return.
-          </p>
+          <span className="badge badge-ok">E-file transmitted</span>
+          <h2 style={{ marginBottom: 0 }}>Return submitted — year-round support continues</h2>
+          <p className="muted">Documents stay in your vault. Refund tracker remains active.</p>
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
             <Link className="btn btn-primary" to="/app/taxpayer/vault">
               Open Tax Vault

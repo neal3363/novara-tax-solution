@@ -1,0 +1,86 @@
+.prepare-lead {
+  margin: -0.35rem 0 1rem;
+  max-width: 48rem;
+  line-height: 1.45;
+}
+
+.known-box {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.85rem;
+}
+
+.interview-layout {
+  display: grid;
+  gap: 1rem;
+}
+
+.interview-chat {
+  min-height: 420px;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-log {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  max-height: 360px;
+  overflow: auto;
+  margin: 0.5rem 0 0.85rem;
+  padding-right: 0.25rem;
+}
+
+.chat-bubble {
+  max-width: 92%;
+  padding: 0.8rem 0.95rem;
+  border-radius: 16px;
+  animation: rise-in 0.3s ease both;
+}
+
+.chat-bubble p {
+  margin: 0;
+  line-height: 1.45;
+  font-size: 0.95rem;
+}
+
+.chat-bubble.assistant,
+.chat-bubble.system {
+  align-self: flex-start;
+  background: linear-gradient(180deg, #f7f5f1, #efece6);
+  border: 1px solid var(--line);
+}
+
+.chat-bubble.user {
+  align-self: flex-end;
+  background: var(--ink);
+  color: white;
+}
+
+.active-turn {
+  border-top: 1px solid var(--line);
+  padding-top: 0.85rem;
+}
+
+.turn-label {
+  margin: 0 0 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--teal);
+}
+
+.side-stack {
+  display: grid;
+  gap: 1rem;
+  align-content: start;
+}
+
+@media (min-width: 960px) {
+  .interview-layout {
+    grid-template-columns: 1.25fr 0.85fr;
+  }
+}

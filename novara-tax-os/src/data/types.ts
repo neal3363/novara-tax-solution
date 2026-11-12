@@ -154,4 +154,6 @@ export interface AppState {
   taxProfile: import('../engine/benefitOptimizer').TaxpayerProfile
   benefitReport: BenefitSnapshot | null
   benefitReviewSigned: boolean
+  /** Conversational AI Smart Tax Interview inside Prepare workflow */
+  interviewChat: { id: string; role: 'assistant' | 'user' | 'system'; text: string; at: string }[]
 }

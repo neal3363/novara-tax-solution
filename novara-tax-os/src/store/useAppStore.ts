@@ -19,12 +19,19 @@ import {
   runBenefitOptimization,
   type TaxpayerProfile,
 } from '../engine/benefitOptimizer'
+import {
+  applyFilingStatusAnswer,
+  conversationalReply,
+  nextBenefitDiscoveryTurn,
+  nextFilingStatusTurn,
+  syncProfileFromDocuments,
+} from '../engine/smartInterview'
 import type { BenefitSnapshot } from '../data/types'
 
 /** Role preference only — never store tax demo payloads in localStorage */
 const ROLE_KEY = 'novara-tax-os-role'
 /** Session-scoped demo state (clears when the tab closes) */
-const SESSION_KEY = 'novara-tax-os-session-v3'
+const SESSION_KEY = 'novara-tax-os-session-v4'
 
 function toSnapshot(profile: TaxpayerProfile): BenefitSnapshot {
   const report = runBenefitOptimization(profile)
@@ -173,6 +180,14 @@ let state: Store = {
   taxProfile: defaultProfile(),
   benefitReport: null,
   benefitReviewSigned: false,
+  interviewChat: [
+    {
+      id: 'iv0',
+      role: 'assistant',
+      text: 'Upload your documents first — ID, W-2s, 1099s, and supporting forms. I’ll extract what I can and only ask what’s still missing.',
+      at: new Date().toISOString(),
+    },
+  ],
   hydrated: false,
 }
 
@@ -204,6 +219,7 @@ function hydrate() {
     // Migrate away from older plaintext localStorage payload
     localStorage.removeItem('novara-tax-os-v1')
     sessionStorage.removeItem('novara-tax-os-session-v2')
+    sessionStorage.removeItem('novara-tax-os-session-v3')
 
     const role = localStorage.getItem(ROLE_KEY) as Role | null
     const sessionRaw = sessionStorage.getItem(SESSION_KEY)
@@ -217,6 +233,7 @@ function hydrate() {
         taxProfile,
         benefitReport,
         benefitReviewSigned: parsed.benefitReviewSigned ?? false,
+        interviewChat: parsed.interviewChat?.length ? parsed.interviewChat : state.interviewChat,
         currentUser: role ? (DEMO_USERS.find((u) => u.role === role) ?? null) : null,
         hydrated: true,
       }
@@ -254,11 +271,12 @@ function classifyName(name: string): DocType {
   const n = name.toLowerCase()
   if (n.includes('w-2') || n.includes('w2')) return 'W-2'
   if (n.includes('1099')) return '1099-NEC'
-  if (n.includes('1098')) return '1098'
+  if (n.includes('1098') || n.includes('tuition') || n.includes('1098-t')) return '1098'
   if (n.includes('pl') || n.includes('p&l') || n.includes('profit')) return 'P&L'
   if (n.includes('trial')) return 'Trial Balance'
   if (n.includes('bank')) return 'Bank Statement'
-  if (n.includes('id') || n.includes('license') || n.includes('passport')) return 'ID'
+  if (n.includes('ssn') || n.includes('social') || n.includes('id') || n.includes('license') || n.includes('passport') || n.includes('dependent'))
+    return 'ID'
   if (n.includes('1040') || n.includes('prior')) return 'Prior Return'
   return 'Other'
 }
@@ -386,16 +404,54 @@ export const actions = {
                     verified: false,
                   },
                 ]
-              : [
-                  {
-                    id: uid('f'),
-                    label: 'Detected label',
-                    value: doc.name.replace(/\.[^.]+$/, ''),
-                    sourcePage: 1,
-                    confidence,
-                    verified: false,
-                  },
-                ]
+              : doc.type === 'ID'
+                ? [
+                    {
+                      id: uid('f'),
+                      label: 'Full name',
+                      value: state.currentUser?.name ?? 'Jordan Blake',
+                      sourcePage: 1,
+                      confidence: 0.96,
+                      verified: false,
+                    },
+                    {
+                      id: uid('f'),
+                      label: 'Date of birth',
+                      value: '03/14/1988',
+                      sourcePage: 1,
+                      confidence: 0.94,
+                      verified: false,
+                    },
+                    {
+                      id: uid('f'),
+                      label: 'Address',
+                      value: '1842 Harbor Ave, Austin, TX',
+                      sourcePage: 1,
+                      confidence: 0.91,
+                      verified: false,
+                    },
+                  ]
+                : doc.type === '1098'
+                  ? [
+                      {
+                        id: uid('f'),
+                        label: 'Mortgage interest',
+                        value: '$8,500.00',
+                        sourcePage: 1,
+                        confidence,
+                        verified: false,
+                      },
+                    ]
+                  : [
+                      {
+                        id: uid('f'),
+                        label: 'Detected label',
+                        value: doc.name.replace(/\.[^.]+$/, ''),
+                        sourcePage: 1,
+                        confidence,
+                        verified: false,
+                      },
+                    ]
 
         const documents = state.documents.map((d) =>
           d.id === doc.id
@@ -407,18 +463,27 @@ export const actions = {
               }
             : d,
         )
+        const taxProfile = syncProfileFromDocuments(state.taxProfile, documents)
+        const benefitReport = toSnapshot(taxProfile)
         state = {
           ...state,
           documents,
+          taxProfile,
+          benefitReport,
           entryPlan: buildEntryPlan(documents),
           entryPlanStatus: 'awaiting_approval',
         }
         emit()
         if (i === docs.length - 1) {
-          actions.addMessage(
-            'assistant',
-            'Extraction complete. Review the data-entry plan — every value links to its source box. Approve before anything is entered.',
-          )
+          const chat = {
+            id: uid('iv'),
+            role: 'assistant' as const,
+            text: 'Extraction complete. Confirm the details below — I won’t ask you to re-type wages, withholding, or names already on your documents. Correct only what’s missing or wrong.',
+            at: new Date().toISOString(),
+          }
+          state = { ...state, interviewChat: [...state.interviewChat, chat], prepStep: Math.max(state.prepStep, 1) }
+          emit()
+          actions.addMessage('assistant', chat.text)
         }
       }, 900 + i * 500)
     })
@@ -434,26 +499,128 @@ export const actions = {
     }
     emit()
   },
-  completeQuestions() {
-    const refund = 1840 + Math.round(Math.random() * 400)
+  confirmExtractionsDetails() {
+    const taxProfile = syncProfileFromDocuments(state.taxProfile, state.documents)
+    const benefitReport = toSnapshot(taxProfile)
+    const filing = nextFilingStatusTurn(taxProfile)
+    const chat = {
+      id: uid('iv'),
+      role: 'assistant' as const,
+      text: filing
+        ? `${filing.aiLead} ${filing.prompt}`
+        : 'Filing status looks complete from prior answers. Let’s check for tax benefits next.',
+      at: new Date().toISOString(),
+    }
+    state = {
+      ...state,
+      taxProfile,
+      benefitReport,
+      prepStep: 2,
+      interviewChat: [...state.interviewChat, chat],
+    }
+    emit()
+  },
+  answerSmartInterview(mapsTo: string, value: string | number) {
+    const strVal = String(value)
+    const userMsg = { id: uid('iv'), role: 'user' as const, text: strVal, at: new Date().toISOString() }
+
+    const filingKeys = ['married_dec31', 'married_filing_plan', 'has_qualifying_person', 'maintained_home']
+    let taxProfile: TaxpayerProfile
+    if (filingKeys.includes(mapsTo)) {
+      taxProfile = applyFilingStatusAnswer(state.taxProfile, mapsTo, strVal)
+    } else {
+      const normalized =
+        strVal === 'Yes' || strVal === 'yes' ? 'yes' : strVal === 'No' || strVal === 'no' ? 'no' : value
+      taxProfile = applyAnswer(state.taxProfile, mapsTo, normalized)
+    }
+
+    const reply = conversationalReply(mapsTo, strVal, taxProfile)
+    const benefitReport = toSnapshot(taxProfile)
+
+    const filingNext = nextFilingStatusTurn(taxProfile)
+    const benefitNext = filingNext ? null : nextBenefitDiscoveryTurn(taxProfile)
+
+    const assistantMsgs = [
+      { id: uid('iv'), role: 'assistant' as const, text: reply, at: new Date().toISOString() },
+    ]
+
+    if (filingNext) {
+      assistantMsgs.push({
+        id: uid('iv'),
+        role: 'assistant',
+        text: `${filingNext.aiLead} ${filingNext.prompt}`,
+        at: new Date().toISOString(),
+      })
+    } else if (benefitNext) {
+      assistantMsgs.push({
+        id: uid('iv'),
+        role: 'assistant',
+        text: benefitNext.aiLead === benefitNext.prompt ? benefitNext.prompt : `${benefitNext.aiLead}`,
+        at: new Date().toISOString(),
+      })
+      if (benefitNext.aiLead !== benefitNext.prompt) {
+        assistantMsgs.push({
+          id: uid('iv'),
+          role: 'assistant',
+          text: benefitNext.prompt,
+          at: new Date().toISOString(),
+        })
+      }
+    } else {
+      assistantMsgs.push({
+        id: uid('iv'),
+        role: 'assistant',
+        text: 'Interview complete for now. I’ll calculate your estimated refund using confirmed documents and verified answers — I won’t invent deductions.',
+        at: new Date().toISOString(),
+      })
+    }
+
+    state = {
+      ...state,
+      taxProfile,
+      benefitReport,
+      benefitReviewSigned: false,
+      returns: syncReturnRefund(benefitReport),
+      interviewChat: [...state.interviewChat, userMsg, ...assistantMsgs],
+      prepStep: filingNext || benefitNext ? 2 : state.prepStep,
+    }
+    emit()
+
+    if (!filingNext && !benefitNext) {
+      actions.completeSmartInterview()
+    }
+  },
+  completeSmartInterview() {
+    const benefitReport = toSnapshot(state.taxProfile)
     const returns = state.returns.map((r) =>
       r.clientId === (state.currentUser?.id ?? 'u-tax') && r.taxYear === 2025
         ? {
             ...r,
             state: 'Client Review' as ReturnState,
-            readiness: 92,
-            refundOrOwe: refund,
+            readiness: benefitReport.auditComplete ? 96 : 88,
+            refundOrOwe: benefitReport.projectedRefund,
             feeSnapshot: [{ label: 'Consumer basic W-2', amount: CONSUMER_PRICES[0].amount, status: 'provisional' }],
             updatedAt: new Date().toISOString(),
           }
         : r,
     )
-    state = { ...state, returns, prepStep: 3 }
+    const chat = {
+      id: uid('iv'),
+      role: 'assistant' as const,
+      text: `Estimated refund ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(benefitReport.projectedRefund)} (base ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(benefitReport.baseRefund)} + verified benefits ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(benefitReport.verifiedSavings)}). Potential additional savings still under review: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(benefitReport.potentialSavings)}.`,
+      at: new Date().toISOString(),
+    }
+    state = {
+      ...state,
+      benefitReport,
+      returns,
+      prepStep: 3,
+      interviewChat: [...state.interviewChat, chat],
+    }
     emit()
-    actions.addMessage(
-      'assistant',
-      `Your Result is ready: estimated refund ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(refund)}. Deterministic engine + readiness score.`,
-    )
+  },
+  completeQuestions() {
+    actions.completeSmartInterview()
   },
   signAndFile() {
     const returns = state.returns.map((r) =>
@@ -589,8 +756,26 @@ export const actions = {
       unresolvedKeys: Array.from(new Set([...state.taxProfile.unresolvedKeys, mapsTo])),
     }
     const benefitReport = toSnapshot(taxProfile)
-    state = { ...state, taxProfile, benefitReport, benefitReviewSigned: false }
+    const filingNext = nextFilingStatusTurn(taxProfile)
+    const benefitNext = filingNext ? null : nextBenefitDiscoveryTurn(taxProfile)
+    const follow = filingNext
+      ? `${filingNext.aiLead} ${filingNext.prompt}`
+      : benefitNext
+        ? benefitNext.prompt
+        : 'Marked unresolved. I can continue calculating with open items flagged for review.'
+    state = {
+      ...state,
+      taxProfile,
+      benefitReport,
+      benefitReviewSigned: false,
+      interviewChat: [
+        ...state.interviewChat,
+        { id: uid('iv'), role: 'user', text: 'Skip / unresolved', at: new Date().toISOString() },
+        { id: uid('iv'), role: 'assistant', text: follow, at: new Date().toISOString() },
+      ],
+    }
     emit()
+    if (!filingNext && !benefitNext && state.prepStep === 2) actions.completeSmartInterview()
   },
   verifyBenefit(ruleId: string) {
     const taxProfile = {
@@ -681,6 +866,14 @@ export const actions = {
       taxProfile,
       benefitReport: toSnapshot(taxProfile),
       benefitReviewSigned: false,
+      interviewChat: [
+        {
+          id: 'iv0',
+          role: 'assistant',
+          text: 'Demo reset. Upload documents first — I’ll extract what I can, then ask only what’s still needed.',
+          at: new Date().toISOString(),
+        },
+      ],
       hydrated: true,
     }
     emit()
