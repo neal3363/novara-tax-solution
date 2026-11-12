@@ -71,6 +71,12 @@ export interface DocumentRecord {
   status: 'scanning' | 'classified' | 'extracted' | 'verified' | 'needs_review'
   confidence: number
   ownerId: string
+  /** Owning TP or Office tenant — required for vault isolation */
+  tenantId: string
+  /** Taxpayer/client this file belongs to (may differ from uploader) */
+  clientId?: string
+  /** Logical storage path scoped to tenant */
+  storagePath?: string
   facts: ExtractedFact[]
 }
 
@@ -93,6 +99,10 @@ export interface TaxReturn {
   readiness: number
   refundOrOwe: number
   preparerId?: string
+  /** Owning TP or Office tenant — never shared across tenants */
+  tenantId: string
+  /** Within an office, only these preparers (plus owner) may open the return */
+  assignedPreparerIds?: string[]
   isBusiness: boolean
   feeSnapshot: { label: string; amount: number; status: string }[]
   appliedBenefits: AppliedBenefitLine[]

@@ -2,7 +2,8 @@ import { actions, useAppStore } from '../../store/useAppStore'
 import '../shared.css'
 
 export function AdminHome() {
-  const { returns, documents } = useAppStore()
+  const { currentUser } = useAppStore()
+  const stats = actions.platformStats()
 
   return (
     <div className="page container">
@@ -16,22 +17,27 @@ export function AdminHome() {
         </button>
       </header>
 
+      <p className="muted rise">
+        Signed in as {currentUser?.name}. Taxpayer documents and returns are not opened by default — only aggregate
+        platform metrics and audited support grants are available.
+      </p>
+
       <div className="stat-row rise">
         <div className="stat panel">
-          <p className="label">Returns (local)</p>
-          <p className="value">{returns.length}</p>
+          <p className="label">Returns (aggregate)</p>
+          <p className="value">{stats.returnCount}</p>
         </div>
         <div className="stat panel">
-          <p className="label">Documents</p>
-          <p className="value">{documents.length}</p>
+          <p className="label">Documents (aggregate)</p>
+          <p className="value">{stats.documentCount}</p>
         </div>
         <div className="stat panel">
           <p className="label">Tenants</p>
-          <p className="value">2</p>
+          <p className="value">{stats.tenantCount}</p>
         </div>
         <div className="stat panel">
-          <p className="label">Risk queue</p>
-          <p className="value">0</p>
+          <p className="label">Content access</p>
+          <p className="value">{stats.contentAccess ? 'Granted' : 'Off'}</p>
         </div>
       </div>
 
@@ -43,6 +49,7 @@ export function AdminHome() {
             ['Bank products', 'Off until partner contract'],
             ['Resolution Center', 'Data hooks only (V3 UI)'],
             ['Proprietary MeF transmitter', 'Off — V1 uses adapter'],
+            ['Admin document browse', 'Off — audited support grant required'],
           ].map(([k, v]) => (
             <div className="row-item" key={k}>
               <div>
@@ -55,10 +62,11 @@ export function AdminHome() {
         <section className="list-panel panel">
           <h2>Compliance baseline</h2>
           {[
-            'Tenant isolation enforced in API design (demo is single-browser store)',
-            'Consent engine required before non-preparation use',
-            'AI cannot transmit, invent evidence, or replace calculations',
-            'Immutable fee snapshots per engagement',
+            'Unique tenant IDs on every client, return, and vault file',
+            'Server-side authorization — never UI-only filtering',
+            'Admin has no default access to taxpayer documents',
+            'TP/Office: unlimited clients & returns; per-return fees only',
+            'Consent + audit required before any cross-tenant transfer',
           ].map((t) => (
             <div className="row-item" key={t}>
               <div>
