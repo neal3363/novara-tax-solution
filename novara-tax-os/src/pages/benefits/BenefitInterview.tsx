@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { formatMoney } from '../../data/fees'
 import { nextInterviewQuestions, runBenefitOptimization } from '../../engine/benefitOptimizer'
+import { AppliedBenefitBanner } from '../../components/benefits/AppliedBenefitBanner'
 import { RefundTracker } from '../../components/benefits/RefundTracker'
 import { AnswerHistory, InterviewChoice } from '../../components/interview/InterviewChoice'
 import { actions, useAppStore } from '../../store/useAppStore'
@@ -57,6 +58,10 @@ export function BenefitInterview() {
       </header>
 
       <RefundTracker report={benefitReport} />
+      <AppliedBenefitBanner
+        events={benefitReport?.lastApplications}
+        returnPath={currentUser?.role === 'preparer' ? '/app/preparer/return' : '/app/taxpayer/prepare'}
+      />
 
       <section className="list-panel panel" style={{ marginTop: '1rem' }}>
         <h2>One question at a time</h2>

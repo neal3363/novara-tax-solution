@@ -95,6 +95,7 @@ export interface TaxReturn {
   preparerId?: string
   isBusiness: boolean
   feeSnapshot: { label: string; amount: number; status: string }[]
+  appliedBenefits: AppliedBenefitLine[]
   updatedAt: string
 }
 
@@ -127,6 +128,29 @@ export interface PreEntryNote {
   detail: string
 }
 
+export interface AppliedBenefitLine {
+  id: string
+  ruleId: string
+  name: string
+  form: string
+  field: string
+  amount: number
+  status: string
+  docStatus: string
+  citation: string
+}
+
+export interface BenefitApplicationEvent {
+  ruleId: string
+  name: string
+  amount: number
+  previousRefund: number
+  updatedRefund: number
+  form: string
+  field: string
+  at: string
+}
+
 export interface BenefitSnapshot {
   taxYear: number
   ruleVersion: string
@@ -144,14 +168,20 @@ export interface BenefitSnapshot {
     category: string
     status: string
     estimatedSavings: number
+    affectingRefund?: number
     explanation: string
     missingAnswers: string[]
     missingDocs: string[]
+    docStatus?: string
+    form?: string
+    field?: string
     ruleCitation: string
   }[]
+  formLines: AppliedBenefitLine[]
   lastRunAt: string
   /** Plain-language explanation of the latest recalculation */
   lastChangeNote?: string
+  lastApplications?: BenefitApplicationEvent[]
 }
 
 export interface AppState {

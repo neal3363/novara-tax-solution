@@ -1,4 +1,11 @@
-import { BENEFIT_CATALOG_2025, BENEFIT_RULE_VERSION, type BenefitRule, type BenefitStatus } from '../data/benefitsCatalog'
+import {
+  BENEFIT_CATALOG_2025,
+  BENEFIT_RULE_VERSION,
+  type BenefitRule,
+  type BenefitStatus,
+  type DocSupportStatus,
+} from '../data/benefitsCatalog'
+import { buildAppliedFormLines, formMappingFor } from './returnForms'
 
 export type ProfileAnswers = Record<string, string | number | boolean | undefined>
 
@@ -35,12 +42,19 @@ export interface BenefitFinding {
   shortName: string
   category: BenefitRule['category']
   status: BenefitStatus
+  /** Calculated allowable amount under TY rules (not a marketing hint) */
   estimatedSavings: number
+  /** Amount currently affecting the working return refund/tax */
+  affectingRefund: number
   explanation: string
   missingAnswers: string[]
   missingDocs: string[]
+  docStatus: DocSupportStatus
+  form?: string
+  field?: string
   ruleCitation: string
   ruleVersion: string
+  refundable?: boolean
 }
 
 export interface OptimizationReport {
@@ -51,6 +65,8 @@ export interface OptimizationReport {
   verifiedSavings: number
   potentialSavings: number
   findings: BenefitFinding[]
+  formLines: ReturnType<typeof buildAppliedFormLines>
+  newlyApplied: BenefitFinding[]
   comparisonNotes: string[]
   blockers: string[]
   auditComplete: boolean
@@ -133,55 +149,148 @@ function answerPresent(p: TaxpayerProfile, key: string) {
   return true
 }
 
+function kidsUnder17(p: TaxpayerProfile) {
+  return p.dependents.filter((d) => d.age < 17).length || (hasChild(p) ? 1 : 0)
+}
+
+/** Tax-year calculation helpers — amounts come from profile facts, not catalog hints. */
 function estimateFor(rule: BenefitRule, p: TaxpayerProfile): number {
   switch (rule.id) {
-    case 'ctc': {
-      const kids = p.dependents.filter((d) => d.age < 17).length || (hasChild(p) ? 1 : 0)
-      return kids * 2000
-    }
+    case 'ctc':
+      return kidsUnder17(p) * 2000
     case 'cdcc': {
-      const care = Math.min(p.childcarePaid, 3000)
-      const afterFsa = Math.max(0, care - p.employerDependentCare)
-      return Math.round(afterFsa * 0.35)
+      // IRC §21: up to $3,000 (1 qualifying person) / $6,000 (2+); credit rate 20–35% (demo uses 20% floor + AGI-ish bump)
+      const persons = Math.max(1, kidsUnder17(p))
+      const cap = persons >= 2 ? 6000 : 3000
+      const care = Math.min(Math.max(0, p.childcarePaid), cap)
+      const afterFsa = Math.max(0, care - Math.max(0, p.employerDependentCare))
+      const earned = p.wages + p.selfEmploymentIncome
+      const rate = earned < 15000 ? 0.35 : earned < 43000 ? 0.2 : 0.2
+      return Math.round(afterFsa * rate)
     }
-    case 'aotc':
-      return Math.min(2500, Math.round(p.tuitionPaid * 0.4) || 2500)
+    case 'aotc': {
+      if (p.tuitionPaid <= 0) return 0
+      const first = Math.min(2000, p.tuitionPaid)
+      const rest = Math.min(2000, Math.max(0, p.tuitionPaid - 2000)) * 0.25
+      return Math.min(2500, Math.round(first + rest))
+    }
     case 'llc':
-      return Math.min(2000, Math.round(p.tuitionPaid * 0.2) || 800)
+      return p.tuitionPaid > 0 ? Math.min(2000, Math.round(p.tuitionPaid * 0.2)) : 0
     case 'qbi':
-      return Math.round(Math.min(p.selfEmploymentIncome, 40000) * 0.2 * 0.22)
+      return p.selfEmploymentIncome > 0
+        ? Math.round(Math.min(p.selfEmploymentIncome, 40000) * 0.2 * 0.22)
+        : 0
     case 'mortgage': {
-      const itemized = p.mortgageInterest + p.propertyTax + p.charitableGifts
-      const standard = p.filingStatus === 'mfj' ? 29200 : 14600
-      return itemized > standard ? Math.round((itemized - standard) * 0.22) : 0
+      const itemized = p.mortgageInterest + Math.min(10000, p.propertyTax) + p.charitableGifts
+      const standard = p.filingStatus === 'mfj' ? 30000 : 15000
+      return itemized > standard ? Math.round(p.mortgageInterest * 0.22) : 0
     }
     case 'mileage':
-      return Math.round(p.businessMileage * 0.7)
+      return p.businessMileage > 0 ? Math.round(p.businessMileage * 0.67) : 0
     case 'property_tax': {
       const salt = Math.min(10000, p.propertyTax)
       const itemized = p.mortgageInterest + salt + p.charitableGifts
       const standard = p.filingStatus === 'mfj' ? 30000 : 15000
-      return itemized > standard ? Math.round(salt * 0.22) : 0
+      return itemized > standard && salt > 0 ? Math.round(salt * 0.22) : 0
     }
     case 'eitc': {
-      const kids = p.dependents.filter((d) => d.age < 17).length || (hasChild(p) ? 1 : 0)
+      const kids = kidsUnder17(p)
       const earned = p.wages + p.selfEmploymentIncome
-      if (earned <= 0 || earned > 65000) return 0
-      return kids >= 2 ? 1800 : kids === 1 ? 1200 : 400
+      if (earned <= 0) return 0
+      // Simplified TY2025-style phaseout bands for demo engine
+      if (kids === 0 && earned > 18591) return 0
+      if (kids === 1 && earned > 49084) return 0
+      if (kids >= 2 && earned > 55768) return 0
+      if (kids >= 3) return Math.min(7830, Math.round(earned * 0.45))
+      if (kids === 2) return Math.min(6960, Math.round(earned * 0.4))
+      if (kids === 1) return Math.min(4213, Math.round(earned * 0.34))
+      return Math.min(632, Math.round(earned * 0.0765))
     }
-    case 'student_loan':
-      return Math.min(2500, p.studentLoanInterest) > 0 ? Math.round(Math.min(2500, p.studentLoanInterest) * 0.22) : rule.estimatedSavingsHint
+    case 'student_loan': {
+      const interest = Math.min(2500, p.studentLoanInterest)
+      return interest > 0 ? Math.round(interest * 0.22) : 0
+    }
+    case 'savers':
+      return p.retirementContributions > 0 ? Math.min(1000, Math.round(p.retirementContributions * 0.1)) : 0
+    case 'hsa':
+      return p.hsaContributions > 0 ? Math.round(Math.min(p.hsaContributions, 4300) * 0.22) : 0
+    case 'energy':
+      return p.energyImprovements > 0 ? Math.min(1200, Math.round(p.energyImprovements * 0.3)) : 0
+    case 'se_health':
+      return p.seHealthPremiums > 0 && p.selfEmploymentIncome > 0
+        ? Math.round(Math.min(p.seHealthPremiums, p.selfEmploymentIncome) * 0.22)
+        : 0
+    case 'charity': {
+      const itemized = p.mortgageInterest + Math.min(10000, p.propertyTax) + p.charitableGifts
+      const standard = p.filingStatus === 'mfj' ? 30000 : 15000
+      return itemized > standard && p.charitableGifts > 0 ? Math.round(p.charitableGifts * 0.22) : 0
+    }
+    case 'medical': {
+      const floor = Math.round((p.wages + p.selfEmploymentIncome) * 0.075)
+      const excess = Math.max(0, p.medicalExpenses - floor)
+      const itemized = p.mortgageInterest + Math.min(10000, p.propertyTax) + p.charitableGifts + excess
+      const standard = p.filingStatus === 'mfj' ? 30000 : 15000
+      return itemized > standard && excess > 0 ? Math.round(excess * 0.22) : 0
+    }
+    case 'educator':
+      return p.isEducator || p.answers.is_educator === 'yes' ? Math.min(300, p.educatorExpenses || 300) : 0
+    case 'hoh':
+      return p.filingStatus === 'hoh' ? 1200 : 0
+    case 'odc': {
+      const other = p.dependents.filter((d) => d.age >= 17).length
+      return other * 500
+    }
     case 'ptc':
-      return p.answers.had_marketplace === 'yes' ? rule.estimatedSavingsHint : 0
+      return p.answers.had_marketplace === 'yes' || p.answers.marketplace_coverage === 'yes' ? 1400 : 0
     case 'state_eitc': {
       const state = String(p.answers.filing_state || '').toLowerCase()
       if (!state || state === 'tx' || state === 'texas' || state === 'florida' || state === 'fl') return 0
-      const kids = p.dependents.filter((d) => d.age < 17).length || (hasChild(p) ? 1 : 0)
-      const federalish = kids >= 2 ? 1800 : kids === 1 ? 1200 : 400
+      const kids = kidsUnder17(p)
+      const earned = p.wages + p.selfEmploymentIncome
+      if (earned <= 0) return 0
+      const federalish = kids >= 2 ? Math.min(6960, Math.round(earned * 0.4)) : kids === 1 ? Math.min(4213, Math.round(earned * 0.34)) : Math.min(632, Math.round(earned * 0.0765))
       return Math.round(federalish * 0.3)
     }
     default:
-      return rule.estimatedSavingsHint
+      return 0
+  }
+}
+
+function docsOnFile(rule: BenefitRule, p: TaxpayerProfile): boolean {
+  if (p.answers[`${rule.id}_docs`] === 'yes') return true
+  if (rule.id === 'cdcc' && (p.answers.care_provider === 'yes' || p.childcarePaid > 0)) {
+    // Provider identity answered — receipt can still be uploaded later
+    return p.answers.cdcc_docs === 'yes'
+  }
+  if (rule.id === 'ctc' && p.answers.id_on_file === 'yes') return true
+  if (rule.id === 'mortgage' && p.mortgageInterest > 0) return true
+  if (rule.id === 'property_tax' && p.propertyTax > 0) return true
+  if ((rule.id === 'aotc' || rule.id === 'llc') && p.tuitionPaid > 0) return true
+  if (rule.id === 'student_loan' && p.studentLoanInterest > 0) return true
+  if (rule.id === 'eitc' && p.wages + p.selfEmploymentIncome > 0) return true
+  return false
+}
+
+function baseFinding(
+  rule: BenefitRule,
+  patch: Partial<BenefitFinding> & Pick<BenefitFinding, 'status' | 'estimatedSavings' | 'explanation'>,
+): BenefitFinding {
+  const map = formMappingFor(rule.id)
+  return {
+    ruleId: rule.id,
+    name: rule.name,
+    shortName: rule.shortName,
+    category: rule.category,
+    affectingRefund: 0,
+    missingAnswers: [],
+    missingDocs: [],
+    docStatus: 'not_required',
+    form: map.form,
+    field: map.field,
+    ruleCitation: rule.ruleCitation,
+    ruleVersion: BENEFIT_RULE_VERSION,
+    refundable: rule.refundable,
+    ...patch,
   }
 }
 
@@ -207,103 +316,89 @@ function evaluateRule(rule: BenefitRule, p: TaxpayerProfile, facts: Record<strin
     )
 
   if (!triggered && !softProbe) {
-    return {
-      ruleId: rule.id,
-      name: rule.name,
-      shortName: rule.shortName,
-      category: rule.category,
+    return baseFinding(rule, {
       status: 'ineligible',
       estimatedSavings: 0,
-      explanation: `No current facts indicate ${rule.shortName} may apply. Engine still keeps it in the catalog for re-scan.`,
-      missingAnswers: [],
-      missingDocs: [],
-      ruleCitation: rule.ruleCitation,
-      ruleVersion: BENEFIT_RULE_VERSION,
-    }
+      explanation: `${rule.shortName} does not appear to apply based on current return facts.`,
+    })
   }
 
   if (!triggered && softProbe) {
-    return {
-      ruleId: rule.id,
-      name: rule.name,
-      shortName: rule.shortName,
-      category: rule.category,
+    return baseFinding(rule, {
       status: 'needs_info',
-      estimatedSavings: rule.estimatedSavingsHint,
-      explanation: `Not assumed ineligible. Ask follow-ups to determine whether ${rule.shortName} applies.`,
+      estimatedSavings: 0,
+      explanation: `More information needed to evaluate ${rule.shortName}.`,
       missingAnswers: rule.requiredAnswers.slice(0, 2),
       missingDocs: rule.requiredDocs.slice(0, 1),
-      ruleCitation: rule.ruleCitation,
-      ruleVersion: BENEFIT_RULE_VERSION,
-    }
+      docStatus: 'requested',
+    })
   }
 
   if (missingAnswers.length > 0) {
-    return {
-      ruleId: rule.id,
-      name: rule.name,
-      shortName: rule.shortName,
-      category: rule.category,
+    return baseFinding(rule, {
       status: 'needs_info',
       estimatedSavings: estimateFor(rule, p),
-      explanation: `Potentially applicable. Additional answers required before eligibility can be verified.`,
+      explanation: `More information needed before ${rule.shortName} can be calculated and applied.`,
       missingAnswers,
       missingDocs: rule.requiredDocs,
-      ruleCitation: rule.ruleCitation,
-      ruleVersion: BENEFIT_RULE_VERSION,
-    }
-  }
-
-  if (p.answers[`${rule.id}_verified`] === 'yes') {
-    return {
-      ruleId: rule.id,
-      name: rule.name,
-      shortName: rule.shortName,
-      category: rule.category,
-      status: 'applied',
-      estimatedSavings: estimateFor(rule, p),
-      explanation: `Verified against ${rule.ruleCitation}. Included in projected refund.`,
-      missingAnswers: [],
-      missingDocs: [],
-      ruleCitation: rule.ruleCitation,
-      ruleVersion: BENEFIT_RULE_VERSION,
-    }
+      docStatus: 'requested',
+    })
   }
 
   if (p.answers[`${rule.id}_uncertain`] === 'yes') {
-    return {
-      ruleId: rule.id,
-      name: rule.name,
-      shortName: rule.shortName,
-      category: rule.category,
+    const amount = estimateFor(rule, p)
+    return baseFinding(rule, {
       status: 'flagged_review',
-      estimatedSavings: estimateFor(rule, p),
-      explanation: `Eligibility uncertain — flagged for human review before claim.`,
-      missingAnswers: [],
+      estimatedSavings: amount,
+      affectingRefund: 0,
+      explanation: `${rule.shortName} is flagged for human review before it can change your refund.`,
       missingDocs: rule.requiredDocs,
-      ruleCitation: rule.ruleCitation,
-      ruleVersion: BENEFIT_RULE_VERSION,
-    }
+      docStatus: 'requested',
+    })
   }
 
-  return {
-    ruleId: rule.id,
-    name: rule.name,
-    shortName: rule.shortName,
-    category: rule.category,
-    status: 'eligible_unverified',
-    estimatedSavings: estimateFor(rule, p),
-    explanation: `Facts support possible eligibility. Supporting docs and preparer confirmation still required.`,
-    missingAnswers: [],
-    missingDocs: rule.requiredDocs,
-    ruleCitation: rule.ruleCitation,
-    ruleVersion: BENEFIT_RULE_VERSION,
+  const amount = estimateFor(rule, p)
+  if (amount <= 0) {
+    return baseFinding(rule, {
+      status: 'ineligible',
+      estimatedSavings: 0,
+      explanation: `${rule.shortName} was evaluated under ${rule.ruleCitation}, but the allowable amount is $0 for this return.`,
+    })
   }
+
+  const hasDocs = docsOnFile(rule, p)
+  const map = formMappingFor(rule.id)
+  // Auto-apply to the working return when eligibility answers are complete.
+  // Missing optional receipts → pending_verification, still affecting refund.
+  if (hasDocs || p.answers[`${rule.id}_verified`] === 'yes') {
+    return baseFinding(rule, {
+      status: 'applied',
+      estimatedSavings: amount,
+      affectingRefund: amount,
+      explanation: `Applied to your return (${map.form} · ${map.field}). Calculated under ${rule.ruleCitation}.`,
+      docStatus: hasDocs ? 'on_file' : 'optional_later',
+      form: map.form,
+      field: map.field,
+    })
+  }
+
+  return baseFinding(rule, {
+    status: 'pending_verification',
+    estimatedSavings: amount,
+    affectingRefund: amount,
+    explanation: `Applied to your working return as pending verification. Upload supporting documents when available — missing receipts do not erase this calculated benefit.`,
+    missingDocs: rule.requiredDocs,
+    docStatus: 'optional_later',
+    form: map.form,
+    field: map.field,
+  })
 }
 
 function resolveIncompatibilities(findings: BenefitFinding[]): BenefitFinding[] {
   const byId = new Map(findings.map((f) => [f.ruleId, f]))
-  const active = (s: BenefitStatus) => ['applied', 'eligible_unverified', 'needs_info', 'flagged_review'].includes(s)
+  const onReturn = (s: BenefitStatus) => s === 'applied' || s === 'pending_verification'
+  const active = (s: BenefitStatus) =>
+    onReturn(s) || s === 'eligible_unverified' || s === 'needs_info' || s === 'flagged_review'
 
   BENEFIT_CATALOG_2025.forEach((rule) => {
     const primary = byId.get(rule.id)
@@ -311,38 +406,30 @@ function resolveIncompatibilities(findings: BenefitFinding[]): BenefitFinding[] 
     rule.incompatibleWith.forEach((otherId) => {
       const other = byId.get(otherId)
       if (!other || !active(other.status)) return
-      // Prefer the higher estimated savings when both are unverified; if one is applied, drop the other
-      if (primary.status === 'applied') {
-        byId.set(otherId, {
-          ...other,
-          status: 'ineligible',
-          estimatedSavings: 0,
-          explanation: `Not stacked with ${primary.shortName} for the same expenses (${rule.ruleCitation}).`,
-        })
-      } else if (other.status === 'applied') {
-        byId.set(rule.id, {
-          ...primary,
-          status: 'ineligible',
-          estimatedSavings: 0,
-          explanation: `Not stacked with ${other.shortName} for the same expenses.`,
-        })
-      } else if (primary.estimatedSavings >= other.estimatedSavings) {
-        byId.set(otherId, {
-          ...other,
-          explanation: `Compare with ${primary.shortName} before claiming — do not double-count the same expenses.`,
-        })
-      }
+      const primaryWins = primary.estimatedSavings >= other.estimatedSavings
+      const winner = primaryWins ? primary : other
+      const loserId = primaryWins ? otherId : rule.id
+      const loser = primaryWins ? other : primary
+      byId.set(loserId, {
+        ...loser,
+        status: 'ineligible',
+        estimatedSavings: 0,
+        affectingRefund: 0,
+        explanation: `Not stacked with ${winner.shortName} for the same expenses. NOVARA applied the higher legally allowable option (${winner.shortName}).`,
+      })
     })
   })
 
   const ctc = byId.get('ctc')
   const odc = byId.get('odc')
-  if (ctc && odc && active(ctc.status) && ctc.estimatedSavings > 0 && active(odc.status)) {
+  if (ctc && odc && onReturn(ctc.status) && ctc.affectingRefund > 0 && active(odc.status) && odc.affectingRefund === 0) {
     byId.set('odc', {
       ...odc,
+      status: 'ineligible',
+      estimatedSavings: 0,
+      affectingRefund: 0,
       explanation:
-        'Other Dependents Credit is for dependents who are not Child Tax Credit children. Keep CTC for qualifying kids under 17.',
-      estimatedSavings: Math.min(odc.estimatedSavings, 500),
+        'Other Dependents Credit is only for dependents who are not Child Tax Credit children under 17.',
     })
   }
 
@@ -351,7 +438,8 @@ function resolveIncompatibilities(findings: BenefitFinding[]): BenefitFinding[] 
 
 export function computeBaseRefund(p: TaxpayerProfile): number {
   const seTaxApprox = Math.round(p.selfEmploymentIncome * 0.9235 * 0.153)
-  const taxableApprox = Math.max(0, p.wages + p.selfEmploymentIncome - 14600)
+  const standard = p.filingStatus === 'mfj' ? 30000 : 15000
+  const taxableApprox = Math.max(0, p.wages + p.selfEmploymentIncome - standard)
   const taxApprox = Math.round(taxableApprox * 0.12) + seTaxApprox
   return p.withholding - taxApprox
 }
@@ -362,24 +450,26 @@ export function runBenefitOptimization(p: TaxpayerProfile): OptimizationReport {
   findings = resolveIncompatibilities(findings)
 
   const baseRefund = computeBaseRefund(p)
-  const verifiedSavings = findings.filter((f) => f.status === 'applied').reduce((s, f) => s + f.estimatedSavings, 0)
+  const onReturn = findings.filter((f) => f.status === 'applied' || f.status === 'pending_verification')
+  const verifiedSavings = onReturn.reduce((s, f) => s + f.affectingRefund, 0)
   const potentialSavings = findings
-    .filter((f) => ['needs_info', 'eligible_unverified', 'flagged_review'].includes(f.status))
-    .reduce((s, f) => s + f.estimatedSavings, 0)
+    .filter((f) => f.status === 'needs_info' || f.status === 'flagged_review')
+    .reduce((s, f) => s + Math.max(0, f.estimatedSavings), 0)
 
   const comparisonNotes: string[] = []
-  const itemized = p.mortgageInterest + p.propertyTax + p.charitableGifts + Math.max(0, p.medicalExpenses - Math.round((p.wages + p.selfEmploymentIncome) * 0.075))
-  const standard = p.filingStatus === 'mfj' ? 29200 : 14600
+  const itemized =
+    p.mortgageInterest +
+    Math.min(10000, p.propertyTax) +
+    p.charitableGifts +
+    Math.max(0, p.medicalExpenses - Math.round((p.wages + p.selfEmploymentIncome) * 0.075))
+  const standard = p.filingStatus === 'mfj' ? 30000 : 15000
   comparisonNotes.push(
     itemized > standard
       ? `Itemizing appears higher than standard deduction (${itemized.toLocaleString()} vs ${standard.toLocaleString()}).`
       : `Standard deduction currently exceeds estimated itemized total (${standard.toLocaleString()} vs ${itemized.toLocaleString()}).`,
   )
   if (p.tuitionPaid > 0 || p.answers.education_expenses === 'yes') {
-    comparisonNotes.push('Education credits: compare AOTC vs Lifetime Learning; do not double-claim the same expenses.')
-  }
-  if (hasDependents(p) && p.filingStatus === 'single') {
-    comparisonNotes.push('Evaluate Head of Household only if unmarried (or considered unmarried) and a qualifying person test is met.')
+    comparisonNotes.push('Education credits: AOTC vs Lifetime Learning — only the higher allowable option is applied.')
   }
 
   const blockers: string[] = []
@@ -389,8 +479,13 @@ export function runBenefitOptimization(p: TaxpayerProfile): OptimizationReport {
   findings
     .filter((f) => f.status === 'flagged_review')
     .forEach((f) => blockers.push(`${f.shortName}: human review required`))
+  findings
+    .filter((f) => f.status === 'pending_verification')
+    .forEach((f) =>
+      blockers.push(`${f.shortName}: applied provisionally — supporting document recommended before e-file`),
+    )
 
-  const openNeeds = findings.some((f) => f.status === 'needs_info' || f.status === 'flagged_review' || f.status === 'eligible_unverified')
+  const openNeeds = findings.some((f) => f.status === 'needs_info' || f.status === 'flagged_review')
   const unresolved = p.unresolvedKeys.length > 0
 
   return {
@@ -400,7 +495,9 @@ export function runBenefitOptimization(p: TaxpayerProfile): OptimizationReport {
     projectedRefund: baseRefund + verifiedSavings,
     verifiedSavings,
     potentialSavings,
-    findings: findings.sort((a, b) => statusRank(a.status) - statusRank(b.status) || b.estimatedSavings - a.estimatedSavings),
+    findings: findings.sort((a, b) => statusRank(a.status) - statusRank(b.status) || b.affectingRefund - a.affectingRefund),
+    formLines: buildAppliedFormLines(findings),
+    newlyApplied: [],
     comparisonNotes,
     blockers,
     auditComplete: !openNeeds && !unresolved,
@@ -408,7 +505,15 @@ export function runBenefitOptimization(p: TaxpayerProfile): OptimizationReport {
 }
 
 function statusRank(s: BenefitStatus) {
-  const order: BenefitStatus[] = ['needs_info', 'flagged_review', 'eligible_unverified', 'identified', 'applied', 'ineligible']
+  const order: BenefitStatus[] = [
+    'needs_info',
+    'flagged_review',
+    'pending_verification',
+    'eligible_unverified',
+    'identified',
+    'applied',
+    'ineligible',
+  ]
   return order.indexOf(s)
 }
 
@@ -613,11 +718,17 @@ export function applyAnswer(p: TaxpayerProfile, mapsTo: string, value: string | 
   if (mapsTo === 'has_child' && (value === 'yes' || value === true) && next.dependents.length === 0) {
     next.dependents = [{ name: 'Dependent child', age: 8, relationship: 'child' }]
   }
+  if (mapsTo === 'paid_childcare' && (value === 'yes' || value === true)) {
+    next.answers.worked_or_looked = 'yes'
+  }
   if (mapsTo === 'childcare_amount') {
     next.childcarePaid = typeof value === 'number' ? value : Number(value) || 0
+    next.answers.paid_childcare = 'yes'
+    next.answers.worked_or_looked = 'yes'
   }
-  if (mapsTo === 'employer_dependent_care' && (value === 'yes' || value === true)) {
-    next.employerDependentCare = next.employerDependentCare || 1000
+  if (mapsTo === 'employer_dependent_care') {
+    if (value === 'yes' || value === true) next.employerDependentCare = next.employerDependentCare || 1000
+    else next.employerDependentCare = 0
   }
   if (mapsTo === 'education_expenses' && (value === 'yes' || value === true) && next.tuitionPaid === 0) {
     next.tuitionPaid = 4000

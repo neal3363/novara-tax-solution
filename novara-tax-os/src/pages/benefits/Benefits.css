@@ -52,6 +52,11 @@
   gap: 0.55rem;
 }
 
+.savings-card.applied {
+  border-color: rgba(10, 92, 84, 0.28);
+  background: linear-gradient(180deg, rgba(10, 92, 84, 0.06), rgba(255, 255, 255, 0.92));
+}
+
 .savings-card-top {
   display: flex;
   justify-content: space-between;

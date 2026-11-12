@@ -33,12 +33,13 @@ import {
   findDuplicateUploads,
   plainLanguageExtractionSummary,
 } from '../engine/documentProcessing'
+import { applyParsedFacts, parseTaxpayerStatement } from '../engine/naturalLanguageFacts'
 import type { BenefitSnapshot } from '../data/types'
 
 /** Role preference only — never store tax demo payloads in localStorage */
 const ROLE_KEY = 'novara-tax-os-role'
 /** Session-scoped demo state (clears when the tab closes) */
-const SESSION_KEY = 'novara-tax-os-session-v6'
+const SESSION_KEY = 'novara-tax-os-session-v7'
 
 function money(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n)
@@ -118,14 +119,53 @@ function clearAnswerTree(mapsTo: string) {
 }
 
 function toSnapshot(profile: TaxpayerProfile, reason?: string): BenefitSnapshot {
-  const report = runBenefitOptimization(profile)
   const prev = state.benefitReport
+  const prevIds = new Set(
+    (prev?.findings ?? [])
+      .filter((f) => f.status === 'applied' || f.status === 'pending_verification')
+      .map((f) => f.ruleId),
+  )
+  const report = runBenefitOptimization(profile)
+  // Detect newly applied against prior snapshot ids (avoid circular OptimizationReport typing)
+  report.newlyApplied = report.findings.filter(
+    (f) =>
+      (f.status === 'applied' || f.status === 'pending_verification') &&
+      f.affectingRefund > 0 &&
+      !prevIds.has(f.ruleId),
+  )
   const delta = report.projectedRefund - (prev?.projectedRefund ?? report.baseRefund)
   let lastChangeNote = reason ?? 'Tax benefits rechecked against your latest documents and answers.'
   if (prev) {
-    const direction = delta === 0 ? 'stayed the same' : delta > 0 ? `went up by ${money(delta)}` : `went down by ${money(Math.abs(delta))}`
-    lastChangeNote = `${reason ? reason + ' ' : ''}Your estimated refund ${direction}. Verified savings ${money(report.verifiedSavings)}; possible (not yet verified) ${money(report.potentialSavings)}.`
+    const direction =
+      delta === 0 ? 'stayed the same' : delta > 0 ? `went up by ${money(delta)}` : `went down by ${money(Math.abs(delta))}`
+    lastChangeNote = `${reason ? reason + ' ' : ''}Your estimated refund ${direction}. Applied benefits ${money(report.verifiedSavings)}; still gathering info on ${money(report.potentialSavings)}.`
   }
+
+  const lastApplications = report.newlyApplied.map((f) => ({
+    ruleId: f.ruleId,
+    name: f.shortName,
+    amount: f.affectingRefund,
+    previousRefund: prev?.projectedRefund ?? report.baseRefund,
+    updatedRefund: report.projectedRefund,
+    form: f.form ?? 'Form 1040',
+    field: f.field ?? f.shortName,
+    at: new Date().toISOString(),
+  }))
+
+  if (lastApplications.length === 0 && delta !== 0 && reason) {
+    // Recalc changed refund without a brand-new rule id (amount update)
+    lastApplications.push({
+      ruleId: 'recalc',
+      name: 'Return recalculation',
+      amount: Math.abs(delta),
+      previousRefund: prev?.projectedRefund ?? report.baseRefund,
+      updatedRefund: report.projectedRefund,
+      form: 'Form 1040',
+      field: 'Refund / balance due',
+      at: new Date().toISOString(),
+    })
+  }
+
   return {
     taxYear: report.taxYear,
     ruleVersion: report.ruleVersion,
@@ -137,8 +177,10 @@ function toSnapshot(profile: TaxpayerProfile, reason?: string): BenefitSnapshot 
     blockers: report.blockers,
     comparisonNotes: report.comparisonNotes,
     findings: report.findings,
+    formLines: report.formLines,
     lastRunAt: new Date().toISOString(),
     lastChangeNote,
+    lastApplications,
   }
 }
 
@@ -148,6 +190,7 @@ function syncReturnRefund(report: BenefitSnapshot) {
       ? {
           ...r,
           refundOrOwe: report.projectedRefund,
+          appliedBenefits: report.formLines,
           readiness: report.auditComplete ? Math.max(r.readiness, 96) : Math.max(r.readiness, 55),
           updatedAt: new Date().toISOString(),
         }
@@ -317,23 +360,35 @@ function hydrate() {
     sessionStorage.removeItem('novara-tax-os-session-v3')
     sessionStorage.removeItem('novara-tax-os-session-v4')
     sessionStorage.removeItem('novara-tax-os-session-v5')
+    sessionStorage.removeItem('novara-tax-os-session-v6')
 
     const role = localStorage.getItem(ROLE_KEY) as Role | null
     const sessionRaw = sessionStorage.getItem(SESSION_KEY)
     if (sessionRaw) {
       const parsed = JSON.parse(sessionRaw) as Omit<AppState, 'currentUser'>
       const taxProfile = parsed.taxProfile ?? defaultProfile()
-      const benefitReport = parsed.benefitReport ?? toSnapshot(taxProfile)
+      const rawReport = parsed.benefitReport ?? toSnapshot(taxProfile)
+      const benefitReport = rawReport
+        ? {
+            ...rawReport,
+            formLines: rawReport.formLines ?? [],
+            lastApplications: rawReport.lastApplications ?? [],
+          }
+        : null
       state = {
         ...state,
         ...parsed,
         taxProfile,
-        benefitReport,
         benefitReviewSigned: parsed.benefitReviewSigned ?? false,
         interviewChat: parsed.interviewChat?.length ? parsed.interviewChat : state.interviewChat,
         interviewAnswers: parsed.interviewAnswers ?? [],
         auditEvents: parsed.auditEvents ?? [],
         uploadIssues: parsed.uploadIssues ?? [],
+        returns: (parsed.returns ?? state.returns).map((r) => ({
+          ...r,
+          appliedBenefits: r.appliedBenefits ?? [],
+        })),
+        benefitReport,
         currentUser: role ? (DEMO_USERS.find((u) => u.role === role) ?? null) : null,
         hydrated: true,
       }
@@ -411,26 +466,73 @@ export const actions = {
   },
   askAi(prompt: string) {
     actions.addMessage('user', prompt)
+    const parsed = parseTaxpayerStatement(prompt)
+    if (parsed.length > 0) {
+      actions.ingestTaxpayerStatement(prompt)
+      return
+    }
     const lower = prompt.toLowerCase()
     let reply =
-      'I’ve reviewed your authorized documents and return state. Ask about refund, missing docs, the entry plan, or next step.'
+      'I’ve reviewed your authorized documents and return state. Tell me expenses in plain language (for example: “I paid $4,000 for daycare while I was working”) and I’ll apply eligible benefits automatically.'
     if (lower.includes('refund')) {
-      reply =
-        'Your draft estimate uses verified wages and withholding. Tap any number to see provenance. Not a guarantee until rules engine + preparer approval complete.'
+      reply = state.benefitReport
+        ? `Your current projected refund is ${money(state.benefitReport.projectedRefund)} (base ${money(state.benefitReport.baseRefund)} + applied benefits ${money(state.benefitReport.verifiedSavings)}).`
+        : reply
     } else if (lower.includes('missing') || lower.includes('document')) {
       reply =
-        'Pre-Entry Notes: possible missing 1099-INT from First Harbor Bank, and one 1099-NEC line needs confirmation.'
-    } else if (lower.includes('plan') || lower.includes('approve') || lower.includes('enter')) {
-      reply =
-        'Filed-style flow: NOVARA reads documents → you approve the data-entry plan (correct or remove lines) → then values can be entered. Nothing is written without approval.'
+        'You can upload supporting documents anytime in the Vault. Missing receipts do not erase a calculated benefit already applied to your working return.'
     } else if (lower.includes('sign') || lower.includes('file')) {
       reply =
-        'Filing gates require verified facts, cleared blocking diagnostics, required signatures/consents, and valid credentials. AI cannot transmit returns.'
-    } else if (lower.includes('business') || lower.includes('1120') || lower.includes('1065')) {
-      reply =
-        'Business returns need the business-enabled office tier, TP business surcharge ($239.98), or direct-consumer business service.'
+        'Filing still requires review, attestations, and approval. AI calculates and applies benefits to the working return but cannot transmit.'
     }
     setTimeout(() => actions.addMessage('assistant', reply), 450)
+  },
+  ingestTaxpayerStatement(text: string) {
+    const facts = parseTaxpayerStatement(text)
+    if (facts.length === 0) {
+      actions.addMessage('assistant', 'I couldn’t map that statement to a tax field. Try including an amount and what it was for.')
+      return
+    }
+    const taxProfile = applyParsedFacts(state.taxProfile, facts)
+    let interviewAnswers = state.interviewAnswers
+    facts.forEach((f) => {
+      interviewAnswers = [
+        ...interviewAnswers.filter((a) => a.mapsTo !== f.mapsTo),
+        {
+          id: uid(`ans-${f.mapsTo}`),
+          mapsTo: f.mapsTo,
+          prompt: f.prompt,
+          answer: f.value,
+          at: new Date().toISOString(),
+        },
+      ]
+    })
+    const benefitReport = toSnapshot(taxProfile, 'Saved your statement to the tax return and recalculated benefits.')
+    const applied = (benefitReport.lastApplications ?? []).filter((a) => a.ruleId !== 'recalc')
+    state = {
+      ...state,
+      taxProfile,
+      interviewAnswers,
+      benefitReport,
+      benefitReviewSigned: false,
+      returns: syncReturnRefund(benefitReport),
+      auditEvents: appendAudit(
+        'nl_fact_ingest',
+        'Structured tax facts captured from conversational statement (amount details omitted from audit).',
+      ),
+    }
+    emit()
+    const lines = applied.length
+      ? applied.map((a) => `${a.name} ${money(a.amount)} applied → refund ${money(a.updatedRefund)}`).join(' · ')
+      : benefitReport.lastChangeNote
+    setTimeout(
+      () =>
+        actions.addMessage(
+          'assistant',
+          `Saved to your return: ${facts.map((f) => `${f.prompt} = ${f.value}`).join('; ')}. ${lines} You can upload a receipt later in the Vault if needed.`,
+        ),
+      350,
+    )
   },
   uploadFiles(files: FileList | File[]) {
     const list = Array.from(files)
@@ -765,6 +867,7 @@ export const actions = {
       preparerId: state.currentUser?.id,
       isBusiness: true,
       feeSnapshot: [{ label: fee.label, amount: fee.amount, status: fee.status }],
+      appliedBenefits: [],
       updatedAt: new Date().toISOString(),
     }
     state = { ...state, returns: [ret, ...state.returns], activeReturnId: ret.id }

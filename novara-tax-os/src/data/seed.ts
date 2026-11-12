@@ -45,6 +45,7 @@ export const SEED_RETURNS: TaxReturn[] = [
     preparerId: 'u-prep',
     isBusiness: false,
     feeSnapshot: [{ label: 'Consumer basic W-2', amount: 149, status: 'provisional' }],
+    appliedBenefits: [],
     updatedAt: new Date().toISOString(),
   },
   {
@@ -59,6 +60,7 @@ export const SEED_RETURNS: TaxReturn[] = [
     preparerId: 'u-prep',
     isBusiness: false,
     feeSnapshot: [{ label: 'TP personal return', amount: 89.99, status: 'approved' }],
+    appliedBenefits: [],
     updatedAt: new Date().toISOString(),
   },
   {
@@ -73,6 +75,7 @@ export const SEED_RETURNS: TaxReturn[] = [
     preparerId: 'u-prep',
     isBusiness: true,
     feeSnapshot: [{ label: 'TP business return', amount: 239.98, status: 'approved' }],
+    appliedBenefits: [],
     updatedAt: new Date().toISOString(),
   },
   {
@@ -87,6 +90,7 @@ export const SEED_RETURNS: TaxReturn[] = [
     preparerId: 'u-prep',
     isBusiness: false,
     feeSnapshot: [{ label: 'TP personal return', amount: 89.99, status: 'approved' }],
+    appliedBenefits: [],
     updatedAt: new Date().toISOString(),
   },
   {
@@ -101,6 +105,7 @@ export const SEED_RETURNS: TaxReturn[] = [
     preparerId: 'u-prep',
     isBusiness: false,
     feeSnapshot: [{ label: 'TP personal return', amount: 89.99, status: 'approved' }],
+    appliedBenefits: [],
     updatedAt: new Date(Date.now() - 86400000 * 40).toISOString(),
   },
 ]

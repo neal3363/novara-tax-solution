@@ -3,6 +3,7 @@ import type { DragEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { actions, useAppStore } from '../../store/useAppStore'
 import { formatMoney } from '../../data/fees'
+import { AppliedBenefitBanner } from '../../components/benefits/AppliedBenefitBanner'
 import { RefundTracker } from '../../components/benefits/RefundTracker'
 import { AnswerHistory, InterviewChoice } from '../../components/interview/InterviewChoice'
 import {
@@ -242,6 +243,23 @@ export function Prepare() {
 
             <div className="side-stack">
               <RefundTracker report={benefitReport} />
+              <AppliedBenefitBanner events={benefitReport?.lastApplications} returnPath="/app/taxpayer/prepare" />
+              {(benefitReport?.formLines?.length ?? 0) > 0 && (
+                <section className="list-panel panel">
+                  <h2>Applied on return</h2>
+                  {benefitReport!.formLines.map((line) => (
+                    <div className="row-item" key={line.id}>
+                      <div>
+                        <strong>{line.name}</strong>
+                        <span className="row-meta">
+                          {line.form} · {line.field}
+                        </span>
+                      </div>
+                      <strong>{formatMoney(line.amount)}</strong>
+                    </div>
+                  ))}
+                </section>
+              )}
               <section className="list-panel panel">
                 <h2>Already on file</h2>
                 <div className="row-item">

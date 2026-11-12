@@ -1,0 +1,59 @@
+.applied-banner {
+  margin: 1rem 0;
+  padding: 1.15rem 1.25rem;
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(10, 92, 84, 0.1), rgba(255, 255, 255, 0.9)),
+    #fff;
+  border: 1px solid rgba(10, 92, 84, 0.25);
+}
+
+.applied-banner .eyebrow {
+  margin: 0;
+  color: #0a5c54;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+}
+
+.applied-banner h2 {
+  margin: 0.35rem 0 0.85rem;
+  font-size: 1.35rem;
+}
+
+.applied-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-bottom: 0.75rem;
+}
+
+.applied-metrics .label {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.applied-metrics .value {
+  margin: 0.2rem 0 0;
+  font-family: var(--font-brand);
+  font-size: 1.15rem;
+}
+
+.applied-metrics .value.accent {
+  color: #0a5c54;
+}
+
+.applied-note {
+  margin: 0 0 0.85rem;
+  color: var(--slate);
+  line-height: 1.45;
+}
+
+@media (max-width: 640px) {
+  .applied-metrics {
+    grid-template-columns: 1fr;
+  }
+}

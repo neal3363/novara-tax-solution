@@ -164,9 +164,13 @@ export function syncProfileFromDocuments(profile: TaxpayerProfile, documents: Do
     next.childcarePaid = childcare
     next.answers.paid_childcare = 'yes'
     next.answers.childcare_amount = childcare
+    next.answers.worked_or_looked = 'yes'
+    next.answers.cdcc_docs = 'yes'
     if (!next.answers.has_child) next.answers.has_child = 'yes'
     if (!next.answers.has_dependents) next.answers.has_dependents = 'yes'
   }
+  if (tuition > 0) next.answers.aotc_docs = 'yes'
+  if (mortgage > 0) next.answers.mortgage_docs = 'yes'
   if (hasW2) next.answers.has_earned_income = 'yes'
   if (hasId) next.answers.id_on_file = 'yes'
   if (has1099 && se > 0) next.answers.schedule_c_signal = 'yes'

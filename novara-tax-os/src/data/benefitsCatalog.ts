@@ -14,9 +14,12 @@ export type BenefitStatus =
   | 'identified'
   | 'needs_info'
   | 'eligible_unverified'
+  | 'pending_verification'
   | 'applied'
   | 'ineligible'
   | 'flagged_review'
+
+export type DocSupportStatus = 'on_file' | 'optional_later' | 'not_required' | 'requested'
 
 export interface BenefitRule {
   id: string
@@ -34,7 +37,7 @@ export interface BenefitRule {
   incompatibleWith?: string[]
 }
 
-export const BENEFIT_RULE_VERSION = '2025.federal+state.demo.v2'
+export const BENEFIT_RULE_VERSION = '2025.federal+state.demo.v3'
 
 export const BENEFIT_CATALOG_2025: BenefitRule[] = [
   {
@@ -74,8 +77,8 @@ export const BENEFIT_CATALOG_2025: BenefitRule[] = [
     description: 'Credit for qualifying care expenses paid so the taxpayer could work or look for work. Coordinates with employer dependent-care benefits.',
     ruleCitation: 'IRC §21 · TY2025 · Form 2441',
     triggerFacts: ['has_child', 'paid_childcare'],
-    requiredAnswers: ['childcare_amount', 'care_provider', 'worked_or_looked', 'employer_dependent_care'],
-    requiredDocs: ['Provider EIN/SSN', 'Care payment records'],
+    requiredAnswers: ['childcare_amount', 'care_provider', 'employer_dependent_care'],
+    requiredDocs: ['Care payment records (can upload later)'],
     estimatedSavingsHint: 1050,
     incompatibleWith: [],
   },
@@ -332,10 +335,11 @@ export const CATEGORY_LABELS: Record<BenefitCategory, string> = {
 
 /** Plain-language status labels for Savings cards */
 export const STATUS_LABELS: Record<string, string> = {
-  needs_info: 'Needs a few answers or documents',
-  eligible_unverified: 'Looks possible — needs verification',
-  applied: 'Applied to your estimate',
+  needs_info: 'More information needed',
+  eligible_unverified: 'Ready to apply',
+  pending_verification: 'Pending verification',
+  applied: 'Applied to return',
   flagged_review: 'Needs human review',
-  ineligible: 'Does not appear to apply',
+  ineligible: 'Not eligible',
   identified: 'Identified',
 }
