@@ -24,8 +24,17 @@ const STEPS = [
 ]
 
 export function Prepare() {
-  const { documents, prepStep, returns, currentUser, taxProfile, benefitReport, interviewChat, interviewAnswers } =
-    useAppStore()
+  const {
+    documents,
+    prepStep,
+    returns,
+    currentUser,
+    taxProfile,
+    benefitReport,
+    interviewChat,
+    interviewAnswers,
+    uploadIssues,
+  } = useAppStore()
   const mine = returns.find((r) => r.clientId === currentUser?.id && r.taxYear === 2025)
   const inputRef = useRef<HTMLInputElement>(null)
   const [drag, setDrag] = useState(false)
@@ -120,6 +129,23 @@ export function Prepare() {
               onChange={(e) => e.target.files && actions.uploadFiles(e.target.files)}
             />
           </div>
+
+          {uploadIssues.length > 0 && (
+            <div className="list-panel panel" style={{ marginTop: '1rem' }}>
+              <h2>Document checks</h2>
+              {uploadIssues.slice(0, 4).map((issue) => (
+                <div className="row-item" key={`${issue.kind}-${issue.title}`}>
+                  <div>
+                    <strong>{issue.title}</strong>
+                    <span className="row-meta">{issue.detail}</span>
+                  </div>
+                  <span className={`badge ${issue.severity === 'high' ? 'badge-warn' : 'badge-neutral'}`}>
+                    {issue.kind}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
 
           {documents.length > 0 && (
             <div className="list-panel panel" style={{ marginTop: '1rem' }}>

@@ -103,8 +103,9 @@ function factMap(p: TaxpayerProfile): Record<string, boolean> {
     student_loan_interest: p.studentLoanInterest > 0 || p.answers.student_loan_interest === 'yes',
     retirement_contributions: p.retirementContributions > 0 || p.answers.retirement_contributions === 'yes',
     hsa_contributions: p.hsaContributions > 0 || p.answers.hsa_contributions === 'yes',
-    owns_home: p.mortgageInterest > 0 || p.answers.owns_home === 'yes',
+    owns_home: p.mortgageInterest > 0 || p.propertyTax > 0 || p.answers.owns_home === 'yes',
     mortgage_interest: p.mortgageInterest > 0,
+    property_taxes: p.propertyTax > 0 || p.answers.property_taxes === 'yes',
     energy_improvements: p.energyImprovements > 0 || p.answers.energy_improvements === 'yes',
     self_employed: p.selfEmploymentIncome > 0 || p.answers.self_employed === 'yes',
     schedule_c: p.selfEmploymentIncome > 0,
@@ -113,6 +114,7 @@ function factMap(p: TaxpayerProfile): Record<string, boolean> {
     charitable_gifts: p.charitableGifts > 0 || p.answers.charitable_gifts === 'yes',
     high_medical: p.medicalExpenses > 0 || p.answers.high_medical === 'yes',
     is_educator: p.isEducator || p.answers.is_educator === 'yes',
+    marketplace_coverage: p.answers.marketplace_coverage === 'yes' || p.answers.had_marketplace === 'yes',
     unmarried_or_considered: p.filingStatus === 'single' || p.filingStatus === 'hoh' || p.answers.unmarried_or_considered === 'yes',
   }
 }
@@ -149,6 +151,29 @@ function estimateFor(rule: BenefitRule, p: TaxpayerProfile): number {
     }
     case 'mileage':
       return Math.round(p.businessMileage * 0.7)
+    case 'property_tax': {
+      const salt = Math.min(10000, p.propertyTax)
+      const itemized = p.mortgageInterest + salt + p.charitableGifts
+      const standard = p.filingStatus === 'mfj' ? 30000 : 15000
+      return itemized > standard ? Math.round(salt * 0.22) : 0
+    }
+    case 'eitc': {
+      const kids = p.dependents.filter((d) => d.age < 17).length || (hasChild(p) ? 1 : 0)
+      const earned = p.wages + p.selfEmploymentIncome
+      if (earned <= 0 || earned > 65000) return 0
+      return kids >= 2 ? 1800 : kids === 1 ? 1200 : 400
+    }
+    case 'student_loan':
+      return Math.min(2500, p.studentLoanInterest) > 0 ? Math.round(Math.min(2500, p.studentLoanInterest) * 0.22) : rule.estimatedSavingsHint
+    case 'ptc':
+      return p.answers.had_marketplace === 'yes' ? rule.estimatedSavingsHint : 0
+    case 'state_eitc': {
+      const state = String(p.answers.filing_state || '').toLowerCase()
+      if (!state || state === 'tx' || state === 'texas' || state === 'florida' || state === 'fl') return 0
+      const kids = p.dependents.filter((d) => d.age < 17).length || (hasChild(p) ? 1 : 0)
+      const federalish = kids >= 2 ? 1800 : kids === 1 ? 1200 : 400
+      return Math.round(federalish * 0.3)
+    }
     default:
       return rule.estimatedSavingsHint
   }
@@ -157,7 +182,23 @@ function estimateFor(rule: BenefitRule, p: TaxpayerProfile): number {
 function evaluateRule(rule: BenefitRule, p: TaxpayerProfile, facts: Record<string, boolean>): BenefitFinding {
   const triggered = rule.triggerFacts.some((t) => facts[t])
   const missingAnswers = rule.requiredAnswers.filter((k) => !answerPresent(p, k))
-  const softProbe = !triggered && rule.triggerFacts.some((t) => ['has_child', 'has_dependents', 'education_expenses', 'owns_home', 'self_employed'].includes(t))
+  const softProbe =
+    !triggered &&
+    rule.triggerFacts.some((t) =>
+      [
+        'has_child',
+        'has_dependents',
+        'education_expenses',
+        'owns_home',
+        'self_employed',
+        'marketplace_coverage',
+        'has_earned_income',
+        'property_taxes',
+        'charitable_gifts',
+        'high_medical',
+        'student_loan_interest',
+      ].includes(t),
+    )
 
   if (!triggered && !softProbe) {
     return {
@@ -256,19 +297,49 @@ function evaluateRule(rule: BenefitRule, p: TaxpayerProfile, facts: Record<strin
 
 function resolveIncompatibilities(findings: BenefitFinding[]): BenefitFinding[] {
   const byId = new Map(findings.map((f) => [f.ruleId, f]))
-  const aotc = byId.get('aotc')
-  const llc = byId.get('llc')
-  if (aotc && llc && ['applied', 'eligible_unverified'].includes(aotc.status) && ['applied', 'eligible_unverified', 'needs_info'].includes(llc.status)) {
-    byId.set('llc', {
-      ...llc,
-      status: aotc.status === 'applied' ? 'ineligible' : llc.status,
+  const active = (s: BenefitStatus) => ['applied', 'eligible_unverified', 'needs_info', 'flagged_review'].includes(s)
+
+  BENEFIT_CATALOG_2025.forEach((rule) => {
+    const primary = byId.get(rule.id)
+    if (!primary || !rule.incompatibleWith?.length || !active(primary.status)) return
+    rule.incompatibleWith.forEach((otherId) => {
+      const other = byId.get(otherId)
+      if (!other || !active(other.status)) return
+      // Prefer the higher estimated savings when both are unverified; if one is applied, drop the other
+      if (primary.status === 'applied') {
+        byId.set(otherId, {
+          ...other,
+          status: 'ineligible',
+          estimatedSavings: 0,
+          explanation: `Not stacked with ${primary.shortName} for the same expenses (${rule.ruleCitation}).`,
+        })
+      } else if (other.status === 'applied') {
+        byId.set(rule.id, {
+          ...primary,
+          status: 'ineligible',
+          estimatedSavings: 0,
+          explanation: `Not stacked with ${other.shortName} for the same expenses.`,
+        })
+      } else if (primary.estimatedSavings >= other.estimatedSavings) {
+        byId.set(otherId, {
+          ...other,
+          explanation: `Compare with ${primary.shortName} before claiming — do not double-count the same expenses.`,
+        })
+      }
+    })
+  })
+
+  const ctc = byId.get('ctc')
+  const odc = byId.get('odc')
+  if (ctc && odc && active(ctc.status) && ctc.estimatedSavings > 0 && active(odc.status)) {
+    byId.set('odc', {
+      ...odc,
       explanation:
-        aotc.status === 'applied'
-          ? 'Incompatible with AOTC for the same student/expenses. AOTC selected as comparison winner in this demo.'
-          : 'Compare AOTC vs Lifetime Learning before applying either credit.',
-      estimatedSavings: aotc.status === 'applied' ? 0 : llc.estimatedSavings,
+        'Other Dependents Credit is for dependents who are not Child Tax Credit children. Keep CTC for qualifying kids under 17.',
+      estimatedSavings: Math.min(odc.estimatedSavings, 500),
     })
   }
+
   return Array.from(byId.values())
 }
 
@@ -351,7 +422,7 @@ export function nextInterviewQuestions(p: TaxpayerProfile, report: OptimizationR
   if (!answered('has_dependents')) {
     qs.push({
       id: 'has_dependents',
-      prompt: 'Do you have any dependents (children or qualifying relatives) for this tax year?',
+      prompt: 'Do you have any dependents?',
       kind: 'yesno',
       mapsTo: 'has_dependents',
       benefitIds: ['ctc', 'eitc', 'odc', 'hoh', 'cdcc'],
@@ -361,7 +432,7 @@ export function nextInterviewQuestions(p: TaxpayerProfile, report: OptimizationR
   if ((p.answers.has_dependents === 'yes' || hasDependents(p)) && !answered('has_child')) {
     qs.push({
       id: 'has_child',
-      prompt: 'Do you have a child under age 17 who lived with you during the year?',
+      prompt: 'Do you have a child under 17 who lived with you?',
       kind: 'yesno',
       mapsTo: 'has_child',
       benefitIds: ['ctc', 'cdcc', 'eitc'],
@@ -372,22 +443,22 @@ export function nextInterviewQuestions(p: TaxpayerProfile, report: OptimizationR
     ;[
       {
         id: 'child_lived_with',
-        prompt: 'Did the child live with you for more than half the year?',
+        prompt: 'Did your child live with you for more than half the year?',
         mapsTo: 'child_lived_with',
       },
       {
         id: 'child_support',
-        prompt: 'Did you provide more than half of the child’s financial support?',
+        prompt: 'Did you pay more than half of your child’s support?',
         mapsTo: 'child_support',
       },
       {
         id: 'another_claimant',
-        prompt: 'Could another person (for example a divorced/separated parent) claim this child?',
+        prompt: 'Could someone else claim this child on their taxes?',
         mapsTo: 'another_claimant',
       },
       {
         id: 'paid_childcare',
-        prompt: 'Did you pay for daycare, babysitting, summer day camp, or after-school care so you could work or look for work?',
+        prompt: 'Did you pay for childcare so you could work?',
         mapsTo: 'paid_childcare',
       },
     ].forEach((q) => {
@@ -400,7 +471,7 @@ export function nextInterviewQuestions(p: TaxpayerProfile, report: OptimizationR
   if ((p.answers.paid_childcare === 'yes' || p.childcarePaid > 0) && !answered('childcare_amount')) {
     qs.push({
       id: 'childcare_amount',
-      prompt: 'About how much did you pay in qualifying childcare expenses this year?',
+      prompt: 'About how much did you pay for childcare?',
       kind: 'number',
       mapsTo: 'childcare_amount',
       benefitIds: ['cdcc'],
@@ -410,7 +481,7 @@ export function nextInterviewQuestions(p: TaxpayerProfile, report: OptimizationR
   if ((p.answers.paid_childcare === 'yes' || p.childcarePaid > 0) && !answered('care_provider')) {
     qs.push({
       id: 'care_provider',
-      prompt: 'Do you have the childcare provider’s name and EIN/SSN for Form 2441?',
+      prompt: 'Do you have your childcare provider’s name and tax ID?',
       kind: 'yesno',
       mapsTo: 'care_provider',
       benefitIds: ['cdcc'],
@@ -420,7 +491,7 @@ export function nextInterviewQuestions(p: TaxpayerProfile, report: OptimizationR
   if ((p.answers.paid_childcare === 'yes' || p.childcarePaid > 0) && !answered('employer_dependent_care')) {
     qs.push({
       id: 'employer_dependent_care',
-      prompt: 'Did you receive employer dependent-care benefits (for example through a cafeteria plan)?',
+      prompt: 'Did your job help pay for childcare (a dependent-care benefit)?',
       kind: 'yesno',
       mapsTo: 'employer_dependent_care',
       benefitIds: ['cdcc'],
@@ -430,17 +501,27 @@ export function nextInterviewQuestions(p: TaxpayerProfile, report: OptimizationR
   if (!answered('education_expenses')) {
     qs.push({
       id: 'education_expenses',
-      prompt: 'Did you or a dependent pay college tuition or other eligible education expenses?',
+      prompt: 'Did you or a dependent pay college tuition?',
       kind: 'yesno',
       mapsTo: 'education_expenses',
       benefitIds: ['aotc', 'llc'],
     })
   }
 
+  if (!answered('student_loan_interest') && p.studentLoanInterest <= 0) {
+    qs.push({
+      id: 'student_loan_interest',
+      prompt: 'Did you pay student loan interest?',
+      kind: 'yesno',
+      mapsTo: 'student_loan_interest',
+      benefitIds: ['student_loan'],
+    })
+  }
+
   if (!answered('retirement_contributions')) {
     qs.push({
       id: 'retirement_contributions',
-      prompt: 'Did you contribute to an IRA, 401(k), or other eligible retirement plan?',
+      prompt: 'Did you put money into a retirement account (IRA or 401k)?',
       kind: 'yesno',
       mapsTo: 'retirement_contributions',
       benefitIds: ['savers'],
@@ -450,7 +531,7 @@ export function nextInterviewQuestions(p: TaxpayerProfile, report: OptimizationR
   if (!answered('self_employed') && p.selfEmploymentIncome <= 0) {
     qs.push({
       id: 'self_employed',
-      prompt: 'Did you operate a business or have self-employment income this year?',
+      prompt: 'Did you earn money from your own business or freelancing?',
       kind: 'yesno',
       mapsTo: 'self_employed',
       benefitIds: ['qbi', 'mileage', 'se_health'],
@@ -460,10 +541,51 @@ export function nextInterviewQuestions(p: TaxpayerProfile, report: OptimizationR
   if (!answered('owns_home')) {
     qs.push({
       id: 'owns_home',
-      prompt: 'Did you own a home and pay mortgage interest or property taxes?',
+      prompt: 'Do you own a home?',
       kind: 'yesno',
       mapsTo: 'owns_home',
-      benefitIds: ['mortgage', 'energy'],
+      benefitIds: ['mortgage', 'property_tax', 'energy'],
+    })
+  }
+
+  if (!answered('had_marketplace')) {
+    qs.push({
+      id: 'had_marketplace',
+      prompt: 'Did you get health insurance through the Marketplace (Healthcare.gov)?',
+      kind: 'yesno',
+      mapsTo: 'had_marketplace',
+      benefitIds: ['ptc'],
+    })
+  }
+
+  if (!answered('charitable_gifts')) {
+    qs.push({
+      id: 'charitable_gifts',
+      prompt: 'Did you make charitable donations you can document?',
+      kind: 'yesno',
+      mapsTo: 'charitable_gifts',
+      benefitIds: ['charity'],
+    })
+  }
+
+  if (!answered('high_medical')) {
+    qs.push({
+      id: 'high_medical',
+      prompt: 'Did you have large medical bills this year?',
+      kind: 'yesno',
+      mapsTo: 'high_medical',
+      benefitIds: ['medical'],
+    })
+  }
+
+  if (!answered('filing_state')) {
+    qs.push({
+      id: 'filing_state',
+      prompt: 'Which state was your main home for tax purposes?',
+      kind: 'choice',
+      choices: ['Texas', 'California', 'New York', 'Florida', 'Other'],
+      mapsTo: 'filing_state',
+      benefitIds: ['state_eitc'],
     })
   }
 
@@ -503,6 +625,21 @@ export function applyAnswer(p: TaxpayerProfile, mapsTo: string, value: string | 
   if (mapsTo === 'owns_home' && (value === 'yes' || value === true) && next.mortgageInterest === 0) {
     next.mortgageInterest = 8500
     next.propertyTax = 4200
+  }
+  if (mapsTo === 'had_marketplace' && (value === 'yes' || value === true)) {
+    next.answers.marketplace_coverage = 'yes'
+  }
+  if (mapsTo === 'charitable_gifts' && (value === 'yes' || value === true) && next.charitableGifts === 0) {
+    next.charitableGifts = 500
+  }
+  if (mapsTo === 'high_medical' && (value === 'yes' || value === true) && next.medicalExpenses === 0) {
+    next.medicalExpenses = 9000
+  }
+  if (mapsTo === 'student_loan_interest' && (value === 'yes' || value === true) && next.studentLoanInterest === 0) {
+    next.studentLoanInterest = 780
+  }
+  if (mapsTo === 'filing_state') {
+    next.answers.filing_state = String(value)
   }
   return next
 }
