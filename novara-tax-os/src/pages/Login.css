@@ -65,6 +65,11 @@
   box-shadow: var(--shadow);
 }
 
+.role-card.suggested {
+  border-color: rgba(13, 110, 102, 0.35);
+  box-shadow: 0 0 0 3px rgba(20, 146, 135, 0.12);
+}
+
 @media (min-width: 800px) {
   .role-grid {
     grid-template-columns: repeat(2, 1fr);
