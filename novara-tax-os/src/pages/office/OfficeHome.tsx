@@ -4,7 +4,7 @@ import { OFFICE_TIERS, UNLIMITED_CLIENTS_COPY, formatMoney } from '../../data/fe
 import '../shared.css'
 
 export function OfficeHome() {
-  const { returns } = useAppStore()
+  const { returns, currentUser } = useAppStore()
   const unsigned = returns.filter((r) => r.state === 'Signature Pending').length
   const rejected = returns.filter((r) => r.state === 'Rejected').length
   const business = returns.filter((r) => r.isBusiness).length
@@ -14,14 +14,14 @@ export function OfficeHome() {
     <div className="page container">
       <header className="page-header">
         <div>
-          <p className="eyebrow">Tax Office AI</p>
-          <h1>Summit Tax Office</h1>
+          <p className="eyebrow">Tax Office AI · preparers + clients</p>
+          <h1>{currentUser?.credentials?.businessName ?? 'Tax Office'}</h1>
         </div>
         <span className="badge badge-ok">{UNLIMITED_CLIENTS_COPY}</span>
       </header>
       <p className="muted">
-        Tenant-isolated workspace. No client or return volume caps — only approved per-return software fees. Manage
-        preparers on <Link to="/app/office/staff">Staff</Link>.
+        Tenant-isolated workspace. Invite preparers and assign clients on <Link to="/app/office/staff">Staff</Link>.
+        Independent TP accounts cannot access staff tools. EFIN verification required before e-file.
       </p>
 
       <div className="stat-row rise">

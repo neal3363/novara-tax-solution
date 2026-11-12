@@ -12,7 +12,8 @@
     "test:dependents": "node scripts/test-dependents.mjs",
     "test:pricing": "node scripts/test-pricing.mjs",
     "test:isolation": "node scripts/test-tenant-isolation.mjs",
-    "test:scale": "node scripts/test-scale-clients.mjs"
+    "test:scale": "node scripts/test-scale-clients.mjs",
+    "test:permissions": "node scripts/test-account-permissions.mjs"
   },
   "dependencies": {
     "@fontsource/figtree": "^5.3.0",

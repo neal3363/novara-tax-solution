@@ -2,22 +2,30 @@ import { Link } from 'react-router-dom'
 import { actions, useAppStore } from '../../store/useAppStore'
 import { UNLIMITED_CLIENTS_COPY, formatMoney } from '../../data/fees'
 import { RefundTracker } from '../../components/benefits/RefundTracker'
+import { isIndependentTp, isOfficePreparer } from '../../engine/accountPermissions'
 import '../shared.css'
 
 export function PreparerHome() {
-  const { returns, entryPlanStatus, entryPlan, preEntryNotes, benefitReport } = useAppStore()
+  const { returns, entryPlanStatus, entryPlan, preEntryNotes, benefitReport, currentUser } = useAppStore()
   const review = returns.filter((r) =>
     ['Preparer Review', 'Diagnostics', 'Extraction/Verification'].includes(r.state),
   )
   const unsigned = returns.filter((r) => r.state === 'Signature Pending')
   const openBenefits =
     benefitReport?.findings.filter((f) => f.status === 'needs_info' || f.status === 'eligible_unverified') ?? []
+  const perms = actions.permissions()
 
   return (
     <div className="page container">
       <header className="page-header">
         <div>
-          <p className="eyebrow">TP inbox · {UNLIMITED_CLIENTS_COPY}</p>
+          <p className="eyebrow">
+            {isIndependentTp(currentUser)
+              ? `Independent TP · clients only · ${UNLIMITED_CLIENTS_COPY}`
+              : isOfficePreparer(currentUser)
+                ? `Office preparer · assigned clients · ${UNLIMITED_CLIENTS_COPY}`
+                : `Preparer · ${UNLIMITED_CLIENTS_COPY}`}
+          </p>
           <h1>Returns ready for judgment</h1>
         </div>
         <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
@@ -29,6 +37,13 @@ export function PreparerHome() {
           </Link>
         </div>
       </header>
+
+      {isIndependentTp(currentUser) && (
+        <p className="muted rise">
+          Staff management is an Office feature only. You cannot invite preparers or assign clients to others.
+          {!perms.transmit ? ' Electronic filing stays blocked until PTIN verification and e-file provider association complete.' : ''}
+        </p>
+      )}
 
       <div className="stat-row rise">
         <div className="stat panel">
