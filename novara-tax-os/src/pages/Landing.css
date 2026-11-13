@@ -137,6 +137,60 @@
   margin-top: 0.5rem;
 }
 
+.hero-compose {
+  margin-top: 1rem;
+  padding: 1rem 1.1rem;
+  border-radius: 18px;
+  background: rgba(4, 24, 22, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(10px);
+  max-width: 40rem;
+}
+
+.hero-compose.drag {
+  border-color: rgba(45, 212, 191, 0.7);
+  box-shadow: 0 0 0 1px rgba(45, 212, 191, 0.35);
+}
+
+.hero-compose-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.85;
+  margin-bottom: 0.45rem;
+}
+
+.hero-compose-input {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  font: inherit;
+  font-size: 1rem;
+}
+
+.hero-compose-input::placeholder {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.hero-compose-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  align-items: center;
+  margin-top: 0.75rem;
+}
+
+.hero-compose-note {
+  margin: 0.65rem 0 0;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.72);
+}
+
 .section {
   padding: 4.25rem 0;
 }

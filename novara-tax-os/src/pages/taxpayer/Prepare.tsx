@@ -1,12 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DragEvent, FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { actions, useAppStore } from '../../store/useAppStore'
 import { formatMoney } from '../../data/fees'
 import { AppliedBenefitBanner } from '../../components/benefits/AppliedBenefitBanner'
 import { RefundTracker } from '../../components/benefits/RefundTracker'
 import { AnswerHistory, InterviewChoice } from '../../components/interview/InterviewChoice'
 import { QuestionOverview, QuestionProgressBar } from '../../components/interview/QuestionProgress'
+import {
+  QuestionnaireTabs,
+  sectionStats,
+  type QuestionnaireSectionId,
+} from '../../components/interview/QuestionnaireTabs'
+import { VoiceInput } from '../../components/VoiceInput'
+import { NovaraSpeak } from '../../components/NovaraSpeak'
+import { detectFilingIntent } from '../../engine/conversationIntent'
 import {
   extractConfirmedFields,
   knownFactsSummary,
@@ -24,6 +32,8 @@ import {
 import { buildDocumentChecklist } from '../../engine/documentChecklist'
 import '../shared.css'
 import './Prepare.css'
+
+const INTENT_KEY = 'novara-pending-intent'
 
 const STEPS = [
   'Upload',
@@ -60,8 +70,10 @@ export function Prepare() {
     uploadIssues,
     householdIntake,
     interviewFocusMapsTo,
+    activeTaxYear,
   } = useAppStore()
-  const mine = returns.find((r) => r.clientId === currentUser?.id && r.taxYear === 2025)
+  const [params] = useSearchParams()
+  const mine = returns.find((r) => r.clientId === currentUser?.id && r.taxYear === activeTaxYear)
   const inputRef = useRef<HTMLInputElement>(null)
   const [drag, setDrag] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -69,6 +81,10 @@ export function Prepare() {
   const [missingName, setMissingName] = useState('')
   const [missingDob, setMissingDob] = useState('')
   const [missingRel, setMissingRel] = useState<HouseholdRelationChoice>('son')
+  const [section, setSection] = useState<QuestionnaireSectionId>('filing')
+  const [compose, setCompose] = useState('')
+  const [pendingVoice, setPendingVoice] = useState<string | null>(null)
+  const [voiceOut, setVoiceOut] = useState(false)
   const fields = useMemo(() => extractConfirmedFields(documents), [documents])
   const known = useMemo(() => knownFactsSummary(documents, taxProfile), [documents, taxProfile])
   const activeStep = stepIndex(householdIntake.phase, prepStep)
@@ -80,10 +96,54 @@ export function Prepare() {
   const qualifyPrompt = nextDependentQualifyPrompt(householdIntake)
 
   useEffect(() => {
+    // Welcome-screen intent / upload handoff
+    let intentRaw: string | null = null
+    try {
+      intentRaw = sessionStorage.getItem(INTENT_KEY)
+      if (intentRaw) sessionStorage.removeItem(INTENT_KEY)
+    } catch {
+      /* ignore */
+    }
+    if (intentRaw) {
+      try {
+        const parsed = JSON.parse(intentRaw) as {
+          text?: string
+          intent?: string
+          taxYear?: number
+          clarify?: string
+        }
+        if (parsed.taxYear) actions.setActiveTaxYear(parsed.taxYear)
+        actions.setPrepStep(2)
+        if (parsed.text) {
+          actions.addMessage('user', parsed.text)
+          actions.addMessage(
+            'assistant',
+            parsed.clarify
+              ? `Got it — ${String(parsed.intent ?? 'filing').replace(/_/g, ' ')}. ${parsed.clarify}`
+              : `Got it — opening your questionnaire for ${String(parsed.intent ?? 'your return').replace(/_/g, ' ')}. Tabs show what’s complete and what’s still needed. Speak, type, or upload anytime.`,
+          )
+        }
+        if (parsed.intent === 'personal_and_business' || parsed.intent === 'business') {
+          setSection('business')
+        } else if (parsed.intent === 'amend' || parsed.intent === 'prior_year') {
+          setSection('filing')
+        } else {
+          setSection('filing')
+        }
+      } catch {
+        actions.setPrepStep(2)
+      }
+    }
+    if (params.get('upload') === '1') {
+      requestAnimationFrame(() => inputRef.current?.click())
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once on enter
+  }, [])
+
+  useEffect(() => {
     if (!activeTurn) return
-    // Instant scroll only when focus target changes — smooth scroll felt frozen on iPad
     document.querySelector('.active-turn')?.scrollIntoView({ behavior: 'auto', block: 'nearest' })
-  }, [interviewFocusMapsTo])
+  }, [interviewFocusMapsTo, activeTurn])
 
   function onDrop(e: DragEvent) {
     e.preventDefault()
@@ -141,18 +201,89 @@ export function Prepare() {
     setMissingDob('')
   }
 
-  const showUpload = prepStep <= 1 && (householdIntake.phase === 'upload' || householdIntake.phase === 'extract_review')
+  const showUpload =
+    section === 'personal' ||
+    section === 'income' ||
+    (prepStep <= 1 && (householdIntake.phase === 'upload' || householdIntake.phase === 'extract_review'))
   const showIdentify = householdIntake.phase === 'identify_primary'
   const showRelationships = householdIntake.phase === 'confirm_relationships'
   const showMissing = householdIntake.phase === 'discover_missing'
-  const showInterview = prepStep === 2 || householdIntake.phase === 'interview'
+  const showInterview = prepStep >= 2 || householdIntake.phase === 'interview' || section !== 'personal'
+
+  function openUnanswered(mapsTo: string) {
+    actions.focusInterviewQuestion(mapsTo)
+    requestAnimationFrame(() => {
+      document.querySelector('.active-turn')?.scrollIntoView({ behavior: 'auto', block: 'center' })
+    })
+  }
+
+  function handleCompose(raw: string) {
+    const text = raw.trim()
+    if (!text) return
+    const cmd = detectFilingIntent(text)
+    if (cmd.type === 'yes_no' && activeTurn) {
+      void confirmTurn(cmd.value === 'yes' ? 'Yes' : 'No')
+      setCompose('')
+      setPendingVoice(null)
+      return
+    }
+    if (cmd.type === 'goto_mapsTo' || cmd.type === 'edit_mapsTo') {
+      if (cmd.type === 'edit_mapsTo') actions.editInterviewAnswer(cmd.mapsTo)
+      else openUnanswered(cmd.mapsTo)
+      actions.addMessage('user', text)
+      actions.addMessage('assistant', `Opening ${cmd.label}.`)
+      setCompose('')
+      setPendingVoice(null)
+      return
+    }
+    if (cmd.type === 'show_unanswered') {
+      const stats = sectionStats(taxProfile, section)
+      const next = stats.items.find((q) => q.status === 'unanswered')
+      if (next) openUnanswered(next.mapsTo)
+      actions.addMessage('user', text)
+      actions.addMessage(
+        'assistant',
+        next ? `Next unanswered in this section: ${next.prompt}` : 'Nothing unanswered in this section right now.',
+      )
+      setCompose('')
+      setPendingVoice(null)
+      return
+    }
+    if (cmd.type === 'continue') {
+      actions.setPrepStep(Math.max(prepStep, 2))
+      const next = resolveInterviewTurn(taxProfile, null)
+      if (next) openUnanswered(next.mapsTo)
+      setCompose('')
+      setPendingVoice(null)
+      return
+    }
+    actions.askAi(text)
+    actions.setPrepStep(Math.max(prepStep, 2))
+    setCompose('')
+    setPendingVoice(null)
+  }
+
+  function onSelectSection(id: QuestionnaireSectionId) {
+    setSection(id)
+    if (id === 'review') {
+      if (prepStep < 3) actions.setPrepStep(Math.max(prepStep, 2))
+      return
+    }
+    if (id !== 'personal') actions.setPrepStep(Math.max(prepStep, 2))
+    const stats = sectionStats(taxProfile, id)
+    const next = stats.items.find((q) => q.status === 'unanswered') ?? stats.items[0]
+    if (next) {
+      if (next.status === 'answered') actions.editInterviewAnswer(next.mapsTo)
+      else openUnanswered(next.mapsTo)
+    }
+  }
 
   return (
     <div className="page container">
       <header className="page-header">
         <div>
-          <p className="eyebrow">Document-first tax preparation</p>
-          <h1>Upload → identify → apply benefits</h1>
+          <p className="eyebrow">Unified tax questionnaire · TY{activeTaxYear}</p>
+          <h1>Prepare your return</h1>
         </div>
         <button className="btn btn-ghost" type="button" onClick={() => actions.resetDemo()}>
           Reset demo
@@ -160,9 +291,11 @@ export function Prepare() {
       </header>
 
       <p className="muted prepare-lead">
-        NOVARA reads your documents, identifies people listed, asks who each person is, builds your household, then
-        calculates the maximum legally allowable refund. You confirm — you don’t retype reliable extracted data.
+        Speak, type, or upload into the same questionnaire. Tabs show what’s complete (green counts) and what still
+        needs answering — jump anytime without choosing an input mode.
       </p>
+
+      <QuestionnaireTabs profile={taxProfile} active={section} onSelect={onSelectSection} />
 
       <div className="stepper" aria-label="Preparation steps">
         {STEPS.map((s, i) => (
@@ -474,18 +607,25 @@ export function Prepare() {
         </section>
       )}
 
-      {showInterview && prepStep >= 2 && prepStep < 3 && (
+      {showInterview && prepStep >= 2 && prepStep < 3 && section !== 'review' && (
         <section className="smart-interview rise">
           <div className="interview-layout">
             <div className="list-panel panel interview-chat">
               <h2>Tax questions &amp; benefits</h2>
               <p className="muted" style={{ marginTop: 0 }}>
-                Green means answered. Orange means unanswered. Continue opens the next unanswered question — never
-                restarts completed ones.
+                Green means answered. Orange means unanswered. Use the tabs above to jump sections. Speak, type, or
+                upload — one shared answer system.
               </p>
               <QuestionProgressBar profile={taxProfile} />
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.55rem', marginBottom: '0.75rem', alignItems: 'center' }}>
+                <label style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center' }}>
+                  <input type="checkbox" checked={voiceOut} onChange={(e) => setVoiceOut(e.target.checked)} />
+                  Allow NOVARA to speak questions (optional)
+                </label>
+                <NovaraSpeak text={activeTurn?.prompt ?? ''} enabled={voiceOut} />
+              </div>
               <div className="chat-log" role="log" aria-live="polite">
-                {interviewChat.map((m) => (
+                {interviewChat.slice(-12).map((m) => (
                   <div key={m.id} className={`chat-bubble ${m.role}`}>
                     <p>{m.text}</p>
                   </div>
@@ -493,13 +633,13 @@ export function Prepare() {
               </div>
 
               {activeTurn ? (
-                <div className="active-turn">
+                <div className="active-turn" id="prepare-active-answer">
                   <p className="turn-label">
                     {activeTurn.phase === 'filing_status'
-                      ? 'Filing status · next unanswered'
+                      ? 'Filing status · current question'
                       : activeTurn.phase === 'dependents'
-                        ? 'Dependent verification · next unanswered'
-                        : 'Tax benefit discovery · next unanswered'}
+                        ? 'Dependent verification · current question'
+                        : 'Tax benefit discovery · current question'}
                   </p>
                   <InterviewChoice
                     key={activeTurn.id}
@@ -525,16 +665,48 @@ export function Prepare() {
                 </div>
               )}
 
+              <div className="field" style={{ marginTop: '0.85rem' }}>
+                <label htmlFor="prepareCompose">Speak or type an answer / command</label>
+                <input
+                  id="prepareCompose"
+                  value={pendingVoice ?? compose}
+                  onChange={(e) => {
+                    setPendingVoice(null)
+                    setCompose(e.target.value)
+                  }}
+                  placeholder='e.g. “I paid $4,800 for childcare” or “Show unanswered”'
+                />
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.55rem', marginTop: '0.45rem' }}>
+                <VoiceInput
+                  onTranscript={(text) => {
+                    setPendingVoice(text)
+                    setCompose(text)
+                  }}
+                />
+                <button
+                  className="btn btn-primary"
+                  type="button"
+                  disabled={!(pendingVoice ?? compose).trim()}
+                  onClick={() => handleCompose(pendingVoice ?? compose)}
+                >
+                  {pendingVoice ? 'Confirm spoken message' : 'Send'}
+                </button>
+                <button className="btn btn-secondary" type="button" onClick={() => inputRef.current?.click()}>
+                  Upload documents
+                </button>
+              </div>
+
               <QuestionOverview
                 profile={taxProfile}
                 focusMapsTo={activeTurn?.mapsTo}
-                onSelectUnanswered={(q) => {
-                  actions.focusInterviewQuestion(q.mapsTo)
+                onSelectUnanswered={(q) => openUnanswered(q.mapsTo)}
+                onEditAnswered={(mapsTo) => {
+                  actions.editInterviewAnswer(mapsTo)
                   requestAnimationFrame(() => {
                     document.querySelector('.active-turn')?.scrollIntoView({ behavior: 'auto', block: 'center' })
                   })
                 }}
-                onEditAnswered={(mapsTo) => actions.editInterviewAnswer(mapsTo)}
               />
 
               <AnswerHistory items={interviewAnswers} onEdit={(mapsTo) => actions.editInterviewAnswer(mapsTo)} />

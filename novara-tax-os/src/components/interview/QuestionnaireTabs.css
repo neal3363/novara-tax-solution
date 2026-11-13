@@ -1,0 +1,71 @@
+.qtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.75rem 0 1rem;
+  padding: 0.35rem;
+  background: rgba(15, 23, 42, 0.03);
+  border: 1px solid var(--line, #e7e2d9);
+  border-radius: 14px;
+}
+
+.qtab {
+  appearance: none;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--slate, #475569);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 650;
+  padding: 0.5rem 0.75rem;
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2.25rem;
+}
+
+.qtab:hover {
+  background: rgba(15, 23, 42, 0.05);
+}
+
+.qtab:focus-visible {
+  outline: 2px solid var(--teal, #0f766e);
+  outline-offset: 2px;
+}
+
+.qtab.active {
+  background: var(--ink, #0f172a);
+  color: #fff;
+}
+
+.qtab.needs:not(.active) {
+  border-color: rgba(234, 88, 12, 0.35);
+}
+
+.qtab.done:not(.active) .qtab-count {
+  color: #15803d;
+}
+
+.qtab-count {
+  font-size: 0.72rem;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+.qtab.active .qtab-count {
+  opacity: 0.9;
+}
+
+@media (max-width: 720px) {
+  .qtabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .qtab {
+    flex: 0 0 auto;
+  }
+}

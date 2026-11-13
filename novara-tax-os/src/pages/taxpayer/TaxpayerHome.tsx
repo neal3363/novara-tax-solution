@@ -44,12 +44,12 @@ export function TaxpayerHome() {
           <Link className="btn btn-secondary" to="/app/taxpayer/import">
             Import prior return
           </Link>
-          <Link className="btn btn-primary" to="/app/taxpayer/assistant">
+          <Link className="btn btn-primary" to="/app/taxpayer/prepare">
             {progress.answeredCount === 0
-              ? 'Start questions'
+              ? 'Open questionnaire'
               : progress.unansweredCount > 0
-                ? 'Continue questions'
-                : 'Review with AI'}
+                ? 'Continue questionnaire'
+                : 'Review questionnaire'}
           </Link>
         </div>
       </header>

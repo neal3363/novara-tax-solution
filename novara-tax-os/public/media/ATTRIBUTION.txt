@@ -1,19 +1,16 @@
 NOVARA Tax OS — ambient media attribution
 ========================================
 
-Video (edited into a seamless silent NOVARA hero reel):
-- Mixkit stock video clips (Envato Mixkit Free License)
+Video (silent NOVARA hero reel — real human motion in lobby / office HQ):
+- Mixkit Free License stock clips (Envato), re-encoded for NOVARA:
   https://mixkit.co/license/#videoFree
-  Source clips include open office activity, coworkers talking,
-  busy office floors, and professional meetings. Compiled and
-  re-encoded for NOVARA. Not affiliated with Filed or Mixkit brands.
+  Includes office-lobby greetings, business building lobby, open-office floors,
+  coworkers talking, and professional meetings. Not affiliated with Filed.
 
-Audio (instrumental lounge / soul-jazz atmosphere):
+Audio:
 - “Soul Jazz” by Francisco Alvear — Mixkit Stock Music Free License
   https://mixkit.co/free-stock-music/soul-jazz-652/
   https://mixkit.co/license/#musicFree
-  Used as supportive website/app background music (not redistributed
-  as a standalone music product). Not a Motown recording or cover.
+  Supportive website background music only (not redistributed standalone).
 
 NOVARA does not copy Filed.com videos, branding, or source code.
-Filed was used only as a general cinematic-reference level of polish.
