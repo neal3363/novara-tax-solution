@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import type { DragEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { actions, useAppStore } from '../../store/useAppStore'
@@ -60,16 +60,11 @@ export function AiAssistant() {
 
   const rel = nextRelationshipPrompt(householdIntake)
 
-  useEffect(() => {
-    if (!activeTurn) return
-    answerPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  }, [activeTurn?.id, activeTurn?.mapsTo, interviewFocusMapsTo])
-
   function openUnanswered(mapsTo: string) {
     actions.focusInterviewQuestion(mapsTo)
-    // scroll runs after store emit + resolve in the effect above
+    // Instant scroll (smooth scroll on iPad Safari often feels like a freeze)
     requestAnimationFrame(() => {
-      answerPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      answerPanelRef.current?.scrollIntoView({ behavior: 'auto', block: 'center' })
     })
   }
 
@@ -230,7 +225,7 @@ export function AiAssistant() {
           onEditAnswered={(mapsTo) => {
             actions.editInterviewAnswer(mapsTo)
             requestAnimationFrame(() => {
-              answerPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+              answerPanelRef.current?.scrollIntoView({ behavior: 'auto', block: 'center' })
             })
           }}
         />
@@ -244,7 +239,7 @@ export function AiAssistant() {
           {activeTurn ? (
             <>
               <p className="turn-label" style={{ marginTop: 0 }}>
-                Answer here · tap Yes/No or type, then Answer
+                Answer here · tap Yes/No to save (or type a name/amount and press Answer)
               </p>
               <InterviewChoice
                 key={activeTurn.id}
