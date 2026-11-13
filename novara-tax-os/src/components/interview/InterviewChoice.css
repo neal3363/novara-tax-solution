@@ -109,25 +109,43 @@
 
 .iv-amount-row {
   display: flex;
+  flex-direction: column;
   flex-wrap: wrap;
-  gap: 0.55rem;
-  align-items: center;
+  gap: 0.45rem;
+  align-items: stretch;
+}
+
+.iv-text-label {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--muted, #5c5852);
 }
 
 .iv-amount-row input {
   flex: 1;
+  width: 100%;
   min-width: 10rem;
   min-height: 3.2rem;
   border-radius: 14px;
   border: 2px solid #c8c4bc;
   padding: 0.75rem 1rem;
-  font-size: 1.05rem;
+  /* 16px minimum avoids iOS Safari focus-zoom that can break typing */
+  font-size: 16px;
   font-weight: 600;
+  -webkit-appearance: none;
+  appearance: none;
+  background: #fff;
+  color: var(--ink, #1a1a1a);
 }
 
 .iv-amount-row input:focus {
   outline: 2px solid rgba(10, 92, 84, 0.35);
   border-color: #0a5c54;
+}
+
+.iv-amount-row input[readonly] {
+  background: #f3f1ec;
+  color: #3d3a35;
 }
 
 .iv-actions {

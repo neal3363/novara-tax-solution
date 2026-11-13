@@ -6,6 +6,8 @@ export type InterviewChoiceKind = 'yesno' | 'choice' | 'number' | 'text' | 'date
 export type InterviewChoiceProps = {
   questionId: string
   prompt: string
+  /** Optional mapsTo — used to force a text field for dep_*_name / dob even if kind is wrong */
+  mapsTo?: string
   choices?: string[]
   kind?: InterviewChoiceKind
   /** Already-confirmed display value (from history), if reopening */
@@ -21,11 +23,11 @@ function normalizeLabel(choice: string) {
   return choice.trim()
 }
 
-function displayAnswer(value: string | number) {
+function displayAnswer(value: string | number, asMoney = false) {
   const s = String(value)
   if (s.toLowerCase() === 'yes') return 'YES'
   if (s.toLowerCase() === 'no') return 'NO'
-  if (typeof value === 'number' || /^\d+(\.\d+)?$/.test(s)) {
+  if (asMoney && (typeof value === 'number' || /^\d+(\.\d+)?$/.test(s))) {
     const n = Number(s)
     if (!Number.isNaN(n)) {
       return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n)
@@ -42,9 +44,33 @@ function isIsoDate(raw: string) {
   return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d
 }
 
+/** Force free-text UI when the question is clearly a typed fact (name / DOB / TIN last4). */
+function detectFreeText(
+  kind: InterviewChoiceKind,
+  mapsTo: string | undefined,
+  prompt: string,
+): { freeText: boolean; mode: 'text' | 'date' } {
+  const key = (mapsTo || '').toLowerCase()
+  const p = prompt.toLowerCase()
+  if (kind === 'date' || key.endsWith('_dob') || p.includes('date of birth') || p.includes('yyyy-mm-dd')) {
+    return { freeText: true, mode: 'date' }
+  }
+  if (
+    kind === 'text' ||
+    key.endsWith('_name') ||
+    key.endsWith('_tin_last4') ||
+    p.includes('full legal name') ||
+    p.includes('last 4')
+  ) {
+    return { freeText: true, mode: 'text' }
+  }
+  return { freeText: false, mode: 'text' }
+}
+
 export function InterviewChoice({
   questionId,
   prompt,
+  mapsTo,
   choices,
   kind = 'choice',
   initialSelected = null,
@@ -55,22 +81,23 @@ export function InterviewChoice({
 }: InterviewChoiceProps) {
   const labelId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
+  const detected = detectFreeText(kind, mapsTo, prompt)
+  const isFreeText = detected.freeText
+  const textMode = detected.mode
+
   const [selected, setSelected] = useState<string | null>(initialSelected)
   const [amount, setAmount] = useState(initialSelected && kind === 'number' ? String(initialSelected) : '')
-  const [textValue, setTextValue] = useState(
-    initialSelected && (kind === 'text' || kind === 'date') ? String(initialSelected) : '',
-  )
-  const [locked, setLocked] = useState(Boolean(initialSelected))
+  const [textValue, setTextValue] = useState(initialSelected && isFreeText ? String(initialSelected) : '')
+  const [locked, setLocked] = useState(Boolean(initialSelected && String(initialSelected).trim()))
   const [localSaving, setLocalSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const submitting = useRef(false)
   const isSaving = saving || localSaving
-  const isFreeText = kind === 'text' || kind === 'date'
 
   const options =
-    choices && choices.length > 0
+    !isFreeText && choices && choices.length > 0
       ? choices.map(normalizeLabel)
-      : kind === 'yesno'
+      : !isFreeText && kind === 'yesno'
         ? ['Yes', 'No']
         : []
 
@@ -80,19 +107,15 @@ export function InterviewChoice({
     options[1].toLowerCase() === 'no'
 
   useEffect(() => {
-    // Reset local draft when the active question changes
+    const free = detectFreeText(kind, mapsTo, prompt).freeText
     setSelected(initialSelected)
     setAmount(initialSelected && kind === 'number' ? String(initialSelected) : '')
-    setTextValue(initialSelected && (kind === 'text' || kind === 'date') ? String(initialSelected) : '')
-    setLocked(Boolean(initialSelected))
+    setTextValue(initialSelected && free ? String(initialSelected) : '')
+    setLocked(Boolean(initialSelected && String(initialSelected).trim()))
     setError(null)
     submitting.current = false
     setLocalSaving(false)
-    if (kind === 'text' || kind === 'date') {
-      // iPad Safari: focus the field so the keyboard opens when the question appears
-      requestAnimationFrame(() => inputRef.current?.focus())
-    }
-  }, [questionId, initialSelected, kind])
+  }, [questionId, initialSelected, kind, mapsTo, prompt])
 
   function pick(choice: string) {
     if (isSaving || locked || submitting.current) return
@@ -104,10 +127,12 @@ export function InterviewChoice({
     if (isSaving || submitting.current) return
     setLocked(false)
     setError(null)
+    // iPad: unlock then focus so the keyboard can open
+    requestAnimationFrame(() => inputRef.current?.focus())
   }
 
   function validate(): { ok: true; value: string | number } | { ok: false; message: string } {
-    if (kind === 'number') {
+    if (kind === 'number' && !isFreeText) {
       const n = Number(String(amount).replace(/[,$]/g, ''))
       if (!Number.isFinite(n) || n < 0) return { ok: false, message: 'Enter a valid amount (0 or greater).' }
       return { ok: true, value: n }
@@ -118,16 +143,21 @@ export function InterviewChoice({
         return {
           ok: false,
           message:
-            kind === 'date'
+            textMode === 'date'
               ? 'Enter the date of birth as YYYY-MM-DD before answering.'
               : 'Enter the full legal name before answering.',
         }
       }
-      if (kind === 'date') {
+      if (textMode === 'date') {
         if (!isIsoDate(raw)) {
           return { ok: false, message: 'Use date format YYYY-MM-DD (for example 2016-03-15).' }
         }
         return { ok: true, value: raw }
+      }
+      if (mapsTo?.endsWith('_tin_last4')) {
+        const digits = raw.replace(/\D/g, '')
+        if (digits.length !== 4) return { ok: false, message: 'Enter exactly 4 digits (last 4 only).' }
+        return { ok: true, value: digits }
       }
       if (raw.length < 2) {
         return { ok: false, message: 'Enter the dependent’s full legal name (at least 2 characters).' }
@@ -149,7 +179,7 @@ export function InterviewChoice({
     }
 
     const value = result.value
-    if (kind === 'number') setSelected(String(value))
+    if (kind === 'number' && !isFreeText) setSelected(String(value))
     else if (isFreeText) setSelected(String(value))
 
     submitting.current = true
@@ -158,7 +188,6 @@ export function InterviewChoice({
     setError(null)
     try {
       await Promise.resolve(onConfirm(value))
-      // Brief settle so double-taps during sync store updates are ignored
       await new Promise((r) => setTimeout(r, 180))
     } catch (err) {
       setLocked(false)
@@ -172,21 +201,37 @@ export function InterviewChoice({
   const canContinue =
     !isSaving &&
     !locked &&
-    (kind === 'number'
-      ? amount.trim() !== '' && Number.isFinite(Number(String(amount).replace(/[,$]/g, '')))
-      : isFreeText
-        ? textValue.trim() !== ''
+    (isFreeText
+      ? textValue.trim() !== ''
+      : kind === 'number'
+        ? amount.trim() !== '' && Number.isFinite(Number(String(amount).replace(/[,$]/g, '')))
         : Boolean(selected))
 
-  const shownAnswer = kind === 'number' && amount.trim() ? amount : isFreeText && textValue.trim() ? textValue : selected
+  const shownAnswer =
+    kind === 'number' && !isFreeText && amount.trim()
+      ? amount
+      : isFreeText && textValue.trim()
+        ? textValue
+        : selected
 
   return (
-    <div className="iv-choice" role="group" aria-labelledby={labelId} data-question-id={questionId}>
+    <form
+      className="iv-choice"
+      role="group"
+      aria-labelledby={labelId}
+      data-question-id={questionId}
+      data-maps-to={mapsTo || ''}
+      data-kind={isFreeText ? textMode : kind}
+      onSubmit={(e) => {
+        e.preventDefault()
+        void continueAnswer()
+      }}
+    >
       <p className="iv-choice-prompt" id={labelId}>
         {prompt}
       </p>
 
-      {kind === 'number' ? (
+      {kind === 'number' && !isFreeText ? (
         <div className="iv-amount-row">
           <input
             ref={inputRef}
@@ -195,45 +240,44 @@ export function InterviewChoice({
             aria-label="Amount in USD"
             placeholder="Enter amount"
             value={amount}
-            disabled={locked || isSaving}
+            readOnly={locked || isSaving}
             onChange={(e) => {
               if (locked || isSaving) return
               setError(null)
               setAmount(e.target.value)
               setSelected(e.target.value)
             }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-                void continueAnswer()
-              }
-            }}
           />
         </div>
       ) : isFreeText ? (
         <div className="iv-amount-row">
+          <label className="iv-text-label" htmlFor={`iv-text-${questionId}`}>
+            {textMode === 'date' ? 'Type the date (YYYY-MM-DD)' : 'Type the full legal name'}
+          </label>
           <input
             ref={inputRef}
-            type={kind === 'date' ? 'text' : 'text'}
-            inputMode={kind === 'date' ? 'numeric' : 'text'}
-            autoComplete={kind === 'date' ? 'bday' : 'name'}
-            autoCapitalize={kind === 'date' ? 'off' : 'words'}
+            id={`iv-text-${questionId}`}
+            name={mapsTo || questionId}
+            type="text"
+            inputMode={textMode === 'date' ? 'numeric' : 'text'}
+            autoComplete={textMode === 'date' ? 'bday' : 'name'}
+            autoCapitalize={textMode === 'date' ? 'off' : 'words'}
+            autoCorrect="off"
+            spellCheck={textMode !== 'date'}
             enterKeyHint="done"
-            aria-label={kind === 'date' ? 'Date of birth YYYY-MM-DD' : 'Full legal name'}
-            placeholder={kind === 'date' ? 'YYYY-MM-DD' : 'Full legal name'}
+            aria-label={textMode === 'date' ? 'Date of birth YYYY-MM-DD' : 'Full legal name'}
+            placeholder={textMode === 'date' ? 'YYYY-MM-DD' : 'e.g. Emma Blake'}
             value={textValue}
-            disabled={locked || isSaving}
+            readOnly={locked || isSaving}
+            onFocus={(e) => {
+              // iPad Safari: select existing text so replace is easy
+              if (!locked && textValue) e.currentTarget.select()
+            }}
             onChange={(e) => {
               if (locked || isSaving) return
               setError(null)
               setTextValue(e.target.value)
               setSelected(e.target.value)
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-                void continueAnswer()
-              }
             }}
           />
         </div>
@@ -270,18 +314,18 @@ export function InterviewChoice({
 
       {shownAnswer != null && String(shownAnswer).trim() !== '' && !error && (
         <p className="iv-confirm-line" aria-live="polite">
-          Your answer: <span>{displayAnswer(shownAnswer)}</span>
+          Your answer: <span>{displayAnswer(shownAnswer, kind === 'number' && !isFreeText)}</span>
           {locked ? ' ✓' : ''}
         </p>
       )}
 
       <div className="iv-actions">
         {!locked && (
-          <button className="btn btn-primary" type="button" disabled={!canContinue} onClick={() => void continueAnswer()}>
+          <button className="btn btn-primary" type="submit" disabled={!canContinue}>
             {isSaving ? 'Saving…' : 'Answer'}
           </button>
         )}
-        {(selected || amount || textValue) && (
+        {(selected || amount || textValue || locked) && (
           <button className="btn btn-secondary" type="button" disabled={isSaving} onClick={changeAnswer}>
             Change Answer
           </button>
@@ -292,7 +336,7 @@ export function InterviewChoice({
           </button>
         )}
       </div>
-    </div>
+    </form>
   )
 }
 
@@ -325,7 +369,7 @@ export function AnswerHistory({
             </p>
             <p className="iv-history-a">
               <span>
-                Your answer: <strong>{displayAnswer(item.answer)}</strong>
+                Your answer: <strong>{displayAnswer(item.answer, false)}</strong>
               </span>
               <button type="button" className="iv-history-edit" onClick={() => onEdit(item.mapsTo)}>
                 Change Answer

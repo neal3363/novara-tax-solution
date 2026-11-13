@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DragEvent, FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { actions, useAppStore } from '../../store/useAppStore'
@@ -77,6 +77,12 @@ export function Prepare() {
   const activeTurn = nextInterviewTurn(taxProfile)
   const relPrompt = nextRelationshipPrompt(householdIntake)
   const qualifyPrompt = nextDependentQualifyPrompt(householdIntake)
+
+  useEffect(() => {
+    if (!activeTurn) return
+    // Keep the name/DOB text field on screen (especially iPad Safari)
+    document.querySelector('.active-turn')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [activeTurn?.id, activeTurn?.mapsTo])
 
   function onDrop(e: DragEvent) {
     e.preventDefault()
@@ -497,6 +503,7 @@ export function Prepare() {
                   <InterviewChoice
                     key={activeTurn.id}
                     questionId={activeTurn.id}
+                    mapsTo={activeTurn.mapsTo}
                     prompt={activeTurn.prompt}
                     kind={activeTurn.kind}
                     choices={activeTurn.choices}

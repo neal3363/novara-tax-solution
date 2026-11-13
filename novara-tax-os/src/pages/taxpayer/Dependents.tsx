@@ -146,6 +146,7 @@ export function Dependents() {
             <InterviewChoice
               key={active.id}
               questionId={active.id}
+              mapsTo={active.mapsTo}
               prompt={active.prompt}
               kind={active.kind}
               choices={active.choices}
