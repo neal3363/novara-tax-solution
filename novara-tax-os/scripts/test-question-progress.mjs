@@ -13,8 +13,13 @@ writeFileSync(
   join(tmp, 'run.ts'),
   `
 import { defaultProfile, applyAnswer, runBenefitOptimization } from '../src/engine/benefitOptimizer.ts'
+import { answerPresent } from '../src/engine/benefitAnswers.ts'
 import { applyFilingStatusAnswer, nextFilingStatusTurn } from '../src/engine/smartInterview.ts'
 import { nextDependentQuestion, applyDependentAnswer } from '../src/engine/dependentsEngine.ts'
+import {
+  nextBenefitSpecificQuestion,
+  benefitQuestionnaireComplete,
+} from '../src/engine/benefitQuestionnaires.ts'
 import {
   buildInterviewProgress,
   groupProgressByCategory,
@@ -157,6 +162,38 @@ console.log('=== Answer focus resolves a discovery turn ===')
   const focused = resolveInterviewTurn(p, next!.mapsTo)
   assert(focused?.mapsTo === next!.mapsTo, 'focus resolves same turn')
   assert(Boolean(focused?.kind), 'focused turn has kind for InterviewChoice')
+}
+
+console.log('=== Business / self-employed No does not loop forever ===')
+{
+  let p = defaultProfile()
+  p = { ...p, selfEmploymentIncome: 0, businessMileage: 0, answers: {}, unresolvedKeys: [], dependents: [] }
+  p = applyFilingStatusAnswer(p, 'married_dec31', 'No')
+  p = applyFilingStatusAnswer(p, 'potential_dependents', 'no')
+  const seen = new Set<string>()
+  let loops = 0
+  for (let i = 0; i < 40; i++) {
+    const t = nextInterviewTurn(p)
+    if (!t) break
+    if (t.mapsTo === 'self_employed' && seen.has('self_employed')) {
+      loops++
+      break
+    }
+    seen.add(t.mapsTo)
+    const v = t.kind === 'number' ? 0 : t.kind === 'choice' && t.choices?.[0] ? t.choices[0] : 'no'
+    p = applyAnswer(p, t.mapsTo, v)
+  }
+  assert(answerPresent(p, 'self_employed'), 'self_employed No counts as answered')
+  assert(loops === 0, 'self_employed is not re-asked after No')
+  assert(nextInterviewTurn(p)?.mapsTo !== 'self_employed', 'next turn is not self_employed after No')
+
+  let m = defaultProfile()
+  m = { ...m, selfEmploymentIncome: 0, businessMileage: 0, answers: {}, unresolvedKeys: [], dependents: [] }
+  m = applyAnswer(m, 'business_vehicle', 'yes')
+  m = applyAnswer(m, 'self_employed', 'no')
+  assert(answerPresent(m, 'self_employed'), 'mileage gate: self_employed No is present')
+  assert(nextBenefitSpecificQuestion('mileage', m) === null, 'mileage questionnaire ends after SE No')
+  assert(benefitQuestionnaireComplete('mileage', m), 'mileage questionnaire complete after eligibility No')
 }
 
 if (failed) {
