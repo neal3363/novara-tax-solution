@@ -600,9 +600,9 @@ export function Prepare() {
             </p>
             {prepStep === 3 && (
               <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
-                <button className="btn btn-primary" type="button" onClick={() => actions.setPrepStep(4)}>
-                  Continue to review &amp; sign
-                </button>
+                <Link className="btn btn-primary" to="/app/taxpayer/final-review">
+                  Continue to checklist, return &amp; signatures
+                </Link>
                 <Link className="btn btn-secondary" to="/app/taxpayer/documents">
                   Documents still needed
                 </Link>
@@ -612,7 +612,10 @@ export function Prepare() {
           {prepStep === 4 && (
             <div className="list-panel panel">
               <h2>Verify → Authorize filing</h2>
-              <p className="muted">Review household, benefits, and fees before e-sign.</p>
+              <p className="muted">
+                Open the final review to view/print the calculated return, complete the document checklist, accept
+                separate disclosures, sign the locked version, then authorize e-file.
+              </p>
               {(mine?.feeSnapshot ?? []).map((f) => (
                 <div className="row-item" key={f.label}>
                   <div>
@@ -622,9 +625,9 @@ export function Prepare() {
                   <strong>{formatMoney(f.amount)}</strong>
                 </div>
               ))}
-              <button className="btn btn-primary" type="button" style={{ marginTop: '0.75rem' }} onClick={() => actions.signAndFile()}>
-                Approve, sign &amp; e-file
-              </button>
+              <Link className="btn btn-primary" to="/app/taxpayer/final-review" style={{ marginTop: '0.75rem' }}>
+                Open final review &amp; sign
+              </Link>
             </div>
           )}
         </section>

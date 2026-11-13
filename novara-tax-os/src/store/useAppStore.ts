@@ -83,6 +83,18 @@ import {
 } from '../engine/smartInterview'
 import { buildInterviewProgress, nextInterviewTurn } from '../engine/questionProgress'
 import {
+  acceptConsent,
+  captureSignature,
+  defaultFilingAuthState,
+  invalidateLockIfStale,
+  lockReturnVersion,
+  signatureLockStatus,
+  type ConsentKind,
+  type FilingAuthState,
+} from '../engine/filingAuthorizations'
+import type { WorkingReturnPacket } from '../engine/returnPacket'
+import { buildWorkingReturnPacket } from '../engine/returnPacket'
+import {
   classifyDocumentName,
   detectDocumentConflicts,
   extractFactsForType,
@@ -112,7 +124,7 @@ import {
 const ROLE_KEY = 'novara-tax-os-role'
 const USER_KEY = 'novara-tax-os-user-id'
 /** Session-scoped demo state (clears when the tab closes) */
-const SESSION_KEY = 'novara-tax-os-session-v12'
+const SESSION_KEY = 'novara-tax-os-session-v13'
 
 function money(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n)
@@ -300,6 +312,19 @@ function toSnapshot(profile: TaxpayerProfile, reason?: string): BenefitSnapshot 
   }
 }
 
+function syncSignaturesAfterProfileChange(profile: TaxpayerProfile, benefitReport: BenefitSnapshot | null) {
+  if (!state.filingAuth?.lockedVersion) return state.filingAuth
+  const packet = buildWorkingReturnPacket({
+    profile,
+    benefitReport,
+    clientName: state.currentUser?.name ?? 'Taxpayer',
+    locked: true,
+    lockedVersionId: state.filingAuth.lockedVersion.versionId,
+    lockedHash: state.filingAuth.lockedVersion.contentHash,
+  })
+  return invalidateLockIfStale(state.filingAuth, packet.contentHash)
+}
+
 function syncReturnRefund(report: BenefitSnapshot) {
   return state.returns.map((r) =>
     r.id === state.activeReturnId ||
@@ -455,6 +480,7 @@ let state: Store = {
   lastQaReport: null,
   calcAuditTrail: null,
   filingAuthorized: false,
+  filingAuth: null,
   hydrated: false,
 }
 
@@ -528,6 +554,7 @@ function hydrate() {
     sessionStorage.removeItem('novara-tax-os-session-v9')
     sessionStorage.removeItem('novara-tax-os-session-v10')
     sessionStorage.removeItem('novara-tax-os-session-v11')
+    sessionStorage.removeItem('novara-tax-os-session-v12')
 
     const role = localStorage.getItem(ROLE_KEY) as Role | null
     const userId = localStorage.getItem(USER_KEY)
@@ -565,6 +592,7 @@ function hydrate() {
         lastQaReport: parsed.lastQaReport ?? null,
         calcAuditTrail: parsed.calcAuditTrail ?? null,
         filingAuthorized: parsed.filingAuthorized ?? false,
+        filingAuth: parsed.filingAuth ?? null,
         returns: scoped.returns,
         documents: scoped.documents,
         benefitReport,
@@ -1269,6 +1297,7 @@ export const actions = {
       interviewChat: [...state.interviewChat, userMsg, ...assistantMsgs],
       interviewAnswers: recordInterviewAnswer(mapsTo, questionPrompt, value),
       interviewFocusMapsTo: nextTurn?.mapsTo ?? null,
+      filingAuth: syncSignaturesAfterProfileChange(taxProfile, benefitReport),
       auditEvents: appendAudit('interview_answer', `Confirmed interview answer for ${mapsTo} (answer text omitted from audit when sensitive).`, {
         mapsTo,
         taxYear: state.activeTaxYear,
@@ -1372,6 +1401,27 @@ export const actions = {
       return
     }
     const year = state.activeTaxYear
+    // Require locked signed version when filingAuth workflow is in use
+    if (state.filingAuth) {
+      const packet = buildWorkingReturnPacket({
+        profile: state.taxProfile,
+        benefitReport: state.benefitReport,
+        clientName: state.currentUser?.name ?? 'Taxpayer',
+        locked: Boolean(state.filingAuth.lockedVersion),
+        lockedVersionId: state.filingAuth.lockedVersion?.versionId,
+        lockedHash: state.filingAuth.lockedVersion?.contentHash,
+      })
+      const lock = signatureLockStatus(state.filingAuth, packet.contentHash)
+      if (!lock.valid) {
+        actions.addMessage('system', lock.reason ?? 'Signatures required before filing.')
+        state = {
+          ...state,
+          auditEvents: appendAudit('transmit_blocked_signature', lock.reason ?? 'signature gate', {}),
+        }
+        emit()
+        return
+      }
+    }
     state = { ...state, filingAuthorized: true }
     const qa = runPreFilingQa({
       profile: state.taxProfile,
@@ -1970,6 +2020,7 @@ export const actions = {
       returns: syncReturnRefund(benefitReport),
       interviewAnswers: recordInterviewAnswer(mapsTo, prompt ?? mapsTo, display as string | number),
       interviewFocusMapsTo: nextTurn?.mapsTo ?? null,
+      filingAuth: syncSignaturesAfterProfileChange(taxProfile, benefitReport),
       interviewChat: [
         ...state.interviewChat,
         {
@@ -2174,6 +2225,7 @@ export const actions = {
       lastQaReport: null,
       calcAuditTrail: null,
       filingAuthorized: false,
+      filingAuth: null,
       hydrated: true,
     }
     emit()
@@ -2331,6 +2383,127 @@ export const actions = {
       currentTaxYear: season.currentTaxYear,
       seasonYear: season.seasonYear,
     })
+  },
+  ensureFilingAuth(opts: { spouseRequired: boolean }) {
+    if (state.filingAuth && state.filingAuth.spouseRequired === opts.spouseRequired) return state.filingAuth
+    const filingAuth = defaultFilingAuthState(opts)
+    state = { ...state, filingAuth }
+    emit()
+    return filingAuth
+  },
+  acceptFilingConsent(kind: ConsentKind, signerName: string) {
+    const base = state.filingAuth ?? defaultFilingAuthState({ spouseRequired: state.taxProfile.filingStatus === 'mfj' })
+    state = {
+      ...state,
+      filingAuth: acceptConsent(base, kind, signerName),
+      auditEvents: appendAudit('consent_accepted', `Accepted consent ${kind}`, {
+        kind,
+        version: base.disclosuresVersion,
+      }),
+    }
+    emit()
+  },
+  revokeFilingConsent(kind: ConsentKind) {
+    if (!state.filingAuth) return
+    const filingAuth: FilingAuthState = {
+      ...state.filingAuth,
+      consents: state.filingAuth.consents.map((c) =>
+        c.kind === kind ? { ...c, accepted: false, acceptedAt: undefined, signerName: undefined } : c,
+      ),
+    }
+    state = { ...state, filingAuth, filingAuthorized: false }
+    emit()
+  },
+  lockAndSignReturn(input: {
+    role: 'primary' | 'spouse' | 'preparer'
+    typedName: string
+    packet: WorkingReturnPacket
+  }): { ok: true } | { ok: false; error: string } {
+    if (!input.typedName.trim()) return { ok: false, error: 'Signature name required.' }
+    let filingAuth =
+      state.filingAuth ?? defaultFilingAuthState({ spouseRequired: state.taxProfile.filingStatus === 'mfj' })
+    // Refresh stale lock against current packet
+    filingAuth = invalidateLockIfStale(filingAuth, input.packet.contentHash)
+    if (input.role === 'primary') {
+      filingAuth = lockReturnVersion(filingAuth, {
+        versionId: input.packet.versionId,
+        contentHash: input.packet.contentHash,
+        lockedAt: new Date().toISOString(),
+        lockedByUserId: state.currentUser?.id ?? 'unknown',
+        taxYear: input.packet.taxYear,
+        projectedRefund: input.packet.summary.projectedRefund,
+      })
+    } else if (!filingAuth.lockedVersion) {
+      return { ok: false, error: 'Primary taxpayer must lock and sign first.' }
+    } else if (filingAuth.lockedVersion.contentHash !== input.packet.contentHash) {
+      return { ok: false, error: 'Return changed — primary must re-lock before spouse signs.' }
+    }
+    filingAuth = captureSignature(filingAuth, {
+      role: input.role,
+      signerName: input.typedName.trim(),
+      typedName: input.typedName.trim(),
+      method: 'typed_name',
+      versionId: filingAuth.lockedVersion?.versionId ?? input.packet.versionId,
+      contentHash: input.packet.contentHash,
+    })
+    const returns = state.returns.map((r) =>
+      r.id === state.activeReturnId || (r.clientId === state.currentUser?.id && r.taxYear === state.activeTaxYear)
+        ? { ...r, state: 'Signature Pending' as ReturnState, updatedAt: new Date().toISOString() }
+        : r,
+    )
+    state = {
+      ...state,
+      filingAuth,
+      returns,
+      prepStep: Math.max(state.prepStep, 4),
+      auditEvents: appendAudit('return_signed', `${input.role} signed return version`, {
+        role: input.role,
+        versionId: filingAuth.lockedVersion?.versionId ?? '',
+        hash: input.packet.contentHash,
+      }),
+    }
+    emit()
+    return { ok: true }
+  },
+  finalizeAndFile(): { ok: true; message: string } | { ok: false; error: string } {
+    const packet = buildWorkingReturnPacket({
+      profile: state.taxProfile,
+      benefitReport: state.benefitReport,
+      clientName: state.currentUser?.name ?? 'Taxpayer',
+      locked: Boolean(state.filingAuth?.lockedVersion),
+      lockedVersionId: state.filingAuth?.lockedVersion?.versionId,
+      lockedHash: state.filingAuth?.lockedVersion?.contentHash,
+    })
+    let filingAuth = state.filingAuth
+    if (!filingAuth) return { ok: false, error: 'Load disclosures and sign before filing.' }
+    filingAuth = invalidateLockIfStale(filingAuth, packet.contentHash)
+    const lock = signatureLockStatus(filingAuth, packet.contentHash)
+    if (!lock.valid) {
+      state = { ...state, filingAuth }
+      emit()
+      return { ok: false, error: lock.reason ?? 'Signatures incomplete.' }
+    }
+    state = {
+      ...state,
+      filingAuth,
+      filingAuthorized: true,
+      benefitReviewSigned: state.benefitReviewSigned || true,
+    }
+    // Reuse QA + sandbox transmit path
+    actions.signAndFile()
+    if (state.returns.some((r) => r.state === 'Transmitted' || r.state === 'Accepted')) {
+      return {
+        ok: true,
+        message: 'Sandbox e-file submitted for the locked return version. Track acceptance in your vault status.',
+      }
+    }
+    // signAndFile may have blocked on QA
+    const qa = state.lastQaReport
+    if (qa && !qa.canFile) return { ok: false, error: qa.summary }
+    return {
+      ok: true,
+      message: 'Filing workflow invoked for locked return (sandbox). Check messages for provider response.',
+    }
   },
   runQaCheck() {
     const active =

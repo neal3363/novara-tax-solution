@@ -333,4 +333,6 @@ export interface AppState {
   calcAuditTrail: import('../engine/calcAuditTrail').CalcAuditTrail | null
   /** Filing authorization captured after review */
   filingAuthorized: boolean
+  /** Separate consents, signatures, and locked return version */
+  filingAuth: import('../engine/filingAuthorizations').FilingAuthState | null
 }
