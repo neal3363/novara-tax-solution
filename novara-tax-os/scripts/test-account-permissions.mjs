@@ -21,6 +21,7 @@ import {
   submitCredential,
   isValidPtinFormat,
   isValidEfinFormat,
+  credentialFingerprint,
   decryptCredentialValue,
   isCredentialVerified,
   completeAuthorizedVerification,
@@ -68,8 +69,11 @@ assert(!isValidEfinFormat('12345'), 'Short EFIN rejected')
 const submitted = submitCredential('ptin', 'P11112222')
 assert(submitted.ok && submitted.credential.status === 'pending_verification', 'Manual PTIN is pending, not verified')
 assert(!isCredentialVerified(submitted.ok ? submitted.credential : null), 'Manual entry not verified')
-const decrypted = submitted.ok ? decryptCredentialValue(submitted.credential.valueEncrypted) : null
-assert(decrypted === 'P11112222', 'Encrypted credential round-trips')
+assert(submitted.ok && submitted.credential.valueFingerprint.startsWith('fp_'), 'Fingerprint stored, not plaintext')
+assert(submitted.ok && !('valueEncrypted' in submitted.credential), 'No recoverable encrypted payload')
+assert(submitted.ok && decryptCredentialValue('anything') === null, 'Decrypt API disabled')
+assert(credentialFingerprint('P11112222') === credentialFingerprint('P11112222'), 'Fingerprint deterministic')
+assert(credentialFingerprint('P11112222') !== credentialFingerprint('P11112223'), 'Fingerprint differs by value')
 const verified = completeAuthorizedVerification(submitted.ok ? submitted.credential : submitted as never, true)
 assert(verified.status === 'verified' && verified.method === 'irs_lookup_verified', 'Only authorized process verifies')
 

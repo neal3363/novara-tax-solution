@@ -35,8 +35,11 @@ export function TaxpayerHome() {
           <Link className="btn btn-secondary" to="/app/taxpayer/years">
             Multi-year dashboard
           </Link>
-          <Link className="btn btn-primary" to="/app/taxpayer/prepare">
-            {prepStep === 0 ? 'Start My Taxes' : 'Continue preparation'}
+          <Link className="btn btn-secondary" to="/app/taxpayer/import">
+            Import prior return
+          </Link>
+          <Link className="btn btn-primary" to="/app/taxpayer/assistant">
+            {prepStep === 0 ? 'Start with AI assistant' : 'Continue with AI'}
           </Link>
         </div>
       </header>

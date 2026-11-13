@@ -22,9 +22,9 @@ export function AppNav() {
     currentUser.role === 'taxpayer'
       ? [
           { to: '/app/taxpayer', label: 'Home' },
+          { to: '/app/taxpayer/assistant', label: 'Assistant' },
           { to: '/app/taxpayer/years', label: 'Years' },
           { to: '/app/taxpayer/prepare', label: 'Prepare' },
-          { to: '/app/taxpayer/dependents', label: 'Dependents' },
           { to: '/app/taxpayer/benefits', label: 'Savings' },
           { to: '/app/taxpayer/vault', label: 'Vault' },
         ]
@@ -32,16 +32,17 @@ export function AppNav() {
         ? [
             { to: '/app/preparer', label: 'Inbox' },
             { to: '/app/preparer/clients', label: 'Clients' },
+            { to: '/app/preparer/request-docs', label: 'Request' },
             { to: '/app/preparer/workspace', label: 'Workspace' },
             { to: '/app/preparer/return', label: 'Return' },
             { to: '/app/preparer/benefits', label: 'Benefits' },
-            { to: '/app/preparer/entry-plan', label: 'Entry' },
           ]
         : currentUser.role === 'efin_owner'
           ? [
               { to: '/app/office', label: 'Office' },
               { to: '/app/office/staff', label: 'Staff' },
               { to: '/app/office/pipeline', label: 'Pipeline' },
+              { to: '/app/office/request-docs', label: 'Request' },
               { to: '/app/fees', label: 'Pricing' },
             ]
           : [
