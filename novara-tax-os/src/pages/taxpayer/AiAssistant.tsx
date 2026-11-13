@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DragEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { actions, useAppStore } from '../../store/useAppStore'
@@ -6,7 +6,7 @@ import { formatMoney } from '../../data/fees'
 import { RefundTracker } from '../../components/benefits/RefundTracker'
 import { InterviewChoice } from '../../components/interview/InterviewChoice'
 import { VoiceInput } from '../../components/VoiceInput'
-import { nextInterviewTurn } from '../../engine/questionProgress'
+import { resolveInterviewTurn } from '../../engine/questionProgress'
 import { QuestionOverview, QuestionProgressBar } from '../../components/interview/QuestionProgress'
 import {
   DOCUMENT_REQUESTS,
@@ -32,8 +32,10 @@ export function AiAssistant() {
     activeTaxYear,
     returns,
     benefitReviewSigned,
+    interviewFocusMapsTo,
   } = useAppStore()
   const inputRef = useRef<HTMLInputElement>(null)
+  const answerPanelRef = useRef<HTMLDivElement>(null)
   const [drag, setDrag] = useState(false)
   const [typed, setTyped] = useState('')
   const [pendingVoice, setPendingVoice] = useState<string | null>(null)
@@ -54,15 +56,33 @@ export function AiAssistant() {
     [taxProfile, documents, mine, benefitReviewSigned],
   )
 
-  const activeTurn = nextInterviewTurn(taxProfile)
+  const activeTurn = resolveInterviewTurn(taxProfile, interviewFocusMapsTo)
 
   const rel = nextRelationshipPrompt(householdIntake)
+
+  useEffect(() => {
+    if (!activeTurn) return
+    answerPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [activeTurn?.id, activeTurn?.mapsTo, interviewFocusMapsTo])
+
+  function openUnanswered(mapsTo: string) {
+    actions.focusInterviewQuestion(mapsTo)
+    // scroll runs after store emit + resolve in the effect above
+    requestAnimationFrame(() => {
+      answerPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
+  }
 
   async function submitAnswer(value: string | number) {
     if (!activeTurn || saving) return
     setSaving(true)
     try {
-      if (activeTurn.phase === 'dependents' || activeTurn.mapsTo.startsWith('dep_') || activeTurn.mapsTo === 'potential_dependents' || activeTurn.mapsTo === 'dependent_count') {
+      if (
+        activeTurn.phase === 'dependents' ||
+        activeTurn.mapsTo.startsWith('dep_') ||
+        activeTurn.mapsTo === 'potential_dependents' ||
+        activeTurn.mapsTo === 'dependent_count'
+      ) {
         actions.answerDependentQuestion(activeTurn.mapsTo, value, activeTurn.prompt)
       } else {
         actions.answerSmartInterview(activeTurn.mapsTo, value, activeTurn.prompt)
@@ -203,26 +223,47 @@ export function AiAssistant() {
           ))}
         </div>
 
-        {activeTurn ? (
-          <InterviewChoice
-            key={activeTurn.id}
-            questionId={activeTurn.id}
-            mapsTo={activeTurn.mapsTo}
-            prompt={activeTurn.prompt}
-            kind={activeTurn.kind}
-            choices={activeTurn.choices}
-            saving={saving}
-            onConfirm={(v) => void submitAnswer(v)}
-          />
-        ) : (
-          <p className="muted">No required question right now. Upload more docs or continue to review.</p>
-        )}
         <QuestionOverview
           profile={taxProfile}
-          focusMapsTo={activeTurn?.mapsTo}
-          onSelectUnanswered={(q) => actions.focusInterviewQuestion(q.mapsTo)}
-          onEditAnswered={(mapsTo) => actions.editInterviewAnswer(mapsTo)}
+          focusMapsTo={activeTurn?.mapsTo ?? interviewFocusMapsTo}
+          onSelectUnanswered={(q) => openUnanswered(q.mapsTo)}
+          onEditAnswered={(mapsTo) => {
+            actions.editInterviewAnswer(mapsTo)
+            requestAnimationFrame(() => {
+              answerPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            })
+          }}
         />
+
+        <div
+          className="active-turn"
+          id="assistant-active-answer"
+          ref={answerPanelRef}
+          style={{ marginTop: '1rem', scrollMarginTop: '5rem' }}
+        >
+          {activeTurn ? (
+            <>
+              <p className="turn-label" style={{ marginTop: 0 }}>
+                Answer here · tap Yes/No or type, then Answer
+              </p>
+              <InterviewChoice
+                key={activeTurn.id}
+                questionId={activeTurn.id}
+                mapsTo={activeTurn.mapsTo}
+                prompt={activeTurn.prompt}
+                kind={activeTurn.kind}
+                choices={activeTurn.choices}
+                saving={saving}
+                onConfirm={(v) => void submitAnswer(v)}
+              />
+            </>
+          ) : (
+            <p className="muted">
+              No required interview question right now. Use{' '}
+              <Link to="/app/taxpayer/benefits">Benefits</Link> for optional questionnaires, or continue to review.
+            </p>
+          )}
+        </div>
 
         <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap', marginTop: '0.75rem', alignItems: 'flex-end' }}>
           <div className="field" style={{ flex: 1, minWidth: 180 }}>

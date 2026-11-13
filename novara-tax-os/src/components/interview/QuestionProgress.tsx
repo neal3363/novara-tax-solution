@@ -112,7 +112,12 @@ export function QuestionOverview({
                   </p>
                 </div>
                 {q.status === 'unanswered' || q.status === 'awaiting_verification' ? (
-                  <button className="btn btn-secondary" type="button" onClick={() => onSelectUnanswered(q)}>
+                  <button
+                    className="btn btn-secondary"
+                    type="button"
+                    aria-label={`Open answer controls for: ${q.prompt}`}
+                    onClick={() => onSelectUnanswered(q)}
+                  >
                     Answer
                   </button>
                 ) : (

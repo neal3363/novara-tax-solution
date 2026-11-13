@@ -17,7 +17,9 @@ import { applyFilingStatusAnswer, nextFilingStatusTurn } from '../src/engine/sma
 import { nextDependentQuestion, applyDependentAnswer } from '../src/engine/dependentsEngine.ts'
 import {
   buildInterviewProgress,
+  groupProgressByCategory,
   nextInterviewTurn,
+  resolveInterviewTurn,
 } from '../src/engine/questionProgress.ts'
 
 let failed = 0
@@ -128,6 +130,33 @@ console.log('=== Greeting format ===')
   p = applyFilingStatusAnswer(p, 'married_dec31', 'No')
   const g = buildInterviewProgress(p).greeting
   assert(g.includes('completed') || g.includes('questions'), 'greeting mentions progress: ' + g)
+}
+
+console.log('=== Assistant overview does not dump unstarted benefit questionnaires ===')
+{
+  let p = defaultProfile()
+  p = applyFilingStatusAnswer(p, 'married_dec31', 'No')
+  p = applyFilingStatusAnswer(p, 'potential_dependents', 'no')
+  const progress = buildInterviewProgress(p)
+  const specific = progress.questions.filter((q) => q.category === 'benefit_specific')
+  assert(specific.length === 0, 'no unstarted benefit-specific questions in overview (got ' + specific.length + ')')
+  const groups = groupProgressByCategory(progress)
+  assert(!groups.some((g) => g.label === 'Business mileage' && g.total >= 10), 'no fake Business mileage (0/15) wall')
+  const turn = resolveInterviewTurn(p, null)
+  assert(Boolean(turn), 'still has a linear next discovery turn')
+  assert(turn?.category === 'benefit_discovery' || turn?.phase === 'benefits', 'next is benefit discovery not phantom specific')
+}
+
+console.log('=== Answer focus resolves a discovery turn ===')
+{
+  let p = defaultProfile()
+  p = applyFilingStatusAnswer(p, 'married_dec31', 'No')
+  p = applyFilingStatusAnswer(p, 'potential_dependents', 'no')
+  const next = nextInterviewTurn(p)
+  assert(Boolean(next?.mapsTo), 'has next mapsTo')
+  const focused = resolveInterviewTurn(p, next!.mapsTo)
+  assert(focused?.mapsTo === next!.mapsTo, 'focus resolves same turn')
+  assert(Boolean(focused?.kind), 'focused turn has kind for InterviewChoice')
 }
 
 if (failed) {

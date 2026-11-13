@@ -7,10 +7,6 @@
 import { answerPresent } from './benefitAnswers'
 import type { TaxpayerProfile } from './benefitOptimizer'
 import { nextInterviewQuestions, runBenefitOptimization } from './benefitOptimizer'
-import {
-  nextBenefitSpecificQuestion,
-  listSupportedBenefitQuestionnaires,
-} from './benefitQuestionnaires'
 import { applyDependentAnswer, emptyDependent, nextDependentQuestion } from './dependentsEngine'
 import { nextBenefitDiscoveryTurn, nextFilingStatusTurn } from './smartInterview'
 
@@ -254,24 +250,10 @@ export function buildInterviewProgress(profile: TaxpayerProfile): InterviewProgr
     }
   }
 
-  // Open benefit-specific questionnaires that have started or have remaining questions triggered
-  for (const catalog of listSupportedBenefitQuestionnaires()) {
-    const next = nextBenefitSpecificQuestion(catalog.ruleId, profile)
-    // Only include if questionnaire has any answered keys or a next question
-    const started = Object.keys(profile.answers).some((k) => k.startsWith(catalog.ruleId) || next)
-    if (!started && !next) continue
-    if (next && !seen.has(next.mapsTo)) {
-      push({
-        id: `ben:${catalog.ruleId}:${next.mapsTo}`,
-        mapsTo: next.mapsTo,
-        prompt: next.prompt,
-        category: 'benefit_specific',
-        categoryLabel: catalog.title,
-        status: 'unanswered',
-        benefitRuleId: catalog.ruleId,
-      })
-    }
-  }
+  // Benefit-specific questionnaires live on /app/taxpayer/benefits/:ruleId — not in the
+  // Assistant/Prepare overview. Listing every catalog's first question here produced a
+  // "Business mileage (0/15)" wall of Answer buttons that never opened InterviewChoice.
+  // Keep discovery probes (above) as the overview's tax-benefit section.
 
   const applicable = questions.filter((q) => q.status !== 'not_applicable')
   const answeredCount = applicable.filter((q) => q.status === 'answered').length
@@ -325,26 +307,109 @@ export function buildInterviewProgress(profile: TaxpayerProfile): InterviewProgr
   }
 }
 
-/** Group questions by category for overview UI */
+/** Group questions by category for overview UI (benefit-specific split by questionnaire title). */
 export function groupProgressByCategory(progress: InterviewProgress) {
   const order: QuestionCategory[] = ['filing_status', 'dependents', 'benefit_discovery', 'benefit_specific']
-  return order
-    .map((cat) => {
-      const items = progress.questions.filter((q) => q.category === cat)
-      if (items.length === 0) return null
-      return {
-        category: cat,
-        label: items[0].categoryLabel,
-        items,
-        answered: items.filter((i) => i.status === 'answered').length,
-        total: items.length,
-      }
-    })
-    .filter(Boolean) as {
+  const groups: {
     category: QuestionCategory
     label: string
     items: ProgressQuestion[]
     answered: number
     total: number
-  }[]
+  }[] = []
+
+  for (const cat of order) {
+    const items = progress.questions.filter((q) => q.category === cat)
+    if (items.length === 0) continue
+    if (cat !== 'benefit_specific') {
+      groups.push({
+        category: cat,
+        label: items[0].categoryLabel,
+        items,
+        answered: items.filter((i) => i.status === 'answered').length,
+        total: items.length,
+      })
+      continue
+    }
+    const byLabel = new Map<string, ProgressQuestion[]>()
+    for (const q of items) {
+      const list = byLabel.get(q.categoryLabel) ?? []
+      list.push(q)
+      byLabel.set(q.categoryLabel, list)
+    }
+    for (const [label, groupItems] of byLabel) {
+      groups.push({
+        category: cat,
+        label,
+        items: groupItems,
+        answered: groupItems.filter((i) => i.status === 'answered').length,
+        total: groupItems.length,
+      })
+    }
+  }
+
+  return groups
+}
+
+export type ResolvedInterviewTurn = {
+  id: string
+  phase: 'filing_status' | 'dependents' | 'benefits'
+  category: QuestionCategory
+  prompt: string
+  kind: 'yesno' | 'choice' | 'number' | 'text' | 'date'
+  choices?: string[]
+  mapsTo: string
+  aiLead?: string
+  benefitRuleId?: string
+}
+
+/** Resolve a concrete answerable turn for next-unanswered or a focused mapsTo. */
+export function resolveInterviewTurn(
+  profile: TaxpayerProfile,
+  focusMapsTo?: string | null,
+): ResolvedInterviewTurn | null {
+  const linear = nextInterviewTurn(profile)
+  if (!focusMapsTo || !focusMapsTo.trim()) return linear
+
+  if (linear && linear.mapsTo === focusMapsTo) return linear
+
+  // Filing status prompts
+  const filing = nextFilingStatusTurn(profile)
+  if (filing && filing.mapsTo === focusMapsTo) {
+    return { ...filing, category: 'filing_status' }
+  }
+
+  // Dependent interview — only if it is the current open dependent question
+  const depQ = nextDependentQuestion(profile.answers, profile.dependents)
+  if (depQ && depQ.mapsTo === focusMapsTo) {
+    return {
+      id: depQ.id,
+      phase: 'dependents',
+      category: 'dependents',
+      prompt: depQ.prompt,
+      kind: depQ.kind as 'yesno' | 'choice' | 'number' | 'text' | 'date',
+      choices: depQ.choices,
+      mapsTo: depQ.mapsTo,
+      aiLead: 'We need exact dependent facts before any dependent credit can change a verified refund.',
+    }
+  }
+
+  // Benefit discovery — allow answering a listed discovery question even if not first in queue
+  const report = runBenefitOptimization(profile)
+  const discovery = nextInterviewQuestions(profile, report).find((q) => q.mapsTo === focusMapsTo)
+  if (discovery && !answerPresent(profile, focusMapsTo) && !profile.unresolvedKeys.includes(focusMapsTo)) {
+    return {
+      id: discovery.id,
+      phase: 'benefits',
+      category: 'benefit_discovery',
+      prompt: discovery.prompt,
+      kind: discovery.kind as 'yesno' | 'choice' | 'number' | 'text' | 'date',
+      choices: discovery.choices ?? (discovery.kind === 'yesno' ? ['Yes', 'No'] : undefined),
+      mapsTo: discovery.mapsTo,
+      aiLead: 'Answer this tax benefit question to continue.',
+    }
+  }
+
+  // Focused question not answerable in this screen — fall back to linear next
+  return linear
 }
