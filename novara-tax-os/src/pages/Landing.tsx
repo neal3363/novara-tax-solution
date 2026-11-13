@@ -119,25 +119,27 @@ export function Landing() {
 
           <div className="hero-copy">
             <p className="hero-brand brand rise">NOVARA TAX OS</p>
-            <h1 className="rise rise-delay-1">AI-Powered Tax Preparation Made Simple</h1>
-            <p className="hero-tagline rise rise-delay-2">Upload It. Answer Questions. Maximize Your Refund.</p>
+            <h1 className="rise rise-delay-1">Speak It. Upload It. File It.</h1>
+            <p className="hero-tagline rise rise-delay-2">
+              Tell NOVARA what you’re filing, upload your documents, and answer only the questions we still need.
+            </p>
             <p className="lead rise rise-delay-2">
-              No tax forms to fill out. No complicated data entry. No guessing which tax deductions you qualify for.
+              Voice, typing, and uploads share one interview — switch anytime. Tax math stays on the verified engine, not
+              conversational guesses.
             </p>
             <p className="lead soft rise rise-delay-3">
-              NOVARA’s AI reads your documents, prepares your return, asks intelligent questions, and searches for every
-              potentially available tax benefit to help maximize your legal refund.
+              Start speaking, drop a W-2, type a correction, then finish by voice again — all on the same return.
             </p>
             <div className="hero-actions rise rise-delay-3">
-              <Link className="btn btn-primary hero-solid" to="/register/tc">
-                Start My Tax Return
+              <Link className="btn btn-primary hero-solid" to="/login?next=/app/taxpayer/assistant&mode=speak">
+                Start Speaking
               </Link>
-              <Link className="btn btn-secondary landing-ghost" to="/register">
-                I’m a Tax Professional
+              <Link className="btn btn-secondary landing-ghost" to="/login?next=/app/taxpayer/assistant&mode=upload">
+                Upload Documents
               </Link>
-              <a className="btn btn-ghost landing-ghost" href="#features">
-                Explore Features
-              </a>
+              <Link className="btn btn-ghost landing-ghost" to="/login?next=/app/taxpayer/assistant&mode=type">
+                Type to NOVARA
+              </Link>
             </div>
           </div>
         </div>

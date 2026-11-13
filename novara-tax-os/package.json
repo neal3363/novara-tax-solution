@@ -21,7 +21,8 @@
     "test:filing": "node scripts/test-final-filing.mjs",
     "test:publish-security": "node scripts/test-publish-security.mjs",
     "test:dep-name": "node scripts/test-dependent-name-answer.mjs",
-    "test:questionnaire": "node scripts/test-questionnaire-e2e.mjs"
+    "test:questionnaire": "node scripts/test-questionnaire-e2e.mjs",
+    "test:conversation": "node scripts/test-conversation-intent.mjs"
   },
   "dependencies": {
     "@fontsource/figtree": "^5.3.0",
