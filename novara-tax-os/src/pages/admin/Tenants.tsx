@@ -1,19 +1,13 @@
 import '../shared.css'
 
+/** Admin placeholder rows — no live multi-tenant PII. */
 const TENANTS = [
   {
-    id: 'tenant-summit',
-    name: 'Summit Tax Office',
-    efin: 'EFIN ****4521',
-    tier: 'Starter Office ($899 floor)',
-    users: 4,
-  },
-  {
-    id: 'tenant-novara-direct',
-    name: 'NOVARA Direct Consumer',
+    id: 'tenant-platform',
+    name: 'NOVARA platform',
     efin: 'Platform ERO path',
-    tier: 'Consumer service',
-    users: 1,
+    tier: 'Internal',
+    users: 0,
   },
 ]
 
@@ -24,6 +18,7 @@ export function Tenants() {
         <div>
           <p className="eyebrow">Tenant management</p>
           <h1>Offices & channels</h1>
+          <p className="muted">Live office tenants appear here after registration — this view does not embed other customers’ data.</p>
         </div>
       </header>
       <section className="list-panel panel rise">

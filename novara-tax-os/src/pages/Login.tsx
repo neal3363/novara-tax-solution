@@ -1,116 +1,51 @@
-import { useMemo } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { lazy, Suspense, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { BrandMark } from '../components/BrandMark'
-import { DEMO_USERS } from '../data/seed'
 import { actions } from '../store/useAppStore'
-import type { Role } from '../data/types'
-import {
-  OFFICE_BUSINESS_FEE,
-  OFFICE_PERSONAL_FEE,
-  OFFICE_SUBSCRIPTION_FLOOR,
-  OFFICE_SUBSCRIPTION_HIGH,
-  TC_BUSINESS_FEE,
-  TC_PERSONAL_FEE,
-  TP_BUSINESS_FEE,
-  TP_PERSONAL_FEE,
-  TP_REGISTRATION_FEE,
-  UNLIMITED_CLIENTS_COPY,
-  formatMoney,
-} from '../data/fees'
+import { fetchViewerSession } from '../auth/sessionClient'
 import './Login.css'
 
-type DemoAccount = {
-  userId: string
-  role: Role
-  title: string
-  blurb: string
-  path: string
-  finds: string
-  intents: string[]
-}
+const IS_DEV = import.meta.env.DEV
 
-const ACCOUNTS: DemoAccount[] = [
-  {
-    userId: 'u-tax',
-    role: 'taxpayer',
-    title: 'TC — Tax Client',
-    blurb: `Personal ${formatMoney(TC_PERSONAL_FEE)} · Business ${formatMoney(TC_BUSINESS_FEE)}. Private vault for this engagement only.`,
-    finds: 'Prepare → Dependents → Savings',
-    path: '/app/taxpayer',
-    intents: ['taxpayer', 'file', 'start', 'tc'],
-  },
-  {
-    userId: 'u-prep',
-    role: 'preparer',
-    title: 'TP — Summit Tax (Alex)',
-    blurb: `Office preparer · assigned clients only · PTIN required · ${UNLIMITED_CLIENTS_COPY}.`,
-    finds: 'Return / Benefits / Entry',
-    path: '/app/preparer',
-    intents: ['professional', 'preparer', 'pro', 'tp', 'summit'],
-  },
-  {
-    userId: 'u-prep-solo',
-    role: 'preparer',
-    title: 'TP — Solo preparer (Taylor Kim)',
-    blurb: `Upfront ${formatMoney(TP_REGISTRATION_FEE)} · PTIN required · Personal ${formatMoney(TP_PERSONAL_FEE)} · Business ${formatMoney(TP_BUSINESS_FEE)}. ${UNLIMITED_CLIENTS_COPY}. Clients only — no staff management.`,
-    finds: 'Independent TP workspace',
-    path: '/app/preparer',
-    intents: ['professional', 'preparer', 'pro', 'tp', 'solo'],
-  },
-  {
-    userId: 'u-owner',
-    role: 'efin_owner',
-    title: 'Office — Summit Tax',
-    blurb: `EFIN required · Subscription ${formatMoney(OFFICE_SUBSCRIPTION_FLOOR)}–${formatMoney(OFFICE_SUBSCRIPTION_HIGH)} · Personal ${formatMoney(OFFICE_PERSONAL_FEE)} · Business ${formatMoney(OFFICE_BUSINESS_FEE)}. ${UNLIMITED_CLIENTS_COPY}. Preparers + clients.`,
-    finds: 'Staff, pipeline, pricing',
-    path: '/app/office',
-    intents: ['office', 'professional', 'pricing', 'efin', 'summit'],
-  },
-  {
-    userId: 'u-owner-lakes',
-    role: 'efin_owner',
-    title: 'Office — Lakeside Tax',
-    blurb: `Separate office tenant · EFIN · ${UNLIMITED_CLIENTS_COPY}. Preparers + clients — cannot see Summit.`,
-    finds: 'Isolated office workspace',
-    path: '/app/office',
-    intents: ['office', 'professional', 'pricing', 'efin', 'lakeside'],
-  },
-  {
-    userId: 'u-admin',
-    role: 'admin',
-    title: 'NOVARA administrator',
-    blurb: 'Subscriptions & flags only — no default access to taxpayer documents.',
-    finds: 'Fee Catalog mirrors centralized pricing',
-    path: '/app/admin',
-    intents: ['admin'],
-  },
-]
+/** Role picker lives in a DEV-only chunk — never shipped in production. */
+const LoginDev = IS_DEV ? lazy(() => import('./LoginDev').then((m) => ({ default: m.LoginDev }))) : null
 
 export function Login() {
   const navigate = useNavigate()
-  const [params] = useSearchParams()
-  const intent = (params.get('intent') || '').toLowerCase()
+  const [busy, setBusy] = useState(!IS_DEV)
+  const [error, setError] = useState<string | null>(null)
 
-  const ordered = useMemo(() => {
-    if (!intent) return ACCOUNTS
-    if (intent === 'pricing') {
-      return [...ACCOUNTS].sort((a, b) => Number(b.role === 'efin_owner') - Number(a.role === 'efin_owner'))
+  useEffect(() => {
+    if (IS_DEV) return
+    let cancelled = false
+    ;(async () => {
+      setBusy(true)
+      const session = await fetchViewerSession()
+      if (cancelled) return
+      if (!session.verified) {
+        setError(
+          session.error === 'unauthorized'
+            ? 'Sign in with Cursor to open this private app.'
+            : `Could not verify session (${session.error}).`,
+        )
+        setBusy(false)
+        return
+      }
+      actions.loginWithVerifiedViewer(session)
+      navigate('/app/taxpayer', { replace: true })
+    })()
+    return () => {
+      cancelled = true
     }
-    return [...ACCOUNTS].sort((a, b) => {
-      const as = a.intents.includes(intent) ? 1 : 0
-      const bs = b.intents.includes(intent) ? 1 : 0
-      return bs - as
-    })
-  }, [intent])
+  }, [navigate])
 
-  const heading =
-    intent === 'taxpayer' || intent === 'file' || intent === 'start' || intent === 'tc'
-      ? 'TC — start your tax return'
-      : intent === 'office' || intent === 'pricing'
-        ? 'Office — open your tax office'
-        : intent === 'professional' || intent === 'preparer' || intent === 'pro' || intent === 'tp'
-          ? 'TP — continue as a tax preparer'
-          : 'Sign in or choose a demo role'
+  if (IS_DEV && LoginDev) {
+    return (
+      <Suspense fallback={<div className="login-page container">Loading local login…</div>}>
+        <LoginDev />
+      </Suspense>
+    )
+  }
 
   return (
     <div className="login-page">
@@ -119,40 +54,19 @@ export function Login() {
           <BrandMark size={52} />
           <div>
             <h1 className="brand">NOVARA</h1>
-            <p>
-              {heading}. Each demo account is a separate tenant — clients, returns, and vault files never cross. Prefer the{' '}
-              <Link to="/register">registration</Link> flow for tier pricing and test-mode checkout.
-            </p>
+            <p>Private sandbox — opening your personal tax workspace after Cursor verifies you.</p>
           </div>
         </div>
-        <div className="role-grid">
-          {ordered.map((r, i) => {
-            const user = DEMO_USERS.find((u) => u.id === r.userId)
-            return (
-              <button
-                key={r.userId}
-                type="button"
-                className={`role-card panel rise rise-delay-${Math.min(i + 1, 3)} ${
-                  intent && r.intents.includes(intent) ? 'suggested' : ''
-                }`}
-                onClick={() => {
-                  actions.loginAs(r.role, r.userId)
-                  navigate(intent === 'pricing' && r.role === 'efin_owner' ? '/app/fees' : r.path)
-                }}
-              >
-                <strong>{r.title}</strong>
-                <span>{r.blurb}</span>
-                <em className="role-finds">
-                  {r.finds}
-                  {user ? ` · ${user.tenantId}` : ''}
-                </em>
-              </button>
-            )
-          })}
-        </div>
-        <p className="muted" style={{ margin: 0 }}>
-          New here? <Link to="/register">Create a TC, TP, or Office account</Link>
-        </p>
+        {busy && <p className="muted">Verifying your Cursor session…</p>}
+        {error && (
+          <div className="panel">
+            <p>{error}</p>
+            <p className="muted">This app is private. Open it while signed in to Cursor, then retry.</p>
+            <button className="btn btn-primary" type="button" onClick={() => window.location.reload()}>
+              Retry
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

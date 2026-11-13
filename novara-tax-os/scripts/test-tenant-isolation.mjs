@@ -9,7 +9,7 @@ mkdirSync(tmp, { recursive: true })
 writeFileSync(
   join(tmp, 'run.ts'),
   `
-import { DEMO_USERS, SEED_DOCS, SEED_RETURNS } from '../src/data/seed.ts'
+import { DEV_DEMO_USERS, DEV_SEED_DOCS, DEV_SEED_RETURNS } from '../src/data/seed.dev.ts'
 import {
   asScopedDocument,
   asScopedReturn,
@@ -30,15 +30,15 @@ function assert(c: boolean, m: string) {
   if (!c) { console.error('FAIL', m); failed++ } else console.log('OK', m)
 }
 
-const returns = SEED_RETURNS.map(asScopedReturn)
-const docs = SEED_DOCS.map(asScopedDocument)
+const returns = DEV_SEED_RETURNS.map(asScopedReturn)
+const docs = DEV_SEED_DOCS.map(asScopedDocument)
 
-const alex = DEMO_USERS.find((u) => u.id === 'u-prep')!
-const kim = DEMO_USERS.find((u) => u.id === 'u-prep-solo')!
-const summitOwner = DEMO_USERS.find((u) => u.id === 'u-owner')!
-const lakesOwner = DEMO_USERS.find((u) => u.id === 'u-owner-lakes')!
-const jordan = DEMO_USERS.find((u) => u.id === 'u-tax')!
-const admin = DEMO_USERS.find((u) => u.id === 'u-admin')!
+const alex = DEV_DEMO_USERS.find((u) => u.id === 'u-prep')!
+const kim = DEV_DEMO_USERS.find((u) => u.id === 'u-prep-solo')!
+const summitOwner = DEV_DEMO_USERS.find((u) => u.id === 'u-owner')!
+const lakesOwner = DEV_DEMO_USERS.find((u) => u.id === 'u-owner-lakes')!
+const jordan = DEV_DEMO_USERS.find((u) => u.id === 'u-tax')!
+const admin = DEV_DEMO_USERS.find((u) => u.id === 'u-admin')!
 
 console.log('=== Cross-tenant return denial ===')
 const kimReturn = returns.find((r) => r.id === 'r-2001')!

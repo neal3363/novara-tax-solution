@@ -26,7 +26,7 @@ import { mapReturnToOfficeStatus, officeDashboardMetrics, OFFICE_PIPELINE_STATUS
 import { buildClientNotification, shouldSuppressDuplicate } from '../src/engine/clientNotifications.ts'
 import { wispSummary } from '../src/engine/securityPlan.ts'
 import { decryptCredentialValue, submitCredential, credentialFingerprint } from '../src/engine/credentials.ts'
-import { DEMO_USERS } from '../src/data/seed.ts'
+import { DEV_DEMO_USERS } from '../src/data/seed.dev.ts'
 import type { TaxReturn } from '../src/data/types.ts'
 
 let failed = 0
@@ -71,7 +71,7 @@ console.log('=== Calc audit trail is deterministic ===')
 
 console.log('=== Secure upload invites ===')
 {
-  const kim = DEMO_USERS.find((u) => u.id === 'u-prep-solo')!
+  const kim = DEV_DEMO_USERS.find((u) => u.id === 'u-prep-solo')!
   const bad = createUploadInvite({
     actor: kim,
     clientId: 'c1',

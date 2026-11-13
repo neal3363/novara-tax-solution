@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { BrandMark } from '../components/BrandMark'
 import {
@@ -19,8 +19,24 @@ import './Register.css'
 
 type Step = 'choose' | 'form' | 'pay' | 'done'
 
+function ProductionRegisterGate({ children }: { children: ReactNode }) {
+  const navigate = useNavigate()
+  useEffect(() => {
+    if (!import.meta.env.DEV) navigate('/login', { replace: true })
+  }, [navigate])
+  if (!import.meta.env.DEV) {
+    return (
+      <div className="login-page container">
+        <p className="muted">Registration is available in the local sandbox. Opening your verified workspace…</p>
+      </div>
+    )
+  }
+  return children
+}
+
 export function RegisterHub() {
   return (
+    <ProductionRegisterGate>
     <div className="login-page register-page">
       <div className="container login-wrap">
         <div className="login-brand rise">
@@ -61,6 +77,7 @@ export function RegisterHub() {
         </p>
       </div>
     </div>
+    </ProductionRegisterGate>
   )
 }
 
@@ -190,6 +207,7 @@ export function RegisterFlow() {
   }
 
   return (
+    <ProductionRegisterGate>
     <div className="login-page register-page">
       <div className="container login-wrap">
         <div className="login-brand rise">
@@ -435,5 +453,6 @@ export function RegisterFlow() {
         )}
       </div>
     </div>
+    </ProductionRegisterGate>
   )
 }
