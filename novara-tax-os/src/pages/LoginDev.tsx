@@ -90,6 +90,8 @@ export function LoginDev() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const intent = (params.get('intent') || '').toLowerCase()
+  const nextRaw = params.get('next')
+  const next = nextRaw && nextRaw.startsWith('/app/') ? nextRaw : null
 
   const ordered = useMemo(() => {
     if (!intent) return DEV_ACCOUNTS
@@ -121,7 +123,15 @@ export function LoginDev() {
               className={`role-card panel rise rise-delay-${Math.min(i + 1, 3)}`}
               onClick={() => {
                 void actions.loginAsDevRole(r.role, r.userId).then(() => {
-                  navigate(intent === 'pricing' && r.role === 'efin_owner' ? '/app/fees' : r.path)
+                  if (intent === 'pricing' && r.role === 'efin_owner') {
+                    navigate('/app/fees')
+                    return
+                  }
+                  if (next && r.role === 'taxpayer') {
+                    navigate(next)
+                    return
+                  }
+                  navigate(r.path)
                 })
               }}
             >

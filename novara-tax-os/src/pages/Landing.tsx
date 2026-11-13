@@ -1,9 +1,12 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useRef, useState } from 'react'
+import type { DragEvent } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { BrandMark } from '../components/BrandMark'
 import { HeroVideoBackground } from '../components/HeroVideoBackground'
 import { MusicControls } from '../components/MusicControls'
+import { VoiceInput } from '../components/VoiceInput'
 import { useAmbientAudio } from '../ambient/AmbientAudioContext'
+import { detectFilingIntent } from '../engine/conversationIntent'
 import {
   OFFICE_BUSINESS_FEE,
   OFFICE_PERSONAL_FEE,
@@ -19,8 +22,6 @@ import {
   formatMoney,
 } from '../data/fees'
 import './Landing.css'
-
-const ENTERED_KEY = 'novara-welcome-entered'
 
 const FEATURES: { title: string; body: string; status: 'live' | 'partial' | 'soon' }[] = [
   {
@@ -93,25 +94,56 @@ const COMPARE = [
   ['Opaque software fees', 'Transparent subscription vs per-return vs bank fees'],
 ]
 
+const INTENT_KEY = 'novara-pending-intent'
+
 export function Landing() {
   const ambient = useAmbientAudio()
-  const [entered, setEntered] = useState(() => {
-    try {
-      return sessionStorage.getItem(ENTERED_KEY) === '1'
-    } catch {
-      return false
-    }
-  })
+  const navigate = useNavigate()
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [typed, setTyped] = useState('')
+  const [pendingVoice, setPendingVoice] = useState<string | null>(null)
+  const [drag, setDrag] = useState(false)
 
-  function enterNovara() {
-    try {
-      sessionStorage.setItem(ENTERED_KEY, '1')
-    } catch {
-      /* ignore */
-    }
-    setEntered(true)
+  function unlockAudio() {
     ambient.enterAndPlay()
   }
+
+  function goToPrepare(opts?: { intent?: string; upload?: boolean }) {
+    unlockAudio()
+    if (opts?.intent) {
+      try {
+        sessionStorage.setItem(INTENT_KEY, opts.intent)
+      } catch {
+        /* ignore */
+      }
+    }
+    const q = opts?.upload ? '?upload=1' : ''
+    navigate(`/login?next=${encodeURIComponent(`/app/taxpayer/prepare${q}`)}`)
+  }
+
+  function submitIntent(raw: string) {
+    const text = raw.trim()
+    if (!text) {
+      goToPrepare()
+      return
+    }
+    const cmd = detectFilingIntent(text)
+    const payload =
+      cmd.type === 'intent'
+        ? JSON.stringify({ text, intent: cmd.intent, taxYear: cmd.taxYear, clarify: cmd.clarify })
+        : JSON.stringify({ text })
+    goToPrepare({ intent: payload })
+  }
+
+  function onDrop(e: DragEvent) {
+    e.preventDefault()
+    setDrag(false)
+    unlockAudio()
+    // Files can't cross login easily — stash flag and open prepare upload
+    goToPrepare({ upload: true })
+  }
+
+  const draft = pendingVoice ?? typed
 
   return (
     <div className="app-shell home">
@@ -127,144 +159,132 @@ export function Landing() {
               </div>
             </div>
             <div className="hero-nav-actions">
-              {entered && <MusicControls compact className="landing-music" />}
+              <MusicControls compact className="landing-music" />
               <a className="nav-text" href="#how">
                 How it works
-              </a>
-              <a className="nav-text" href="#professionals">
-                Professionals
               </a>
               <Link className="btn btn-secondary landing-ghost" to="/login?intent=professional">
                 Tax pros
               </Link>
-              <Link
-                className="btn btn-primary hero-solid"
-                to="/register"
-                onClick={() => {
-                  if (!entered) enterNovara()
-                }}
-              >
-                Start
-              </Link>
+              <button className="btn btn-primary hero-solid" type="button" onClick={() => goToPrepare()}>
+                Start Filing
+              </button>
             </div>
           </nav>
 
-          {!entered ? (
-            <div className="hero-copy hero-welcome">
-              <p className="hero-brand brand rise">NOVARA TAX OS</p>
-              <h1 className="rise rise-delay-1">Speak It. Upload It. File It.</h1>
-              <p className="hero-tagline rise rise-delay-2">
-                A premium, voice-first tax preparation experience — tell NOVARA what you need, upload documents, and
-                answer only what’s still missing.
-              </p>
-              <div className="hero-actions rise rise-delay-3">
-                <button className="btn btn-primary hero-solid hero-enter" type="button" onClick={enterNovara}>
-                  Enter NOVARA
-                </button>
-              </div>
-              <p className="lead soft rise rise-delay-3">
-                Music starts gently after you enter (browser rules require a tap). Mute anytime — the interview stays
-                distraction-free once you’re inside.
-              </p>
-            </div>
-          ) : (
-            <div className="hero-copy">
-              <p className="hero-brand brand rise">NOVARA TAX OS</p>
-              <h1 className="rise rise-delay-1">Speak It. Upload It. File It.</h1>
-              <p className="hero-tagline rise rise-delay-2">
-                Tell NOVARA what you’re filing, upload your documents, and answer only the questions we still need.
-              </p>
-              <p className="lead rise rise-delay-2">
-                Voice, typing, and uploads share one interview — switch anytime. Tax math stays on the verified engine,
-                not conversational guesses.
-              </p>
-              <div className="hero-actions rise rise-delay-3">
-                <Link
-                  className="btn btn-primary hero-solid"
-                  to="/login?next=/app/taxpayer/assistant&mode=speak"
-                  onClick={() => ambient.enterAndPlay()}
-                >
-                  Start Speaking
-                </Link>
-                <Link
+          <div className="hero-copy">
+            <p className="hero-brand brand rise">NOVARA TAX OS</p>
+            <h1 className="rise rise-delay-1">Speak It. Upload It. File It.</h1>
+            <p className="hero-tagline rise rise-delay-2">Your AI-powered tax preparation experience.</p>
+            <p className="lead rise rise-delay-2">
+              Tell NOVARA what you’re filing — speak or type in the same place — or upload documents. One questionnaire
+              with tabs for everything still needed.
+            </p>
+
+            <div
+              className={`hero-compose rise rise-delay-3 ${drag ? 'drag' : ''}`}
+              onDragOver={(e) => {
+                e.preventDefault()
+                setDrag(true)
+              }}
+              onDragLeave={() => setDrag(false)}
+              onDrop={onDrop}
+            >
+              <label className="hero-compose-label" htmlFor="heroIntent">
+                Tell NOVARA what you need
+              </label>
+              <input
+                id="heroIntent"
+                className="hero-compose-input"
+                value={draft}
+                onChange={(e) => {
+                  setPendingVoice(null)
+                  setTyped(e.target.value)
+                }}
+                onFocus={unlockAudio}
+                placeholder='e.g. “I’m filing my personal taxes” or “I’m amending my 2023 return”'
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') submitIntent(draft)
+                }}
+              />
+              <div className="hero-compose-actions">
+                <VoiceInput
+                  labelStart="Speak"
+                  labelStop="Stop"
+                  onTranscript={(text) => {
+                    unlockAudio()
+                    setPendingVoice(text)
+                    setTyped(text)
+                  }}
+                />
+                <button
                   className="btn btn-secondary landing-ghost"
-                  to="/login?next=/app/taxpayer/assistant&mode=upload"
-                  onClick={() => ambient.enterAndPlay()}
+                  type="button"
+                  onClick={() => {
+                    unlockAudio()
+                    fileRef.current?.click()
+                  }}
                 >
                   Upload Documents
-                </Link>
-                <Link
-                  className="btn btn-ghost landing-ghost"
-                  to="/login?next=/app/taxpayer/assistant&mode=type"
-                  onClick={() => ambient.enterAndPlay()}
+                </button>
+                <button
+                  className="btn btn-primary hero-solid"
+                  type="button"
+                  onClick={() => submitIntent(draft)}
                 >
-                  Type to NOVARA
-                </Link>
+                  {draft.trim() ? 'Continue' : 'Start Filing'}
+                </button>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  multiple
+                  hidden
+                  accept=".pdf,.png,.jpg,.jpeg,.webp,.heic,.json"
+                  onChange={() => goToPrepare({ upload: true })}
+                />
               </div>
-              <div className="hero-music-row rise rise-delay-3">
-                <MusicControls />
-              </div>
+              <p className="hero-compose-note">
+                No Speak / Type / Upload tabs — one entrance. Voice is optional. Music starts after you interact.
+              </p>
             </div>
-          )}
+          </div>
         </div>
       </section>
 
       <section className="section" id="how">
         <div className="container">
           <p className="landing-kicker">How NOVARA works</p>
-          <h2>Five Simple Steps</h2>
-          <p className="section-lead">From upload to e-file — without forcing you through blank tax forms.</p>
+          <h2>One questionnaire. Three ways to answer.</h2>
+          <p className="section-lead">
+            Speak, type, or upload into the same return. Tabs show what’s complete and what’s still unanswered.
+          </p>
           <div className="steps-grid">
             {[
-              [
-                'STEP 1 — UPLOAD',
-                'Upload your driver’s license, Social Security card, W-2s, 1099s, and other available tax documents securely.',
-              ],
-              [
-                'STEP 2 — ANSWER',
-                'Our AI asks simple questions about your filing status, dependents, childcare, education, business expenses, and other circumstances.',
-              ],
-              [
-                'STEP 3 — OPTIMIZE',
-                'NOVARA evaluates applicable tax credits, deductions, and filing options to help identify your maximum legally allowable refund.',
-              ],
-              [
-                'STEP 4 — REVIEW',
-                'See your estimated refund, discovered tax benefits, and completed return summary. Confirm that everything is accurate.',
-              ],
-              [
-                'STEP 5 — SIGN & FILE',
-                'Electronically sign your return and submit through an authorized e-filing process when available.',
-              ],
-            ].map(([title, body], i) => (
-              <article className="step-block" key={title}>
-                <span className="step-index">{String(i + 1).padStart(2, '0')}</span>
-                <strong>{title}</strong>
-                <p>{body}</p>
-              </article>
+              ['STEP 1 — TELL OR UPLOAD', 'Say what you’re filing, or drop W-2s and IDs. Either path opens the same workspace.'],
+              ['STEP 2 — QUESTIONNAIRE TABS', 'Personal, filing status, dependents, income, business, deductions, credits, review.'],
+              ['STEP 3 — FILL GAPS ONLY', 'NOVARA asks what’s still missing. Green = answered, orange = still needed.'],
+              ['STEP 4 — REVIEW & FILE', 'Confirm the estimate, sign, and complete preparation without blank tax forms.'],
+            ].map(([t, b]) => (
+              <div key={t}>
+                <h3>{t}</h3>
+                <p>{b}</p>
+              </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="section" id="features" style={{ paddingTop: 0 }}>
+      <section className="section soft">
         <div className="container">
           <p className="landing-kicker">Capabilities</p>
-          <h2>Everything NOVARA Does for You</h2>
-          <p className="section-lead">
-            Live demo features are marked clearly. Anything not fully operational is labeled Coming soon.
-          </p>
+          <h2>Built for accurate preparation</h2>
           <div className="feature-grid">
             {FEATURES.map((f) => (
-              <article className="feature-item" key={f.title}>
-                <div className="feature-top">
+              <article key={f.title} className="feature-card">
+                <div className="feature-card-top">
                   <h3>{f.title}</h3>
-                  <span
-                    className={`badge ${
-                      f.status === 'live' ? 'badge-ok' : f.status === 'partial' ? 'badge-warn' : 'badge-neutral'
-                    }`}
-                  >
-                    {f.status === 'live' ? 'In demo' : f.status === 'partial' ? 'Partial' : 'Coming soon'}
+                  <span className={`badge ${f.status === 'live' ? 'badge-ok' : 'badge-neutral'}`}>
+                    {f.status === 'live' ? 'Live' : f.status === 'partial' ? 'Partial' : 'Soon'}
                   </span>
                 </div>
                 <p>{f.body}</p>
@@ -274,183 +294,50 @@ export function Landing() {
         </div>
       </section>
 
-      <section className="section maximize-section" id="maximize">
+      <section className="section" id="professionals">
         <div className="container">
-          <p className="landing-kicker">Maximum Refund Discovery</p>
-          <h2>Don’t Leave Eligible Tax Benefits Unclaimed</h2>
+          <p className="landing-kicker">For professionals</p>
+          <h2>TC · TP · Office pricing</h2>
           <p className="section-lead">
-            Many taxpayers don’t know which tax credits and deductions they may qualify for. NOVARA asks intelligent
-            questions to investigate benefits related to:
+            Transparent fees for taxpayers, independent preparers, and offices. {UNLIMITED_CLIENTS_COPY}.
           </p>
-          <ul className="benefit-bullets">
-            {[
-              'Children and qualifying dependents',
-              'Daycare and childcare expenses',
-              'College and education',
-              'Retirement savings',
-              'Self-employment',
-              'Homeownership',
-              'Charitable giving',
-              'Medical expenses',
-              'Other applicable federal and state benefits',
-            ].map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-          <p className="maximize-closer">
-            NOVARA doesn’t just prepare your return. It investigates opportunities to reduce your taxes legally.
-          </p>
-          <Link className="btn btn-primary" to="/login?intent=taxpayer">
-            Start My Tax Return
-          </Link>
-        </div>
-      </section>
-
-      <section className="section" id="professionals" style={{ paddingTop: 0 }}>
-        <div className="container">
-          <p className="landing-kicker">For tax offices</p>
-          <h2>Run Your Entire Tax Office With NOVARA</h2>
-          <p className="section-lead">
-            For tax professionals, NOVARA provides a unified platform for AI-assisted preparation, office operations, and
-            transparent fees.
-          </p>
-          <div className="pro-grid">
-            {[
-              ['AI-assisted tax preparation', 'live'],
-              ['Office and preparer management', 'live'],
-              ['EFIN-based workflows', 'partial'],
-              ['Client intake and document management', 'live'],
-              ['Individual and supported business tax returns', 'live'],
-              ['Tax-benefit optimization', 'live'],
-              ['Return pipeline management', 'live'],
-              ['Electronic signature workflows', 'live'],
-              ['Bank-product integrations where available', 'soon'],
-              ['Fee management and reporting', 'live'],
-              ['Service bureau administration', 'soon'],
-              ['Secure, role-based access', 'partial'],
-            ].map(([label, status]) => (
-              <div className="pro-item" key={label}>
-                <strong>{label}</strong>
-                <span className={`badge ${status === 'live' ? 'badge-ok' : status === 'partial' ? 'badge-warn' : 'badge-neutral'}`}>
-                  {status === 'live' ? 'In demo' : status === 'partial' ? 'Partial' : 'Coming soon'}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          <div className="pricing-band panel">
-            <div>
-              <p className="landing-kicker">Three tiers · one price catalog</p>
-              <h3>
-                Office {formatMoney(OFFICE_SUBSCRIPTION_FLOOR)}–{formatMoney(OFFICE_SUBSCRIPTION_HIGH)} · TP upfront{' '}
-                {formatMoney(TP_REGISTRATION_FEE)}
-              </h3>
-              <p className="muted">
-                {UNLIMITED_CLIENTS_COPY} for TP and Office. Per-return software fees stay separate from banking-product
-                fees.
+          <div className="pricing-grid">
+            <article className="price-card">
+              <h3>Tax Client</h3>
+              <p>
+                Personal {formatMoney(TC_PERSONAL_FEE)} · Business {formatMoney(TC_BUSINESS_FEE)}
               </p>
-              <ul className="mini-list">
-                {STARTER_INCLUDES.slice(0, 5).map((i) => (
-                  <li key={i}>{i}</li>
+              <ul>
+                {STARTER_INCLUDES.map((x) => (
+                  <li key={x}>{x}</li>
                 ))}
               </ul>
-              <p className="fee-line">
-                TC personal {formatMoney(TC_PERSONAL_FEE)} / business {formatMoney(TC_BUSINESS_FEE)} · TP{' '}
-                {formatMoney(TP_PERSONAL_FEE)} / {formatMoney(TP_BUSINESS_FEE)} · Office{' '}
-                {formatMoney(OFFICE_PERSONAL_FEE)} / {formatMoney(OFFICE_BUSINESS_FEE)}
+            </article>
+            <article className="price-card">
+              <h3>Tax Professional</h3>
+              <p>
+                Registration {formatMoney(TP_REGISTRATION_FEE)} · Personal {formatMoney(TP_PERSONAL_FEE)} · Business{' '}
+                {formatMoney(TP_BUSINESS_FEE)}
               </p>
-            </div>
-            <div className="pricing-band-actions">
-              <Link className="btn btn-primary" to="/register">
-                Register — TC · TP · Office
-              </Link>
-              <Link className="btn btn-secondary" to="/login?intent=pricing">
-                View Professional Pricing
-              </Link>
-            </div>
+            </article>
+            <article className="price-card">
+              <h3>Office</h3>
+              <p>
+                Subscription {formatMoney(OFFICE_SUBSCRIPTION_FLOOR)}–{formatMoney(OFFICE_SUBSCRIPTION_HIGH)} · Personal{' '}
+                {formatMoney(OFFICE_PERSONAL_FEE)} · Business {formatMoney(OFFICE_BUSINESS_FEE)}
+              </p>
+            </article>
           </div>
-        </div>
-      </section>
-
-      <section className="section" id="compare" style={{ paddingTop: 0 }}>
-        <div className="container">
-          <p className="landing-kicker">Why choose NOVARA?</p>
-          <h2>Traditional Tax Preparation vs. NOVARA</h2>
-          <div className="compare-table panel">
-            <div className="compare-head">
-              <span>Traditional</span>
-              <span>NOVARA</span>
-            </div>
-            {COMPARE.map(([left, right]) => (
-              <div className="compare-row" key={left}>
-                <span>{left}</span>
-                <span>{right}</span>
+          <div className="compare-grid">
+            {COMPARE.map(([a, b]) => (
+              <div key={a} className="compare-row">
+                <span>{a}</span>
+                <strong>{b}</strong>
               </div>
             ))}
           </div>
         </div>
       </section>
-
-      <section className="section" id="trust" style={{ paddingTop: 0 }}>
-        <div className="container">
-          <p className="landing-kicker">Trust and security</p>
-          <h2>Built with taxpayer protection in mind</h2>
-          <p className="section-lead">
-            This public demo uses sample data and session storage. We only describe controls that exist in the product
-            design or demo — not certifications that have not been obtained.
-          </p>
-          <div className="trust-grid">
-            {[
-              'Encrypted transport in production architectures (TLS)',
-              'Protected handling of taxpayer identification fields in workflows',
-              'Secure authentication path for published private apps via Cursor sign-in',
-              'Authorized preparer / role-scoped demo access after login',
-              'Document verification and extraction confidence checks',
-              'Audit-oriented event messaging and benefit rule citations',
-              'Human review and filing gates before transmission',
-            ].map((item) => (
-              <div className="trust-item" key={item}>
-                <span aria-hidden>●</span>
-                <p>{item}</p>
-              </div>
-            ))}
-          </div>
-          <p className="muted trust-note">
-            SOC reports, IRS provider approvals, and production e-file authorization are not advertised here until
-            obtained and implemented.
-          </p>
-        </div>
-      </section>
-
-      <section className="final-cta">
-        <div className="container">
-          <h2>Your Taxes. Simplified. Your Refund. Optimized.</h2>
-          <p>Let NOVARA handle the complicated work.</p>
-          <p className="cta-steps">Upload. Answer. Optimize. Review. File.</p>
-          <div className="hero-actions">
-              <Link className="btn btn-primary hero-solid" to="/register/tc">
-                Start Filing
-              </Link>
-            <Link className="btn btn-secondary landing-ghost" to="/register">
-              Join as a Tax Professional
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      <footer className="landing-footer">
-        <div className="container footer-row">
-          <div>
-            <strong className="brand">NOVARA</strong> Tax OS
-          </div>
-          <div className="footer-links">
-            <a href="#how">How it works</a>
-            <a href="#features">Features</a>
-            <a href="#professionals">Professionals</a>
-            <Link to="/login">Sign in</Link>
-          </div>
-        </div>
-      </footer>
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { BrandMark } from '../components/BrandMark'
 import { actions } from '../store/useAppStore'
 import { fetchViewerSession } from '../auth/sessionClient'
@@ -10,8 +10,15 @@ const IS_DEV = import.meta.env.DEV
 /** Role picker lives in a DEV-only chunk — never shipped in production. */
 const LoginDev = IS_DEV ? lazy(() => import('./LoginDev').then((m) => ({ default: m.LoginDev }))) : null
 
+function safeNext(raw: string | null): string {
+  if (!raw || !raw.startsWith('/app/')) return '/app/taxpayer'
+  return raw
+}
+
 export function Login() {
   const navigate = useNavigate()
+  const [params] = useSearchParams()
+  const next = safeNext(params.get('next'))
   const [busy, setBusy] = useState(!IS_DEV)
   const [error, setError] = useState<string | null>(null)
 
@@ -29,7 +36,7 @@ export function Login() {
       if (cancelled) return
       if (session.verified) {
         actions.loginWithVerifiedViewer(session)
-        navigate('/app/taxpayer', { replace: true })
+        navigate(next, { replace: true })
         return
       }
       actions.clearSession()
@@ -43,7 +50,7 @@ export function Login() {
     return () => {
       cancelled = true
     }
-  }, [navigate])
+  }, [navigate, next])
 
   if (IS_DEV && LoginDev) {
     return (
@@ -84,7 +91,7 @@ export function Login() {
                   void fetchViewerSession().then((session) => {
                     if (session.verified) {
                       actions.loginWithVerifiedViewer(session)
-                      navigate('/app/taxpayer', { replace: true })
+                      navigate(next, { replace: true })
                       return
                     }
                     actions.clearSession()

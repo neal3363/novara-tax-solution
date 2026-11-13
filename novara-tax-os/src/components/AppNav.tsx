@@ -23,9 +23,9 @@ export function AppNav() {
     currentUser.role === 'taxpayer'
       ? [
           { to: '/app/taxpayer', label: 'Home' },
-          { to: '/app/taxpayer/assistant', label: 'Assistant' },
+          { to: '/app/taxpayer/prepare', label: 'Questionnaire' },
           { to: '/app/taxpayer/years', label: 'Years' },
-          { to: '/app/taxpayer/prepare', label: 'Prepare' },
+          { to: '/app/taxpayer/assistant', label: 'Chat' },
           { to: '/app/taxpayer/final-review', label: 'Sign & file' },
           { to: '/app/taxpayer/vault', label: 'Vault' },
         ]

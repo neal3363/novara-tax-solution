@@ -19,9 +19,10 @@
 .hero-video-overlay {
   position: absolute;
   inset: 0;
+  /* Readable text without hiding lobby walkers / desk activity */
   background:
-    linear-gradient(105deg, rgba(4, 28, 26, 0.82) 0%, rgba(6, 46, 43, 0.62) 42%, rgba(8, 53, 49, 0.45) 100%),
-    linear-gradient(0deg, rgba(4, 20, 18, 0.55) 0%, transparent 42%);
+    linear-gradient(105deg, rgba(4, 28, 26, 0.72) 0%, rgba(6, 46, 43, 0.48) 45%, rgba(8, 53, 49, 0.28) 100%),
+    linear-gradient(0deg, rgba(4, 20, 18, 0.42) 0%, transparent 48%);
   pointer-events: none;
 }
 
