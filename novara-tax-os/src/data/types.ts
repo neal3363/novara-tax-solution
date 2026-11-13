@@ -287,7 +287,16 @@ export interface AppState {
     prompt: string
     answer: string | number
     at: string
+    /** Stable question id (same as mapsTo for engine keys) */
+    questionId?: string
+    tenantId?: string
+    clientId?: string
+    taxYear?: number
+    returnId?: string | null
+    benefitRuleId?: string
   }[]
+  /** Jump target for question overview — next unanswered resume */
+  interviewFocusMapsTo?: string | null
   auditEvents: AuditEvent[]
   uploadIssues: {
     kind: 'duplicate' | 'conflict' | 'missing'

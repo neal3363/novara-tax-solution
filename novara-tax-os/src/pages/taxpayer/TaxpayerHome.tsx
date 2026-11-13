@@ -1,12 +1,15 @@
 import { Link } from 'react-router-dom'
+import { useMemo } from 'react'
 import { useAppStore, actions } from '../../store/useAppStore'
 import { formatMoney } from '../../data/fees'
 import { RefundTracker } from '../../components/benefits/RefundTracker'
+import { buildInterviewProgress } from '../../engine/questionProgress'
 import '../shared.css'
 
 export function TaxpayerHome() {
-  const { currentUser, returns, documents, prepStep, benefitReport, activeTaxYear, multiYearEngagements } =
+  const { currentUser, returns, documents, prepStep, benefitReport, activeTaxYear, multiYearEngagements, taxProfile } =
     useAppStore()
+  const progress = useMemo(() => buildInterviewProgress(taxProfile), [taxProfile])
   const mine =
     returns.find((r) => r.clientId === currentUser?.id && r.taxYear === activeTaxYear) ??
     returns.find((r) => r.clientId === currentUser?.id) ??
@@ -27,6 +30,9 @@ export function TaxpayerHome() {
         <div>
           <p className="eyebrow">Upload → Answer → Review → Approve</p>
           <h1>Hi, {currentUser?.name.split(' ')[0]}</h1>
+          <p className="muted" style={{ marginTop: '0.35rem', maxWidth: '36rem' }}>
+            {progress.greeting}
+          </p>
         </div>
         <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
           <Link className="btn btn-secondary" to="/app/taxpayer/years/select">
@@ -39,7 +45,11 @@ export function TaxpayerHome() {
             Import prior return
           </Link>
           <Link className="btn btn-primary" to="/app/taxpayer/assistant">
-            {prepStep === 0 ? 'Start with AI assistant' : 'Continue with AI'}
+            {progress.answeredCount === 0
+              ? 'Start questions'
+              : progress.unansweredCount > 0
+                ? 'Continue questions'
+                : 'Review with AI'}
           </Link>
         </div>
       </header>
