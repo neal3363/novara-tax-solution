@@ -87,6 +87,7 @@ assert(clampMod.PRODUCTION_ALLOWED_ROLES.length === 1, 'only taxpayer allowed in
 console.log('=== Production session / RoleGate hardening ===')
 const storeSrc = readFileSync(join(root, 'src/store/useAppStore.ts'), 'utf8')
 const roleGateSrc = readFileSync(join(root, 'src/components/RoleGate.tsx'), 'utf8')
+const sessionApiSrc = readFileSync(join(root, 'api/session.ts'), 'utf8')
 assert(storeSrc.includes('novara-tax-os-session-v15'), 'session key bumped to v15')
 assert(storeSrc.includes('PRODUCTION_MEMORY_ONLY'), 'production memory-only field list present')
 assert(storeSrc.includes('freshWorkspaceForViewer'), 'viewer switch wipes via fresh workspace helper')
@@ -98,6 +99,12 @@ assert(
 )
 assert(roleGateSrc.includes("!roles.includes('taxpayer')"), 'RoleGate refuses elevated-only routes in production')
 assert(roleGateSrc.includes('clampProductionRole'), 'RoleGate clamps production role')
+assert(
+  !/import\s+\{\s*getIdentity\s*\}\s+from\s+['\"]\.\.\/cursor\/identity/.test(sessionApiSrc),
+  'session API does not statically import identity (avoids cold-start 500)',
+)
+assert(sessionApiSrc.includes('missing_header'), 'session API returns missing_header for unsigned visits')
+assert(sessionApiSrc.includes('await import('), 'session API loads identity dynamically when header present')
 console.log('=== Tenant isolation engine ===')
 const iso = spawnSync('npm', ['run', 'test:isolation'], { cwd: root, encoding: 'utf8', shell: true })
 assert(iso.status === 0, 'tenant isolation tests pass')
