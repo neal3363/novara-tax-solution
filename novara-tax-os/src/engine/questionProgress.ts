@@ -9,6 +9,7 @@ import type { TaxpayerProfile } from './benefitOptimizer'
 import { nextInterviewQuestions, runBenefitOptimization } from './benefitOptimizer'
 import { applyDependentAnswer, emptyDependent, nextDependentQuestion } from './dependentsEngine'
 import { nextBenefitDiscoveryTurn, nextFilingStatusTurn } from './smartInterview'
+import { registryTurnIfUnanswered } from './interviewRegistry'
 
 export type QuestionStatus = 'answered' | 'unanswered' | 'awaiting_verification' | 'not_applicable'
 
@@ -222,7 +223,7 @@ export function buildInterviewProgress(profile: TaxpayerProfile): InterviewProgr
       'business_miles',
       'owns_home',
       'retirement_contributions',
-      'student_loan_interest_yes',
+      'student_loan_interest',
     ]
     for (const key of discoveryKeys) {
       if (!isAnswered(profile, key)) continue
@@ -373,13 +374,17 @@ export function resolveInterviewTurn(
 
   if (linear && linear.mapsTo === focusMapsTo) return linear
 
-  // Filing status prompts
+  // Prefer opening the focused unanswered question from the stable registry (Edit / overview Answer)
+  const focused = registryTurnIfUnanswered(focusMapsTo, profile)
+  if (focused) return focused as ResolvedInterviewTurn
+
+  // Filing status — engine next may still match after partial clear
   const filing = nextFilingStatusTurn(profile)
   if (filing && filing.mapsTo === focusMapsTo) {
     return { ...filing, category: 'filing_status' }
   }
 
-  // Dependent interview — only if it is the current open dependent question
+  // Dependent interview — current open dependent question
   const depQ = nextDependentQuestion(profile.answers, profile.dependents)
   if (depQ && depQ.mapsTo === focusMapsTo) {
     return {
@@ -394,7 +399,7 @@ export function resolveInterviewTurn(
     }
   }
 
-  // Benefit discovery — allow answering a listed discovery question even if not first in queue
+  // Benefit discovery from live queue
   const report = runBenefitOptimization(profile)
   const discovery = nextInterviewQuestions(profile, report).find((q) => q.mapsTo === focusMapsTo)
   if (discovery && !answerPresent(profile, focusMapsTo) && !profile.unresolvedKeys.includes(focusMapsTo)) {
@@ -410,6 +415,6 @@ export function resolveInterviewTurn(
     }
   }
 
-  // Focused question not answerable in this screen — fall back to linear next
+  // Focused question already answered or not reopenable — continue linear next
   return linear
 }
