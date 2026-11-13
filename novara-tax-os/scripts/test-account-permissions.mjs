@@ -9,7 +9,7 @@ mkdirSync(tmp, { recursive: true })
 writeFileSync(
   join(tmp, 'run.ts'),
   `
-import { DEMO_USERS } from '../src/data/seed.ts'
+import { DEV_DEMO_USERS } from '../src/data/seed.dev.ts'
 import {
   canAssignClients,
   canCreateClients,
@@ -33,10 +33,10 @@ function assert(c: boolean, m: string) {
   if (!c) { console.error('FAIL', m); failed++ } else console.log('OK', m)
 }
 
-const tc = DEMO_USERS.find((u) => u.id === 'u-tax')!
-const kim = DEMO_USERS.find((u) => u.id === 'u-prep-solo')!
-const alex = DEMO_USERS.find((u) => u.id === 'u-prep')!
-const morgan = DEMO_USERS.find((u) => u.id === 'u-owner')!
+const tc = DEV_DEMO_USERS.find((u) => u.id === 'u-tax')!
+const kim = DEV_DEMO_USERS.find((u) => u.id === 'u-prep-solo')!
+const alex = DEV_DEMO_USERS.find((u) => u.id === 'u-prep')!
+const morgan = DEV_DEMO_USERS.find((u) => u.id === 'u-owner')!
 
 console.log('=== Account types ===')
 assert(tc.accountType === 'tc', 'Jordan is TC')

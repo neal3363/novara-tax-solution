@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
-import { DEMO_USERS, SEED_DOCS, SEED_OFFICE_STAFF, SEED_RETURNS, SMART_QUESTIONS } from '../data/seed'
+import { buildViewerWorkspace, EMPTY_DOCS, EMPTY_RETURNS, SMART_QUESTIONS } from '../data/seed'
+import type { ViewerSession } from '../auth/sessionClient'
 import type {
   AccountType,
   AppState,
@@ -123,8 +124,22 @@ import {
 /** Role preference only — never store tax demo payloads in localStorage */
 const ROLE_KEY = 'novara-tax-os-role'
 const USER_KEY = 'novara-tax-os-user-id'
-/** Session-scoped demo state (clears when the tab closes) */
-const SESSION_KEY = 'novara-tax-os-session-v13'
+/** Signed-in account JSON (session-scoped; avoids shipping other tenants in the bundle) */
+const USER_JSON_KEY = 'novara-tax-os-user-json'
+/** Session-scoped app state (clears when the tab closes) */
+const SESSION_KEY = 'novara-tax-os-session-v14'
+
+type DevSeedModule = typeof import('../data/seed.dev')
+let devSeedCache: DevSeedModule | null = null
+
+async function loadDevSeed(): Promise<DevSeedModule> {
+  if (!import.meta.env.DEV) {
+    throw new Error('Dev seed is unavailable outside local development')
+  }
+  if (devSeedCache) return devSeedCache
+  devSeedCache = await import('../data/seed.dev')
+  return devSeedCache
+}
 
 function money(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n)
@@ -391,68 +406,31 @@ function buildEntryPlan(docs: DocumentRecord[]): EntryPlanLine[] {
       })
     })
   })
-  if (lines.length === 0) {
-    return [
-      {
-        id: 'ep-seed-1',
-        form: 'W-2',
-        field: 'Form 1040 · Line 1a',
-        proposedValue: '$72,400.00',
-        sourceDocId: 'd-1',
-        sourceDocName: 'W2_Acme_2025.pdf',
-        sourceBox: 'Box 1 Wages',
-        sourcePage: 1,
-        confidence: 0.98,
-        status: 'proposed',
-      },
-      {
-        id: 'ep-seed-2',
-        form: 'W-2',
-        field: 'Form 1040 · Line 25a',
-        proposedValue: '$8,920.00',
-        sourceDocId: 'd-1',
-        sourceDocName: 'W2_Acme_2025.pdf',
-        sourceBox: 'Box 2 Federal withheld',
-        sourcePage: 1,
-        confidence: 0.97,
-        status: 'proposed',
-      },
-      {
-        id: 'ep-seed-3',
-        form: '1099-NEC',
-        field: 'Schedule C · Gross receipts',
-        proposedValue: '$4,250.00',
-        sourceDocId: 'd-2',
-        sourceDocName: '1099NEC_Studio.pdf',
-        sourceBox: 'Box 1 NEC',
-        sourcePage: 1,
-        confidence: 0.81,
-        status: 'proposed',
-      },
-    ]
-  }
   return lines
 }
 
+const EMPTY_BOOT_MESSAGE =
+  'Hi — I’m your NOVARA Tax AI. Upload documents and I’ll classify, extract, and guide your return. I propose; the rules engine calculates. A preparer approves the entry plan before anything is written.'
+
 let state: Store = {
   currentUser: null,
-  documents: SEED_DOCS,
-  returns: SEED_RETURNS,
+  documents: EMPTY_DOCS,
+  returns: EMPTY_RETURNS,
   messages: [
     {
       id: 'm0',
       role: 'assistant',
-      text: 'Hi — I’m your NOVARA Tax AI. Upload documents and I’ll classify, extract, and guide your return. I propose; the rules engine calculates. A preparer approves the entry plan before anything is written.',
+      text: EMPTY_BOOT_MESSAGE,
       at: new Date().toISOString(),
     },
   ],
   prepStep: 0,
   questions: SMART_QUESTIONS,
   vaultFilter: 'all',
-  entryPlan: buildEntryPlan(SEED_DOCS),
+  entryPlan: [],
   entryPlanStatus: 'awaiting_approval',
-  preEntryNotes: DEFAULT_NOTES,
-  activeReturnId: SEED_RETURNS.find((r) => r.state === 'Preparer Review')?.id ?? SEED_RETURNS[0].id,
+  preEntryNotes: [],
+  activeReturnId: '',
   binderTab: 'forms',
   taxProfile: defaultProfile(),
   benefitReport: null,
@@ -471,7 +449,7 @@ let state: Store = {
   uploadIssues: [],
   accountTier: undefined,
   registrationPayments: [],
-  officeStaff: SEED_OFFICE_STAFF,
+  officeStaff: [],
   householdIntake: emptyHouseholdIntake(),
   multiYearEngagements: [],
   activeTaxYear: resolveFilingSeason().currentTaxYear,
@@ -503,9 +481,11 @@ function persist() {
     if (state.currentUser) {
       localStorage.setItem(ROLE_KEY, state.currentUser.role)
       localStorage.setItem(USER_KEY, state.currentUser.id)
+      sessionStorage.setItem(USER_JSON_KEY, JSON.stringify(state.currentUser))
     } else {
       localStorage.removeItem(ROLE_KEY)
       localStorage.removeItem(USER_KEY)
+      sessionStorage.removeItem(USER_JSON_KEY)
     }
     const { hydrated: _, currentUser: __, ...sessionRest } = state
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(sessionRest))
@@ -514,13 +494,18 @@ function persist() {
   }
 }
 
-function resolveDemoUser(role: Role | null, userId: string | null): UserAccount | null {
+function resolveStoredUser(role: Role | null, userId: string | null): UserAccount | null {
   if (!role) return null
-  return (
-    (userId ? DEMO_USERS.find((u) => u.id === userId) : undefined) ??
-    DEMO_USERS.find((u) => u.role === role) ??
-    null
-  )
+  try {
+    const raw = sessionStorage.getItem(USER_JSON_KEY)
+    if (raw) {
+      const user = JSON.parse(raw) as UserAccount
+      if ((!userId || user.id === userId) && user.role === role) return user
+    }
+  } catch {
+    /* ignore */
+  }
+  return null
 }
 
 function ensureTenantFields(returns: TaxReturn[], documents: DocumentRecord[]) {
@@ -555,6 +540,7 @@ function hydrate() {
     sessionStorage.removeItem('novara-tax-os-session-v10')
     sessionStorage.removeItem('novara-tax-os-session-v11')
     sessionStorage.removeItem('novara-tax-os-session-v12')
+    sessionStorage.removeItem('novara-tax-os-session-v13')
 
     const role = localStorage.getItem(ROLE_KEY) as Role | null
     const userId = localStorage.getItem(USER_KEY)
@@ -583,7 +569,7 @@ function hydrate() {
         uploadIssues: parsed.uploadIssues ?? [],
         registrationPayments: parsed.registrationPayments ?? [],
         accountTier: parsed.accountTier ?? roleToTier(role ?? '') ?? undefined,
-        officeStaff: parsed.officeStaff?.length ? parsed.officeStaff : SEED_OFFICE_STAFF,
+        officeStaff: parsed.officeStaff ?? [],
         householdIntake: parsed.householdIntake ?? emptyHouseholdIntake(),
         multiYearEngagements: parsed.multiYearEngagements ?? [],
         activeTaxYear: parsed.activeTaxYear ?? resolveFilingSeason().currentTaxYear,
@@ -596,7 +582,7 @@ function hydrate() {
         returns: scoped.returns,
         documents: scoped.documents,
         benefitReport,
-        currentUser: resolveDemoUser(role, userId),
+        currentUser: resolveStoredUser(role, userId),
         hydrated: true,
       }
     } else {
@@ -605,7 +591,7 @@ function hydrate() {
         ...state,
         taxProfile,
         benefitReport: toSnapshot(taxProfile),
-        currentUser: resolveDemoUser(role, userId),
+        currentUser: resolveStoredUser(role, userId),
         hydrated: true,
       }
     }
@@ -646,22 +632,67 @@ function uid(prefix: string) {
 }
 
 export const actions = {
-  loginAs(role: Role, userId?: string) {
+  /** Production: bind a private workspace to the verified Cursor viewer (no role picker). */
+  loginWithVerifiedViewer(session: ViewerSession) {
+    const ws = buildViewerWorkspace(session)
+    const sameUser = state.currentUser?.id === ws.user.id && state.returns.length > 0
+    state = {
+      ...state,
+      currentUser: ws.user,
+      accountTier: 'TC',
+      documents: sameUser ? state.documents : ws.documents,
+      returns: sameUser ? state.returns : ws.returns,
+      officeStaff: [],
+      activeReturnId: sameUser
+        ? state.activeReturnId || ws.returns[0]?.id || ''
+        : ws.returns[0]?.id || '',
+      entryPlan: sameUser ? state.entryPlan : [],
+      entryPlanStatus: sameUser ? state.entryPlanStatus : 'awaiting_approval',
+      preEntryNotes: sameUser ? state.preEntryNotes : [],
+      messages: sameUser
+        ? state.messages
+        : [
+            {
+              id: 'm0',
+              role: 'assistant',
+              text: EMPTY_BOOT_MESSAGE,
+              at: new Date().toISOString(),
+            },
+          ],
+    }
+    emit()
+  },
+  /** Local DEV only — loads multi-tenant fixtures via dynamic import (not shipped in prod). */
+  async loginAsDevRole(role: Role, userId?: string) {
+    if (!import.meta.env.DEV) return
+    const seed = await loadDevSeed()
     const user =
-      (userId ? DEMO_USERS.find((u) => u.id === userId) : undefined) ??
-      DEMO_USERS.find((u) => u.role === role) ??
-      DEMO_USERS[0]
+      (userId ? seed.DEV_DEMO_USERS.find((u) => u.id === userId) : undefined) ??
+      seed.DEV_DEMO_USERS.find((u) => u.role === role) ??
+      seed.DEV_DEMO_USERS[0]
     state = {
       ...state,
       currentUser: user,
       accountTier: roleToTier(user.role) ?? state.accountTier,
+      documents: seed.DEV_SEED_DOCS,
+      returns: seed.DEV_SEED_RETURNS,
+      officeStaff: seed.DEV_SEED_OFFICE_STAFF,
+      entryPlan: buildEntryPlan(seed.DEV_SEED_DOCS),
+      entryPlanStatus: 'awaiting_approval',
+      preEntryNotes: DEFAULT_NOTES,
       activeReturnId:
-        filterReturnsForActor(
-          user,
-          state.returns.map((r) => asScopedReturn(r)),
-        )[0]?.id ?? state.activeReturnId,
+        seed.DEV_SEED_RETURNS.find((r) => r.state === 'Preparer Review')?.id ??
+        seed.DEV_SEED_RETURNS[0]?.id ??
+        '',
     }
     emit()
+  },
+  /** @deprecated Use loginAsDevRole in DEV or loginWithVerifiedViewer in production. */
+  loginAs(role: Role, userId?: string) {
+    if (import.meta.env.DEV) {
+      void actions.loginAsDevRole(role, userId)
+      return
+    }
   },
   /** Tenant-scoped returns for the signed-in actor (authorization enforced). */
   visibleReturns(): TenantScopedReturn[] {
@@ -874,7 +905,7 @@ export const actions = {
           doc.name,
           confidence,
           uid,
-          state.currentUser?.name ?? 'Jordan Blake',
+          state.currentUser?.name ?? 'Taxpayer',
         )
         const documents = state.documents.map((d) =>
           d.id === doc.id
@@ -895,7 +926,7 @@ export const actions = {
         const prior = state.householdIntake
         const candidates = extractPeopleFromDocuments(
           documents,
-          state.currentUser?.name ?? 'Jordan Blake',
+          state.currentUser?.name ?? 'Taxpayer',
         ).map((c) => {
           const prev = prior.candidates.find((p) => p.id === c.id)
           return prev
@@ -970,7 +1001,7 @@ export const actions = {
     const benefitReport = toSnapshot(taxProfile)
     const candidates = extractPeopleFromDocuments(
       state.documents,
-      state.currentUser?.name ?? 'Jordan Blake',
+      state.currentUser?.name ?? 'Taxpayer',
     ).map((c) => {
       const prev = state.householdIntake.candidates.find((p) => p.id === c.id)
       return prev
@@ -2178,57 +2209,129 @@ export const actions = {
     sessionStorage.removeItem(SESSION_KEY)
     sessionStorage.removeItem('novara-tax-os-session-v2')
     sessionStorage.removeItem('novara-tax-os-session-v7')
+    sessionStorage.removeItem('novara-tax-os-session-v13')
+    const current = state.currentUser
     const taxProfile = defaultProfile()
-    state = {
-      currentUser: state.currentUser,
-      documents: SEED_DOCS,
-      returns: SEED_RETURNS,
-      messages: [
-        {
-          id: 'm0',
-          role: 'assistant',
-          text: 'Demo reset. Upload documents — then run Tax Benefit Optimization. Filing stops only after the benefit review is complete.',
-          at: new Date().toISOString(),
-        },
-      ],
-      prepStep: 0,
-      questions: SMART_QUESTIONS,
-      vaultFilter: 'all',
-      entryPlan: buildEntryPlan(SEED_DOCS),
-      entryPlanStatus: 'awaiting_approval',
-      preEntryNotes: DEFAULT_NOTES,
-      activeReturnId: SEED_RETURNS.find((r) => r.state === 'Preparer Review')?.id ?? SEED_RETURNS[0].id,
-      binderTab: 'forms',
-      taxProfile,
-      benefitReport: toSnapshot(taxProfile),
-      benefitReviewSigned: false,
-      interviewChat: [
-        {
-          id: 'iv0',
-          role: 'assistant',
-          text: 'Demo reset. Upload documents first — I’ll extract what I can, then ask only what’s still needed.',
-          at: new Date().toISOString(),
-        },
-      ],
-      interviewAnswers: [],
-      interviewFocusMapsTo: null,
-      auditEvents: [],
-      uploadIssues: [],
-      accountTier: roleToTier(state.currentUser?.role ?? '') ?? undefined,
-      registrationPayments: [],
-      officeStaff: SEED_OFFICE_STAFF,
-      householdIntake: emptyHouseholdIntake(),
-      multiYearEngagements: [],
-      activeTaxYear: resolveFilingSeason().currentTaxYear,
-      uploadInvites: [],
-      clientNotifications: [],
-      lastQaReport: null,
-      calcAuditTrail: null,
-      filingAuthorized: false,
-      filingAuth: null,
-      hydrated: true,
+
+    const applyReset = (payload: {
+      documents: DocumentRecord[]
+      returns: TaxReturn[]
+      officeStaff: OfficeStaffMember[]
+      entryPlan: EntryPlanLine[]
+      preEntryNotes: PreEntryNote[]
+      activeReturnId: string
+    }) => {
+      state = {
+        currentUser: current,
+        documents: payload.documents,
+        returns: payload.returns,
+        messages: [
+          {
+            id: 'm0',
+            role: 'assistant',
+            text: 'Workspace reset. Upload documents — then run Tax Benefit Optimization. Filing stops only after the benefit review is complete.',
+            at: new Date().toISOString(),
+          },
+        ],
+        prepStep: 0,
+        questions: SMART_QUESTIONS,
+        vaultFilter: 'all',
+        entryPlan: payload.entryPlan,
+        entryPlanStatus: 'awaiting_approval',
+        preEntryNotes: payload.preEntryNotes,
+        activeReturnId: payload.activeReturnId,
+        binderTab: 'forms',
+        taxProfile,
+        benefitReport: toSnapshot(taxProfile),
+        benefitReviewSigned: false,
+        interviewChat: [
+          {
+            id: 'iv0',
+            role: 'assistant',
+            text: 'Workspace reset. Upload documents first — I’ll extract what I can, then ask only what’s still needed.',
+            at: new Date().toISOString(),
+          },
+        ],
+        interviewAnswers: [],
+        interviewFocusMapsTo: null,
+        auditEvents: [],
+        uploadIssues: [],
+        accountTier: roleToTier(current?.role ?? '') ?? undefined,
+        registrationPayments: [],
+        officeStaff: payload.officeStaff,
+        householdIntake: emptyHouseholdIntake(),
+        multiYearEngagements: [],
+        activeTaxYear: resolveFilingSeason().currentTaxYear,
+        uploadInvites: [],
+        clientNotifications: [],
+        lastQaReport: null,
+        calcAuditTrail: null,
+        filingAuthorized: false,
+        filingAuth: null,
+        hydrated: true,
+      }
+      emit()
     }
-    emit()
+
+    if (import.meta.env.DEV && current) {
+      void loadDevSeed().then((seed) => {
+        const known = seed.DEV_DEMO_USERS.some((u) => u.id === current.id)
+        if (known) {
+          applyReset({
+            documents: seed.DEV_SEED_DOCS,
+            returns: seed.DEV_SEED_RETURNS,
+            officeStaff: seed.DEV_SEED_OFFICE_STAFF,
+            entryPlan: buildEntryPlan(seed.DEV_SEED_DOCS),
+            preEntryNotes: DEFAULT_NOTES,
+            activeReturnId:
+              seed.DEV_SEED_RETURNS.find((r) => r.state === 'Preparer Review')?.id ??
+              seed.DEV_SEED_RETURNS[0]?.id ??
+              '',
+          })
+          return
+        }
+        const ws = buildViewerWorkspace({
+          sub: current.id.replace(/^u-/, ''),
+          name: current.name,
+          email: current.email,
+        })
+        applyReset({
+          documents: ws.documents,
+          returns: ws.returns,
+          officeStaff: [],
+          entryPlan: [],
+          preEntryNotes: [],
+          activeReturnId: ws.returns[0]?.id ?? '',
+        })
+      })
+      return
+    }
+
+    if (current) {
+      const ws = buildViewerWorkspace({
+        sub: current.id.replace(/^u-/, ''),
+        name: current.name,
+        email: current.email,
+      })
+      applyReset({
+        documents: ws.documents,
+        returns: [{ ...ws.returns[0], clientId: current.id, clientName: current.name, tenantId: current.tenantId }],
+        officeStaff: [],
+        entryPlan: [],
+        preEntryNotes: [],
+        activeReturnId: ws.returns[0]?.id ?? '',
+      })
+      return
+    }
+
+    applyReset({
+      documents: EMPTY_DOCS,
+      returns: EMPTY_RETURNS,
+      officeStaff: [],
+      entryPlan: [],
+      preEntryNotes: [],
+      activeReturnId: '',
+    })
   },
   setActiveTaxYear(year: number) {
     state = { ...state, activeTaxYear: year }

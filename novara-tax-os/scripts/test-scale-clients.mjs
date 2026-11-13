@@ -9,7 +9,7 @@ mkdirSync(tmp, { recursive: true })
 writeFileSync(
   join(tmp, 'run.ts'),
   `
-import { DEMO_USERS } from '../src/data/seed.ts'
+import { DEV_DEMO_USERS } from '../src/data/seed.dev.ts'
 import {
   asScopedReturn,
   assertNoClientQuota,
@@ -26,8 +26,8 @@ function assert(c: boolean, m: string) {
   if (!c) { console.error('FAIL', m); failed++ } else console.log('OK', m)
 }
 
-const kim = DEMO_USERS.find((u) => u.id === 'u-prep-solo')!
-const alex = DEMO_USERS.find((u) => u.id === 'u-prep')!
+const kim = DEV_DEMO_USERS.find((u) => u.id === 'u-prep-solo')!
+const alex = DEV_DEMO_USERS.find((u) => u.id === 'u-prep')!
 
 function makeReturns(tenantId: string, preparerId: string, count: number): TaxReturn[] {
   const out: TaxReturn[] = []

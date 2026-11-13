@@ -1,326 +1,59 @@
-import type { DocumentRecord, OfficeStaffMember, TaxReturn, UserAccount } from './types'
-import {
-  OFFICE_PERSONAL_FEE,
-  TC_PERSONAL_FEE,
-  TP_BUSINESS_FEE,
-  TP_PERSONAL_FEE,
-} from './fees'
+/**
+ * Production-safe seed helpers.
+ * Multi-tenant demo rosters live in seed.dev.ts and load only under import.meta.env.DEV.
+ */
+import type { DocumentRecord, TaxReturn, UserAccount } from './types'
+import { TC_PERSONAL_FEE } from './fees'
 import { vaultStoragePath } from '../engine/tenantIsolation'
-import { seedVerifiedCredential } from '../engine/credentials'
-
-export const DEMO_USERS: UserAccount[] = [
-  {
-    id: 'u-tax',
-    name: 'Jordan Blake',
-    email: 'jordan@example.com',
-    role: 'taxpayer',
-    tenantId: 'tenant-novara-direct',
-    accountType: 'tc',
-  },
-  {
-    id: 'u-prep',
-    name: 'Alex Rivera',
-    email: 'alex@summit-tax.office',
-    role: 'preparer',
-    tenantId: 'tenant-summit',
-    accountType: 'office_preparer',
-    // Full PTIN never stored on the account — fingerprint + last-four only (demo format examples)
-    credentials: {
-      ptin: seedVerifiedCredential('ptin', 'P00000001'),
-      efileProvider: { providerName: 'Summit Tax Office MeF', status: 'associated', associatedAt: new Date().toISOString() },
-    },
-  },
-  {
-    id: 'u-prep-solo',
-    name: 'Taylor Kim',
-    email: 'taylor@kimtax.prep',
-    role: 'preparer',
-    tenantId: 'tenant-kim-tp',
-    accountType: 'independent_tp',
-    credentials: {
-      ptin: seedVerifiedCredential('ptin', 'P00000002'),
-      efileProvider: { providerName: 'Authorized E-File Partner (demo)', status: 'associated', associatedAt: new Date().toISOString() },
-      businessName: 'Kim Tax Preparation',
-    },
-  },
-  {
-    id: 'u-owner',
-    name: 'Morgan Lee',
-    email: 'morgan@summit-tax.office',
-    role: 'efin_owner',
-    tenantId: 'tenant-summit',
-    accountType: 'office_owner',
-    credentials: {
-      efin: seedVerifiedCredential('efin', '000001'),
-      ein: seedVerifiedCredential('ein', '00-0000001'),
-      businessName: 'Summit Tax Office LLC',
-      businessAddress: '100 Market St, Austin, TX',
-      efileProvider: { providerName: 'NOVARA MeF Adapter', status: 'associated', associatedAt: new Date().toISOString() },
-    },
-  },
-  {
-    id: 'u-owner-lakes',
-    name: 'Jamie Brooks',
-    email: 'jamie@lakeside-tax.office',
-    role: 'efin_owner',
-    tenantId: 'tenant-lakeside',
-    accountType: 'office_owner',
-    credentials: {
-      efin: seedVerifiedCredential('efin', '000002'),
-      ein: seedVerifiedCredential('ein', '00-0000002'),
-      businessName: 'Lakeside Tax LLC',
-      businessAddress: '22 Harbor Rd, Chicago, IL',
-      efileProvider: { providerName: 'NOVARA MeF Adapter', status: 'associated', associatedAt: new Date().toISOString() },
-    },
-  },
-  {
-    id: 'u-admin',
-    name: 'Nova Ops',
-    email: 'ops@novara.tax',
-    role: 'admin',
-    tenantId: 'platform',
-    accountType: 'admin',
-  },
-]
-
-export const SEED_OFFICE_STAFF: OfficeStaffMember[] = [
-  {
-    id: 'staff-summit-owner',
-    tenantId: 'tenant-summit',
-    userId: 'u-owner',
-    name: 'Morgan Lee',
-    email: 'morgan@summit-tax.office',
-    kind: 'owner',
-    status: 'active',
-    invitedAt: new Date(Date.now() - 86400000 * 90).toISOString(),
-  },
-  {
-    id: 'staff-summit-alex',
-    tenantId: 'tenant-summit',
-    userId: 'u-prep',
-    name: 'Alex Rivera',
-    email: 'alex@summit-tax.office',
-    kind: 'preparer',
-    status: 'active',
-    invitedAt: new Date(Date.now() - 86400000 * 60).toISOString(),
-    ptinDisplay: '····0001',
-    ptinStatus: 'verified',
-  },
-  {
-    id: 'staff-lakes-owner',
-    tenantId: 'tenant-lakeside',
-    userId: 'u-owner-lakes',
-    name: 'Jamie Brooks',
-    email: 'jamie@lakeside-tax.office',
-    kind: 'owner',
-    status: 'active',
-    invitedAt: new Date(Date.now() - 86400000 * 40).toISOString(),
-  },
-]
-
-export const SEED_RETURNS: TaxReturn[] = [
-  {
-    id: 'r-1001',
-    clientName: 'Jordan Blake',
-    clientId: 'u-tax',
-    taxYear: 2025,
-    returnType: '1040',
-    state: 'Documents Pending',
-    readiness: 42,
-    refundOrOwe: 0,
-    preparerId: undefined,
-    tenantId: 'tenant-novara-direct',
-    isBusiness: false,
-    feeSnapshot: [{ label: 'Personal tax return (TC)', amount: TC_PERSONAL_FEE, status: 'approved' }],
-    appliedBenefits: [],
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'r-1002',
-    clientName: 'Casey Nguyen',
-    clientId: 'c-casey',
-    taxYear: 2025,
-    returnType: '1040_Schedule_C',
-    state: 'Preparer Review',
-    readiness: 78,
-    refundOrOwe: 2140,
-    preparerId: 'u-prep',
-    tenantId: 'tenant-summit',
-    assignedPreparerIds: ['u-prep'],
-    isBusiness: false,
-    feeSnapshot: [{ label: 'Personal tax return (Office software)', amount: OFFICE_PERSONAL_FEE, status: 'approved' }],
-    appliedBenefits: [],
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'r-1003',
-    clientName: 'Harbor Goods LLC',
-    clientId: 'c-harbor',
-    taxYear: 2025,
-    returnType: '1120-S',
-    state: 'Intake Started',
-    readiness: 22,
-    refundOrOwe: 0,
-    preparerId: 'u-prep',
-    tenantId: 'tenant-summit',
-    assignedPreparerIds: ['u-prep'],
-    isBusiness: true,
-    feeSnapshot: [{ label: 'Business tax return (TP software)', amount: TP_BUSINESS_FEE, status: 'approved' }],
-    appliedBenefits: [],
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'r-1004',
-    clientName: 'Sam Ortiz',
-    clientId: 'c-sam',
-    taxYear: 2025,
-    returnType: '1040',
-    state: 'Signature Pending',
-    readiness: 96,
-    refundOrOwe: -480,
-    preparerId: 'u-prep',
-    tenantId: 'tenant-summit',
-    assignedPreparerIds: ['u-prep'],
-    isBusiness: false,
-    feeSnapshot: [{ label: 'Personal tax return (Office software)', amount: OFFICE_PERSONAL_FEE, status: 'approved' }],
-    appliedBenefits: [],
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'r-1005',
-    clientName: 'Riley Chen',
-    clientId: 'c-riley',
-    taxYear: 2024,
-    returnType: '1040',
-    state: 'Accepted',
-    readiness: 100,
-    refundOrOwe: 1785,
-    preparerId: 'u-prep',
-    tenantId: 'tenant-summit',
-    assignedPreparerIds: ['u-prep'],
-    isBusiness: false,
-    feeSnapshot: [{ label: 'Personal tax return (TP software)', amount: TP_PERSONAL_FEE, status: 'approved' }],
-    appliedBenefits: [],
-    updatedAt: new Date(Date.now() - 86400000 * 40).toISOString(),
-  },
-  {
-    id: 'r-2001',
-    clientName: 'Pat Morales',
-    clientId: 'c-pat',
-    taxYear: 2025,
-    returnType: '1040',
-    state: 'Preparer Review',
-    readiness: 70,
-    refundOrOwe: 920,
-    preparerId: 'u-prep-solo',
-    tenantId: 'tenant-kim-tp',
-    assignedPreparerIds: ['u-prep-solo'],
-    isBusiness: false,
-    feeSnapshot: [{ label: 'Personal tax return (TP software)', amount: TP_PERSONAL_FEE, status: 'approved' }],
-    appliedBenefits: [],
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'r-3001',
-    clientName: 'Quinn Avery',
-    clientId: 'c-quinn',
-    taxYear: 2025,
-    returnType: '1040',
-    state: 'Intake Started',
-    readiness: 25,
-    refundOrOwe: 0,
-    preparerId: undefined,
-    tenantId: 'tenant-lakeside',
-    isBusiness: false,
-    feeSnapshot: [{ label: 'Personal tax return (Office software)', amount: OFFICE_PERSONAL_FEE, status: 'approved' }],
-    appliedBenefits: [],
-    updatedAt: new Date().toISOString(),
-  },
-]
-
-export const SEED_DOCS: DocumentRecord[] = [
-  {
-    id: 'd-1',
-    name: 'W2_Acme_2025.pdf',
-    type: 'W-2',
-    taxYear: 2025,
-    sizeLabel: '240 KB',
-    uploadedAt: new Date().toISOString(),
-    status: 'extracted',
-    confidence: 0.97,
-    ownerId: 'u-tax',
-    clientId: 'u-tax',
-    tenantId: 'tenant-novara-direct',
-    storagePath: vaultStoragePath('tenant-novara-direct', 'u-tax', 'd-1'),
-    facts: [
-      { id: 'f1', label: 'Employer', value: 'Acme Logistics Inc.', sourcePage: 1, confidence: 0.99, verified: true },
-      { id: 'f2', label: 'Wages (Box 1)', value: '$72,400.00', sourcePage: 1, confidence: 0.98, verified: true },
-      { id: 'f3', label: 'Federal withheld', value: '$8,920.00', sourcePage: 1, confidence: 0.97, verified: false },
-    ],
-  },
-  {
-    id: 'd-2',
-    name: '1099NEC_Studio.pdf',
-    type: '1099-NEC',
-    taxYear: 2025,
-    sizeLabel: '188 KB',
-    uploadedAt: new Date(Date.now() - 3600000).toISOString(),
-    status: 'needs_review',
-    confidence: 0.81,
-    ownerId: 'u-tax',
-    clientId: 'u-tax',
-    tenantId: 'tenant-novara-direct',
-    storagePath: vaultStoragePath('tenant-novara-direct', 'u-tax', 'd-2'),
-    facts: [
-      { id: 'f4', label: 'Payer', value: 'Northlight Studio', sourcePage: 1, confidence: 0.9, verified: false },
-      { id: 'f5', label: 'Nonemployee compensation', value: '$4,250.00', sourcePage: 1, confidence: 0.81, verified: false },
-    ],
-  },
-  {
-    id: 'd-kim-1',
-    name: 'W2_Pat_2025.pdf',
-    type: 'W-2',
-    taxYear: 2025,
-    sizeLabel: '210 KB',
-    uploadedAt: new Date().toISOString(),
-    status: 'extracted',
-    confidence: 0.95,
-    ownerId: 'c-pat',
-    clientId: 'c-pat',
-    tenantId: 'tenant-kim-tp',
-    storagePath: vaultStoragePath('tenant-kim-tp', 'c-pat', 'd-kim-1'),
-    facts: [
-      { id: 'fk1', label: 'Wages (Box 1)', value: '$54,000.00', sourcePage: 1, confidence: 0.96, verified: true },
-    ],
-  },
-  {
-    id: 'd-lakes-1',
-    name: 'W2_Quinn_2025.pdf',
-    type: 'W-2',
-    taxYear: 2025,
-    sizeLabel: '198 KB',
-    uploadedAt: new Date().toISOString(),
-    status: 'classified',
-    confidence: 0.9,
-    ownerId: 'c-quinn',
-    clientId: 'c-quinn',
-    tenantId: 'tenant-lakeside',
-    storagePath: vaultStoragePath('tenant-lakeside', 'c-quinn', 'd-lakes-1'),
-    facts: [],
-  },
-]
+import { resolveFilingSeason } from '../engine/taxYearCatalog'
 
 export const SMART_QUESTIONS = [
-  {
-    id: 'q1',
-    prompt: 'Did you move to a different state during 2025?',
-  },
-  {
-    id: 'q2',
-    prompt: 'Do you want to contribute to an IRA or retirement account for this tax year?',
-  },
-  {
-    id: 'q3',
-    prompt: 'Did anyone else claim you as a dependent?',
-  },
+  { id: 'q1', prompt: 'Did you move to a different state during this tax year?' },
+  { id: 'q2', prompt: 'Do you want to contribute to an IRA or retirement account for this tax year?' },
+  { id: 'q3', prompt: 'Did anyone else claim you as a dependent?' },
 ]
+
+/** Build an isolated TC workspace for the verified Cursor viewer — no other tenants. */
+export function buildViewerWorkspace(viewer: {
+  sub: string
+  name: string
+  email: string
+}): { user: UserAccount; returns: TaxReturn[]; documents: DocumentRecord[] } {
+  const season = resolveFilingSeason()
+  const tenantId = `tenant-viewer-${viewer.sub.replace(/[^a-zA-Z0-9]/g, '').slice(0, 24) || 'owner'}`
+  const userId = `u-${viewer.sub.replace(/[^a-zA-Z0-9]/g, '').slice(0, 24) || 'owner'}`
+  const displayName = viewer.name?.trim() || viewer.email?.split('@')[0] || 'Taxpayer'
+  const user: UserAccount = {
+    id: userId,
+    name: displayName,
+    email: viewer.email || `${userId}@novara.local`,
+    role: 'taxpayer',
+    tenantId,
+    accountType: 'tc',
+  }
+  const returnId = `r-${userId}-ty${season.currentTaxYear}`
+  const returns: TaxReturn[] = [
+    {
+      id: returnId,
+      clientName: displayName,
+      clientId: userId,
+      taxYear: season.currentTaxYear,
+      returnType: '1040',
+      state: 'Client Created',
+      readiness: 5,
+      refundOrOwe: 0,
+      tenantId,
+      isBusiness: false,
+      feeSnapshot: [{ label: 'Personal tax return (TC)', amount: TC_PERSONAL_FEE, status: 'quoted' }],
+      appliedBenefits: [],
+      updatedAt: new Date().toISOString(),
+    },
+  ]
+  const documents: DocumentRecord[] = []
+  void vaultStoragePath
+  return { user, returns, documents }
+}
+
+/** Empty production bootstrap — filled only after verified session. */
+export const EMPTY_RETURNS: TaxReturn[] = []
+export const EMPTY_DOCS: DocumentRecord[] = []
