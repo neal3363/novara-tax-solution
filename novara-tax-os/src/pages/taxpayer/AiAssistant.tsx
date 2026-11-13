@@ -117,8 +117,8 @@ export function AiAssistant() {
     const cmd = detectFilingIntent(text)
 
     if (cmd.type === 'yes_no' && activeTurn) {
+      // submitAnswer already appends to interviewChat via answerSmartInterview / dependent path
       void submitAnswer(cmd.value === 'yes' ? 'Yes' : 'No')
-      actions.addMessage('user', text)
       return
     }
     if (cmd.type === 'continue') {
@@ -175,7 +175,7 @@ export function AiAssistant() {
       return
     }
 
-    // Shared NL fact ingest + assistant reply (same engine as typed)
+    // free_text / none — shared NL fact ingest (same engine as Prepare)
     actions.askAi(text)
   }
 
