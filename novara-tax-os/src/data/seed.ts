@@ -1,6 +1,7 @@
 /**
  * Production-safe seed helpers.
- * Multi-tenant demo rosters live in seed.dev.ts and load only under import.meta.env.DEV.
+ * Multi-tenant demo rosters live in /dev-fixtures (outside the published app tree)
+ * and load only under import.meta.env.DEV via the @dev-fixtures alias.
  */
 import type { DocumentRecord, TaxReturn, UserAccount } from './types'
 import { TC_PERSONAL_FEE } from './fees'

@@ -1,6 +1,12 @@
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import type { IncomingMessage } from 'node:http'
+
+const rootDir = path.dirname(fileURLToPath(import.meta.url))
+/** Multi-tenant DEV fixtures live outside the published app tree. */
+const devFixtures = path.resolve(rootDir, '../dev-fixtures')
 
 function headersFromNode(req: IncomingMessage): Headers {
   const headers = new Headers()
@@ -42,8 +48,16 @@ function sessionApiPlugin(): Plugin {
 
 export default defineConfig({
   plugins: [react(), sessionApiPlugin()],
+  resolve: {
+    alias: {
+      '@dev-fixtures': devFixtures,
+    },
+  },
   server: {
     host: '0.0.0.0',
     port: 5173,
+    fs: {
+      allow: [rootDir, devFixtures],
+    },
   },
 })
