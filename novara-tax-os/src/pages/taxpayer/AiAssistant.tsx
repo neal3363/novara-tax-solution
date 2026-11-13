@@ -207,6 +207,7 @@ export function AiAssistant() {
           <InterviewChoice
             key={activeTurn.id}
             questionId={activeTurn.id}
+            mapsTo={activeTurn.mapsTo}
             prompt={activeTurn.prompt}
             kind={activeTurn.kind}
             choices={activeTurn.choices}
