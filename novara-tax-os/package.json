@@ -15,7 +15,8 @@
     "test:scale": "node scripts/test-scale-clients.mjs",
     "test:permissions": "node scripts/test-account-permissions.mjs",
     "test:intake": "node scripts/test-document-intake.mjs",
-    "test:multiyear": "node scripts/test-multi-year-pricing.mjs"
+    "test:multiyear": "node scripts/test-multi-year-pricing.mjs",
+    "test:master": "node scripts/test-master-platform.mjs"
   },
   "dependencies": {
     "@fontsource/figtree": "^5.3.0",

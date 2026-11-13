@@ -1,7 +1,7 @@
 /**
  * PTIN / EFIN credential handling.
  * Manually entered values are NEVER treated as verified without a validation process.
- * Sensitive values are stored encrypted (demo cipher) — UI shows last-four only.
+ * Full credential values are NEVER stored — only last-four + irreversible fingerprint.
  */
 
 export type CredentialStatus =
@@ -15,13 +15,12 @@ export type CredentialKind = 'ptin' | 'efin' | 'ein'
 
 export interface ProfessionalCredential {
   kind: CredentialKind
-  /** Opaque encrypted payload — never render in UI */
-  valueEncrypted: string
+  /** Irreversible fingerprint — cannot recover the credential from this value */
+  valueFingerprint: string
   lastFour: string
   status: CredentialStatus
   submittedAt: string
   verifiedAt?: string
-  /** How verification was (or will be) performed */
   method: 'format_only' | 'irs_lookup_pending' | 'irs_lookup_verified' | 'seed_preverified'
   taxYear: number
   displayHint: string
@@ -33,74 +32,44 @@ export interface EfileProviderAssociation {
   associatedAt?: string
 }
 
-const DEMO_KEY = 'novara-cred-v1'
-
-function toBase64(text: string): string {
-  if (typeof btoa === 'function') return btoa(text)
-  return bytesToBase64(new TextEncoder().encode(text))
-}
-
-function bytesToBase64(bytes: Uint8Array): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
-  let out = ''
-  for (let i = 0; i < bytes.length; i += 3) {
-    const a = bytes[i]
-    const b = bytes[i + 1] ?? 0
-    const c = bytes[i + 2] ?? 0
-    const triple = (a << 16) | (b << 8) | c
-    out += chars[(triple >> 18) & 63]
-    out += chars[(triple >> 12) & 63]
-    out += i + 1 < bytes.length ? chars[(triple >> 6) & 63] : '='
-    out += i + 2 < bytes.length ? chars[triple & 63] : '='
-  }
-  return out
-}
-
-function fromBase64(encoded: string): string {
-  if (typeof atob === 'function') return atob(encoded)
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
-  const clean = encoded.replace(/=+$/, '')
-  const bytes: number[] = []
-  for (let i = 0; i < clean.length; i += 4) {
-    const n =
-      (chars.indexOf(clean[i]) << 18) |
-      (chars.indexOf(clean[i + 1]) << 12) |
-      (chars.indexOf(clean[i + 2] ?? 'A') << 6) |
-      chars.indexOf(clean[i + 3] ?? 'A')
-    bytes.push((n >> 16) & 255)
-    if (clean[i + 2]) bytes.push((n >> 8) & 255)
-    if (clean[i + 3]) bytes.push(n & 255)
-  }
-  return new TextDecoder().decode(Uint8Array.from(bytes))
-}
-
-/** Demo-at-rest encryption — production would use KMS / field-level crypto */
-export function encryptCredentialValue(raw: string): string {
+/** Irreversible fingerprint — not encryption; full value is discarded after hashing. */
+export function credentialFingerprint(raw: string): string {
   const normalized = raw.trim().toUpperCase()
-  return toBase64(`${DEMO_KEY}:${normalized}`)
-}
-
-export function decryptCredentialValue(encrypted: string): string | null {
-  try {
-    const raw = fromBase64(encrypted)
-    if (!raw.startsWith(`${DEMO_KEY}:`)) return null
-    return raw.slice(DEMO_KEY.length + 1)
-  } catch {
-    return null
+  // FNV-1a 64-bit style mix — deterministic, non-reversible for credential recovery
+  let h = 0xcbf29ce484222325n
+  for (let i = 0; i < normalized.length; i++) {
+    h ^= BigInt(normalized.charCodeAt(i))
+    h = (h * 0x100000001b3n) & 0xffffffffffffffffn
   }
+  // Domain-separated with app salt that does not embed the plaintext
+  const salt = 'novara-cred-fingerprint-v2'
+  let h2 = 0xcbf29ce484222325n
+  const mixed = `${salt}:${h.toString(16)}`
+  for (let i = 0; i < mixed.length; i++) {
+    h2 ^= BigInt(mixed.charCodeAt(i))
+    h2 = (h2 * 0x100000001b3n) & 0xffffffffffffffffn
+  }
+  return `fp_${h2.toString(16).padStart(16, '0')}`
 }
 
-/** PTIN format: P + 8 digits */
+/** @deprecated Removed — credentials are never stored in recoverable form */
+export function encryptCredentialValue(_raw: string): string {
+  throw new Error('CREDENTIAL_STORAGE_CHANGED: full credential values are not stored. Use submitCredential().')
+}
+
+/** @deprecated Removed — nothing to decrypt */
+export function decryptCredentialValue(_encrypted: string): string | null {
+  return null
+}
+
 export function isValidPtinFormat(value: string): boolean {
   return /^P\d{8}$/i.test(value.trim())
 }
 
-/** EFIN format: 6 digits */
 export function isValidEfinFormat(value: string): boolean {
   return /^\d{6}$/.test(value.trim())
 }
 
-/** EIN format: XX-XXXXXXX or 9 digits */
 export function isValidEinFormat(value: string): boolean {
   const v = value.trim()
   return /^\d{2}-\d{7}$/.test(v) || /^\d{9}$/.test(v)
@@ -112,8 +81,8 @@ function lastFourOf(value: string): string {
 }
 
 /**
- * Accept a credential for storage. Status is always unverified or pending —
- * never verified from manual entry alone.
+ * Accept a credential for storage. Status is always pending —
+ * never verified from manual entry alone. Full value is discarded.
  */
 export function submitCredential(
   kind: CredentialKind,
@@ -131,35 +100,37 @@ export function submitCredential(
     return { ok: false, error: 'EIN must be 9 digits (XX-XXXXXXX).' }
   }
 
+  const lastFour = lastFourOf(value)
   const credential: ProfessionalCredential = {
     kind,
-    valueEncrypted: encryptCredentialValue(value),
-    lastFour: lastFourOf(value),
+    valueFingerprint: credentialFingerprint(value),
+    lastFour,
     status: 'pending_verification',
     submittedAt: new Date().toISOString(),
     method: 'irs_lookup_pending',
     taxYear,
     displayHint:
       kind === 'ptin'
-        ? `PTIN ····${lastFourOf(value)} (pending verification)`
+        ? `PTIN ····${lastFour} (pending verification)`
         : kind === 'efin'
-          ? `EFIN ····${lastFourOf(value)} (pending verification)`
-          : `EIN ····${lastFourOf(value)} (pending verification)`,
+          ? `EFIN ····${lastFour} (pending verification)`
+          : `EIN ····${lastFour} (pending verification)`,
   }
   return { ok: true, credential }
 }
 
-/** Seed helper — only for demo accounts that completed an authorized verification path */
+/** Seed helper — demo accounts that completed an authorized verification path */
 export function seedVerifiedCredential(
   kind: CredentialKind,
   rawValue: string,
   taxYear = 2025,
 ): ProfessionalCredential {
   const value = rawValue.trim().toUpperCase()
+  const lastFour = lastFourOf(value)
   return {
     kind,
-    valueEncrypted: encryptCredentialValue(value),
-    lastFour: lastFourOf(value),
+    valueFingerprint: credentialFingerprint(value),
+    lastFour,
     status: 'verified',
     submittedAt: new Date(Date.now() - 86400000 * 30).toISOString(),
     verifiedAt: new Date(Date.now() - 86400000 * 28).toISOString(),
@@ -167,14 +138,13 @@ export function seedVerifiedCredential(
     taxYear,
     displayHint:
       kind === 'ptin'
-        ? `PTIN ····${lastFourOf(value)} (verified)`
+        ? `PTIN ····${lastFour} (verified)`
         : kind === 'efin'
-          ? `EFIN ····${lastFourOf(value)} (verified)`
-          : `EIN ····${lastFourOf(value)} (verified)`,
+          ? `EFIN ····${lastFour} (verified)`
+          : `EIN ····${lastFour} (verified)`,
   }
 }
 
-/** Request async verification (demo) — keeps pending until authorized process completes */
 export function requestCredentialVerification(
   credential: ProfessionalCredential,
 ): ProfessionalCredential {
@@ -187,11 +157,6 @@ export function requestCredentialVerification(
   }
 }
 
-/**
- * Complete verification only via an authorized method — not available as a
- * client-side "I confirm" toggle for user-entered values in production.
- * Demo exposes this only for admin/test harness after simulating IRS lookup.
- */
 export function completeAuthorizedVerification(
   credential: ProfessionalCredential,
   authorized: boolean,

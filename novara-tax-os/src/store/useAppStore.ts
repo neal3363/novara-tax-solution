@@ -91,12 +91,27 @@ import {
 import { applyParsedFacts, parseTaxpayerStatement } from '../engine/naturalLanguageFacts'
 import { evaluateDependent } from '../engine/dependentsEngine'
 import type { BenefitSnapshot } from '../data/types'
+import {
+  createUploadInvite,
+  markInviteUsed,
+  revokeInvite,
+  validateUploadInvite,
+  type UploadInvite,
+} from '../engine/secureUploadInvite'
+import { parsePriorReturnExport, type ImportedReturnDraft } from '../engine/priorReturnImport'
+import { runPreFilingQa } from '../engine/qaEngine'
+import { buildCalcAuditTrail } from '../engine/calcAuditTrail'
+import {
+  buildClientNotification,
+  shouldSuppressDuplicate,
+  type NotificationKind,
+} from '../engine/clientNotifications'
 
 /** Role preference only — never store tax demo payloads in localStorage */
 const ROLE_KEY = 'novara-tax-os-role'
 const USER_KEY = 'novara-tax-os-user-id'
 /** Session-scoped demo state (clears when the tab closes) */
-const SESSION_KEY = 'novara-tax-os-session-v11'
+const SESSION_KEY = 'novara-tax-os-session-v12'
 
 function money(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n)
@@ -248,7 +263,8 @@ function toSnapshot(profile: TaxpayerProfile, reason?: string): BenefitSnapshot 
 
 function syncReturnRefund(report: BenefitSnapshot) {
   return state.returns.map((r) =>
-    r.id === state.activeReturnId || (r.clientId === (state.currentUser?.id ?? 'u-tax') && r.taxYear === 2025)
+    r.id === state.activeReturnId ||
+    (r.clientId === (state.currentUser?.id ?? 'u-tax') && r.taxYear === state.activeTaxYear)
       ? {
           ...r,
           refundOrOwe: report.projectedRefund,
@@ -394,6 +410,11 @@ let state: Store = {
   householdIntake: emptyHouseholdIntake(),
   multiYearEngagements: [],
   activeTaxYear: resolveFilingSeason().currentTaxYear,
+  uploadInvites: [],
+  clientNotifications: [],
+  lastQaReport: null,
+  calcAuditTrail: null,
+  filingAuthorized: false,
   hydrated: false,
 }
 
@@ -466,6 +487,7 @@ function hydrate() {
     sessionStorage.removeItem('novara-tax-os-session-v8')
     sessionStorage.removeItem('novara-tax-os-session-v9')
     sessionStorage.removeItem('novara-tax-os-session-v10')
+    sessionStorage.removeItem('novara-tax-os-session-v11')
 
     const role = localStorage.getItem(ROLE_KEY) as Role | null
     const userId = localStorage.getItem(USER_KEY)
@@ -497,6 +519,11 @@ function hydrate() {
         householdIntake: parsed.householdIntake ?? emptyHouseholdIntake(),
         multiYearEngagements: parsed.multiYearEngagements ?? [],
         activeTaxYear: parsed.activeTaxYear ?? resolveFilingSeason().currentTaxYear,
+        uploadInvites: parsed.uploadInvites ?? [],
+        clientNotifications: parsed.clientNotifications ?? [],
+        lastQaReport: parsed.lastQaReport ?? null,
+        calcAuditTrail: parsed.calcAuditTrail ?? null,
+        filingAuthorized: parsed.filingAuthorized ?? false,
         returns: scoped.returns,
         documents: scoped.documents,
         benefitReport,
@@ -1290,8 +1317,42 @@ export const actions = {
       emit()
       return
     }
+    const year = state.activeTaxYear
+    state = { ...state, filingAuthorized: true }
+    const qa = runPreFilingQa({
+      profile: state.taxProfile,
+      documents: state.documents,
+      taxReturn:
+        state.returns.find((r) => r.id === state.activeReturnId) ??
+        state.returns.find((r) => r.clientId === actor?.id && r.taxYear === year),
+      benefitReviewSigned: state.benefitReviewSigned,
+      authorizedToFile: true,
+    })
+    const trail = buildCalcAuditTrail(state.taxProfile, runBenefitOptimization(state.taxProfile))
+    state = {
+      ...state,
+      lastQaReport: qa,
+      calcAuditTrail: trail,
+      auditEvents: appendAudit('pre_filing_qa', qa.summary, {
+        canFile: qa.canFile,
+        critical: qa.criticalCount,
+      }),
+    }
+    if (!qa.canFile) {
+      actions.addMessage('system', `Filing blocked by QA: ${qa.summary}`)
+      emit()
+      return
+    }
+    if (!trail.productionReady) {
+      actions.addMessage(
+        'system',
+        'Filing blocked: calculation trail is not production-ready (incomplete refund or blockers).',
+      )
+      emit()
+      return
+    }
     const returns = state.returns.map((r) =>
-      r.clientId === (state.currentUser?.id ?? 'u-tax') && r.taxYear === 2025
+      r.clientId === (state.currentUser?.id ?? 'u-tax') && r.taxYear === year
         ? {
             ...r,
             state: 'Transmitted' as ReturnState,
@@ -1300,21 +1361,38 @@ export const actions = {
           }
         : r,
     )
-    state = { ...state, returns, prepStep: 5 }
+    state = { ...state, returns, prepStep: 5, filingAuthorized: true }
+    actions.notifyClient({
+      kind: 'submitted',
+      clientId: state.currentUser?.id ?? 'u-tax',
+      clientFirstName: state.currentUser?.name ?? 'Client',
+    })
     emit()
-    actions.addMessage('system', 'E-sign captured. Return transmitted through integrated provider adapter.')
+    actions.addMessage(
+      'system',
+      'E-sign captured. Return transmitted through SANDBOX e-file adapter (not a live IRS submission).',
+    )
     setTimeout(() => {
+      // Sandbox acceptance only — clearly labeled; never invents live IRS status
       state = {
         ...state,
         returns: state.returns.map((r) =>
-          r.clientId === (state.currentUser?.id ?? 'u-tax') && r.taxYear === 2025
+          r.clientId === (state.currentUser?.id ?? 'u-tax') && r.taxYear === year
             ? { ...r, state: 'Accepted' as ReturnState }
             : r,
         ),
         prepStep: 5,
       }
+      actions.notifyClient({
+        kind: 'irs_accepted',
+        clientId: state.currentUser?.id ?? 'u-tax',
+        clientFirstName: state.currentUser?.name ?? 'Client',
+      })
       emit()
-      actions.addMessage('assistant', 'Accepted. Final records are in your Document Manager. I’ll stay with you year-round.')
+      actions.addMessage(
+        'assistant',
+        'Sandbox provider response: Accepted (test). Final records are in your Document Manager. This is not a live IRS acceptance.',
+      )
     }, 1600)
   },
   advanceReturn(id: string, next: ReturnState) {
@@ -1533,6 +1611,26 @@ export const actions = {
     if (!actions.assertReturnAccess(returnId)) {
       return { ok: false as const, error: 'Access denied' }
     }
+    const taxReturn = state.returns.find((r) => r.id === returnId)
+    const qa = runPreFilingQa({
+      profile: { ...state.taxProfile, taxYear: taxReturn?.taxYear ?? state.taxProfile.taxYear },
+      documents: state.documents,
+      taxReturn,
+      benefitReviewSigned: state.benefitReviewSigned,
+      authorizedToFile: state.filingAuthorized,
+    })
+    state = { ...state, lastQaReport: qa }
+    if (!qa.canFile) {
+      state = {
+        ...state,
+        auditEvents: appendAudit('transmit_blocked_qa', qa.summary, {
+          returnId,
+          critical: qa.criticalCount,
+        }),
+      }
+      emit()
+      return { ok: false as const, error: qa.summary }
+    }
     state = {
       ...state,
       returns: state.returns.map((r) =>
@@ -1540,9 +1638,11 @@ export const actions = {
           ? { ...r, state: 'Transmitted' as ReturnState, readiness: 100, updatedAt: new Date().toISOString() }
           : r,
       ),
-      auditEvents: appendAudit('return_transmitted', `Return ${returnId} transmitted under verified credentials.`, {
-        returnId,
-      }),
+      auditEvents: appendAudit(
+        'return_transmitted',
+        `Return ${returnId} transmitted under verified credentials (sandbox e-file).`,
+        { returnId },
+      ),
     }
     emit()
     return { ok: true as const }
@@ -1926,10 +2026,13 @@ export const actions = {
       emit()
       return false
     }
+    const trail = buildCalcAuditTrail(state.taxProfile, runBenefitOptimization(state.taxProfile))
     state = {
       ...state,
       benefitReport,
       benefitReviewSigned: true,
+      filingAuthorized: true,
+      calcAuditTrail: trail,
       returns: state.returns.map((r) =>
         r.id === state.activeReturnId
           ? { ...r, state: 'Ready to File' as ReturnState, readiness: 100, refundOrOwe: benefitReport.projectedRefund, updatedAt: new Date().toISOString() }
@@ -1996,6 +2099,11 @@ export const actions = {
       householdIntake: emptyHouseholdIntake(),
       multiYearEngagements: [],
       activeTaxYear: resolveFilingSeason().currentTaxYear,
+      uploadInvites: [],
+      clientNotifications: [],
+      lastQaReport: null,
+      calcAuditTrail: null,
+      filingAuthorized: false,
       hydrated: true,
     }
     emit()
@@ -2152,6 +2260,222 @@ export const actions = {
     return quoteMultiYearOrder(tier, selections, {
       currentTaxYear: season.currentTaxYear,
       seasonYear: season.seasonYear,
+    })
+  },
+  runQaCheck() {
+    const active =
+      state.returns.find((r) => r.id === state.activeReturnId) ??
+      state.returns.find((r) => r.clientId === state.currentUser?.id && r.taxYear === state.activeTaxYear)
+    const lastQaReport = runPreFilingQa({
+      profile: state.taxProfile,
+      documents: state.documents,
+      taxReturn: active,
+      benefitReviewSigned: state.benefitReviewSigned,
+      authorizedToFile: state.filingAuthorized,
+    })
+    const calcAuditTrail = buildCalcAuditTrail(state.taxProfile, runBenefitOptimization(state.taxProfile))
+    state = {
+      ...state,
+      lastQaReport,
+      calcAuditTrail,
+      auditEvents: appendAudit('qa_rerun', lastQaReport.summary, { canFile: lastQaReport.canFile }),
+    }
+    emit()
+    return lastQaReport
+  },
+  createClientUploadInvite(input: {
+    clientId: string
+    clientName: string
+    channel: 'sms' | 'email' | 'link'
+    destination: string
+  }): { ok: true; invite: UploadInvite } | { ok: false; error: string } {
+    const actor = state.currentUser
+    if (!actor) return { ok: false, error: 'Not signed in.' }
+    const result = createUploadInvite({ actor, ...input })
+    if (!result.ok) return result
+    state = {
+      ...state,
+      uploadInvites: [result.invite, ...state.uploadInvites],
+      auditEvents: appendAudit('upload_invite_created', `Invite for ${input.clientName} via ${input.channel}`, {
+        inviteId: result.invite.id,
+        clientId: input.clientId,
+        tenantId: actor.tenantId,
+      }),
+    }
+    actions.notifyClient({
+      kind: 'upload_invite',
+      clientId: input.clientId,
+      clientFirstName: input.clientName,
+      channel: input.channel === 'link' ? 'in_app' : input.channel,
+    })
+    emit()
+    return result
+  },
+  revokeUploadInvite(inviteId: string) {
+    const inv = state.uploadInvites.find((i) => i.id === inviteId)
+    if (!inv || inv.tenantId !== state.currentUser?.tenantId) return
+    state = {
+      ...state,
+      uploadInvites: state.uploadInvites.map((i) => (i.id === inviteId ? revokeInvite(i) : i)),
+      auditEvents: appendAudit('upload_invite_revoked', `Revoked invite ${inviteId}`, { inviteId }),
+    }
+    emit()
+  },
+  redeemUploadInvite(token: string, files: FileList | File[]) {
+    const invite = state.uploadInvites.find((i) => i.token === token)
+    const check = validateUploadInvite(invite, {
+      tenantId: invite?.tenantId ?? '',
+      clientId: invite?.clientId ?? '',
+    })
+    if (!invite || !check.ok) {
+      return { ok: false as const, error: !check.ok ? check.error : 'Invalid invitation.' }
+    }
+    // Scoped upload only — does not expose existing tax records or grant a full session
+    const list = Array.from(files)
+    const now = new Date().toISOString()
+    const docs: DocumentRecord[] = list.map((file) => {
+      const id = uid('d')
+      const type = classifyDocumentName(file.name)
+      const yearFromName = file.name.match(/(20\d{2})/)
+      return {
+        id,
+        name: file.name,
+        type,
+        taxYear: yearFromName ? Number(yearFromName[1]) : state.activeTaxYear,
+        sizeLabel:
+          file.size > 1024 * 1024
+            ? `${(file.size / 1024 / 1024).toFixed(1)} MB`
+            : `${Math.max(1, Math.round(file.size / 1024))} KB`,
+        uploadedAt: now,
+        status: 'scanning' as const,
+        confidence: 0,
+        ownerId: invite.clientId,
+        clientId: invite.clientId,
+        tenantId: invite.tenantId,
+        storagePath: vaultStoragePath(invite.tenantId, invite.clientId, id),
+        facts: [],
+      }
+    })
+    state = {
+      ...state,
+      documents: [...docs, ...state.documents],
+      uploadInvites: state.uploadInvites.map((i) => (i.id === invite.id ? markInviteUsed(i) : i)),
+      auditEvents: appendAudit(
+        'upload_invite_redeemed',
+        `Documents uploaded via invite ${invite.id} (upload-only access).`,
+        { inviteId: invite.id, clientId: invite.clientId, count: docs.length },
+      ),
+    }
+    emit()
+    // Async classify like normal uploads
+    docs.forEach((doc) => {
+      setTimeout(() => {
+        const confidence = 0.86 + (doc.name.length % 10) / 100
+        const facts = extractFactsForType(doc.type, doc.name, confidence, uid, invite.clientName)
+        state = {
+          ...state,
+          documents: state.documents.map((d) =>
+            d.id === doc.id
+              ? {
+                  ...d,
+                  status: (confidence < 0.9 ? 'needs_review' : 'extracted') as DocumentRecord['status'],
+                  confidence,
+                  facts,
+                }
+              : d,
+          ),
+        }
+        emit()
+      }, 600)
+    })
+    return { ok: true as const, documentIds: docs.map((d) => d.id) }
+  },
+  applyPriorReturnImport(draft: ImportedReturnDraft) {
+    // Never auto-apply filing status or dependents — wages/withholding only when present, flagged
+    let taxProfile = { ...state.taxProfile }
+    if (typeof draft.wages === 'number') taxProfile = { ...taxProfile, wages: draft.wages }
+    if (typeof draft.withholding === 'number') taxProfile = { ...taxProfile, withholding: draft.withholding }
+    taxProfile = {
+      ...taxProfile,
+      answers: {
+        ...taxProfile.answers,
+        prior_return_imported: 'yes',
+        prior_return_vendor: draft.vendor,
+        prior_return_year: draft.taxYear,
+        // Explicitly do NOT set filing status / dependents from prior year
+      },
+      unresolvedKeys: Array.from(
+        new Set([
+          ...taxProfile.unresolvedKeys,
+          ...draft.uncertainFields.map((f) => `import_${f.replace(/\s+/g, '_').toLowerCase()}`),
+        ]),
+      ),
+    }
+    const benefitReport = toSnapshot(taxProfile, `Applied draft facts from ${draft.vendor} prior return (pending confirmation).`)
+    const trail = buildCalcAuditTrail(taxProfile, runBenefitOptimization(taxProfile))
+    state = {
+      ...state,
+      taxProfile,
+      benefitReport,
+      calcAuditTrail: trail,
+      benefitReviewSigned: false,
+      filingAuthorized: false,
+      returns: syncReturnRefund(benefitReport),
+      interviewChat: [
+        ...state.interviewChat,
+        {
+          id: uid('iv'),
+          role: 'assistant',
+          text: `I imported draft facts from ${draft.rawSourceLabel}. Filing status and dependents were NOT reused. Please confirm wages, withholding, and current-year eligibility.`,
+          at: new Date().toISOString(),
+        },
+      ],
+      auditEvents: appendAudit('prior_return_import', `Imported draft from ${draft.vendor}`, {
+        vendor: draft.vendor,
+        taxYear: draft.taxYear,
+        confidence: draft.confidence,
+      }),
+    }
+    emit()
+  },
+  notifyClient(input: {
+    kind: NotificationKind
+    clientId: string
+    clientFirstName: string
+    channel?: 'sms' | 'email' | 'in_app'
+    relatedReturnId?: string
+  }) {
+    const actor = state.currentUser
+    if (!actor) return null
+    if (shouldSuppressDuplicate(state.clientNotifications, input.kind, input.clientId)) {
+      return null
+    }
+    const note = buildClientNotification({
+      id: uid('ntf'),
+      kind: input.kind,
+      tenantId: actor.tenantId,
+      clientId: input.clientId,
+      clientFirstName: input.clientFirstName,
+      channel: input.channel,
+      relatedReturnId: input.relatedReturnId,
+    })
+    state = {
+      ...state,
+      clientNotifications: [note, ...state.clientNotifications].slice(0, 100),
+      auditEvents: appendAudit('client_notification', note.subject, {
+        kind: note.kind,
+        clientId: note.clientId,
+        channel: note.channel,
+      }),
+    }
+    // Caller may emit; if called mid-action without emit, still persist on next emit
+    return note
+  },
+  parsePriorReturnFile(fileName: string, textContent?: string) {
+    return parsePriorReturnExport({
+      fileName,
+      textContent,
+      fallbackTaxpayerName: state.currentUser?.name ?? 'Taxpayer',
     })
   },
 }

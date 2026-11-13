@@ -11,7 +11,7 @@ import type { DocType, DocumentRecord } from '../data/types'
 import type { DependentRecord, DependentRelationship } from './dependentsEngine'
 import { emptyDependent, evaluateDependent, maskTinLast4 } from './dependentsEngine'
 import type { TaxpayerProfile } from './benefitOptimizer'
-import { encryptCredentialValue } from './credentials'
+import { credentialFingerprint } from './credentials'
 
 export type IntakePhase =
   | 'upload'
@@ -47,8 +47,8 @@ export interface ExtractedPerson {
   id: string
   fullLegalName: string
   dateOfBirth?: string
-  /** Encrypted full TIN when extracted — never render raw */
-  tinEncrypted?: string
+  /** Irreversible TIN fingerprint — never store or render full SSN */
+  tinFingerprint?: string
   tinLast4?: string
   address?: string
   sourceDocIds: string[]
@@ -185,12 +185,12 @@ export function maskSensitiveFactValue(label: string, value: string): string {
   return value
 }
 
-export function encryptTinIfPresent(raw: string | undefined): { tinEncrypted?: string; tinLast4?: string } {
+export function encryptTinIfPresent(raw: string | undefined): { tinFingerprint?: string; tinLast4?: string } {
   if (!raw) return {}
   const digits = raw.replace(/\D/g, '')
   if (digits.length < 4) return {}
   return {
-    tinEncrypted: encryptCredentialValue(digits),
+    tinFingerprint: credentialFingerprint(digits),
     tinLast4: digits.slice(-4),
   }
 }
@@ -260,7 +260,7 @@ export function extractPeopleFromDocuments(
       byKey.set(key, {
         ...existing,
         dateOfBirth: existing.dateOfBirth || partial.dateOfBirth,
-        tinEncrypted: existing.tinEncrypted || partial.tinEncrypted,
+        tinFingerprint: existing.tinFingerprint || partial.tinFingerprint,
         tinLast4: existing.tinLast4 || partial.tinLast4,
         address: existing.address || partial.address,
         sourceDocIds: Array.from(new Set([...existing.sourceDocIds, ...partial.sourceDocIds])),

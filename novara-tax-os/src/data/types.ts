@@ -314,4 +314,14 @@ export interface AppState {
   multiYearEngagements: MultiYearEngagement[]
   /** Active tax year for prepare / vault focus */
   activeTaxYear: number
+  /** Secure client upload invitations (TP / Office) */
+  uploadInvites: import('../engine/secureUploadInvite').UploadInvite[]
+  /** Client/preparer notification log (sandbox messaging) */
+  clientNotifications: import('../engine/clientNotifications').ClientNotification[]
+  /** Last pre-filing QA report */
+  lastQaReport: import('../engine/qaEngine').QaReport | null
+  /** Deterministic calculation audit trail */
+  calcAuditTrail: import('../engine/calcAuditTrail').CalcAuditTrail | null
+  /** Filing authorization captured after review */
+  filingAuthorized: boolean
 }

@@ -26,6 +26,10 @@ import { Staff } from './pages/office/Staff'
 import { Pipeline } from './pages/office/Pipeline'
 import { AdminHome } from './pages/admin/AdminHome'
 import { Tenants } from './pages/admin/Tenants'
+import { AiAssistant } from './pages/taxpayer/AiAssistant'
+import { PriorReturnImport } from './pages/taxpayer/PriorReturnImport'
+import { RequestDocuments } from './pages/preparer/RequestDocuments'
+import { SecureUpload } from './pages/public/SecureUpload'
 
 export default function App() {
   return (
@@ -34,11 +38,14 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<RegisterHub />} />
       <Route path="/register/:tier" element={<RegisterFlow />} />
+      <Route path="/upload/:token" element={<SecureUpload />} />
       <Route path="/app" element={<RequireAuth />}>
         <Route path="taxpayer" element={<RoleGate roles={['taxpayer']}><TaxpayerHome /></RoleGate>} />
         <Route path="taxpayer/years" element={<RoleGate roles={['taxpayer']}><MultiYearDashboard /></RoleGate>} />
         <Route path="taxpayer/years/select" element={<RoleGate roles={['taxpayer']}><YearSelect /></RoleGate>} />
         <Route path="taxpayer/prepare" element={<RoleGate roles={['taxpayer']}><Prepare /></RoleGate>} />
+        <Route path="taxpayer/assistant" element={<RoleGate roles={['taxpayer']}><AiAssistant /></RoleGate>} />
+        <Route path="taxpayer/import" element={<RoleGate roles={['taxpayer']}><PriorReturnImport /></RoleGate>} />
         <Route path="taxpayer/vault" element={<RoleGate roles={['taxpayer']}><Vault /></RoleGate>} />
         <Route path="taxpayer/documents" element={<RoleGate roles={['taxpayer']}><DocumentsNeeded /></RoleGate>} />
         <Route path="taxpayer/dependents" element={<RoleGate roles={['taxpayer']}><Dependents /></RoleGate>} />
@@ -54,6 +61,8 @@ export default function App() {
         <Route path="preparer/workspace" element={<RoleGate roles={['preparer']}><Workspace /></RoleGate>} />
         <Route path="preparer/entry-plan" element={<RoleGate roles={['preparer']}><EntryPlan /></RoleGate>} />
         <Route path="preparer/return" element={<RoleGate roles={['preparer']}><ReturnEditor /></RoleGate>} />
+        <Route path="preparer/request-docs" element={<RoleGate roles={['preparer']}><RequestDocuments /></RoleGate>} />
+        <Route path="preparer/import" element={<RoleGate roles={['preparer']}><PriorReturnImport /></RoleGate>} />
         <Route path="preparer/benefits" element={<RoleGate roles={['preparer']}><BenefitDashboard /></RoleGate>} />
         <Route path="preparer/benefits/interview" element={<RoleGate roles={['preparer']}><BenefitInterview /></RoleGate>} />
         <Route path="preparer/benefits/review" element={<RoleGate roles={['preparer']}><BenefitReview /></RoleGate>} />
@@ -61,6 +70,7 @@ export default function App() {
         <Route path="office" element={<RoleGate roles={['efin_owner']}><OfficeHome /></RoleGate>} />
         <Route path="office/staff" element={<RoleGate roles={['efin_owner']}><Staff /></RoleGate>} />
         <Route path="office/pipeline" element={<RoleGate roles={['efin_owner']}><Pipeline /></RoleGate>} />
+        <Route path="office/request-docs" element={<RoleGate roles={['efin_owner']}><RequestDocuments /></RoleGate>} />
 
         <Route path="admin" element={<RoleGate roles={['admin']}><AdminHome /></RoleGate>} />
         <Route path="admin/tenants" element={<RoleGate roles={['admin']}><Tenants /></RoleGate>} />
