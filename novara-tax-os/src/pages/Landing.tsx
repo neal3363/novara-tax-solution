@@ -1,5 +1,9 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { BrandMark } from '../components/BrandMark'
+import { HeroVideoBackground } from '../components/HeroVideoBackground'
+import { MusicControls } from '../components/MusicControls'
+import { useAmbientAudio } from '../ambient/AmbientAudioContext'
 import {
   OFFICE_BUSINESS_FEE,
   OFFICE_PERSONAL_FEE,
@@ -15,6 +19,8 @@ import {
   formatMoney,
 } from '../data/fees'
 import './Landing.css'
+
+const ENTERED_KEY = 'novara-welcome-entered'
 
 const FEATURES: { title: string; body: string; status: 'live' | 'partial' | 'soon' }[] = [
   {
@@ -88,10 +94,29 @@ const COMPARE = [
 ]
 
 export function Landing() {
+  const ambient = useAmbientAudio()
+  const [entered, setEntered] = useState(() => {
+    try {
+      return sessionStorage.getItem(ENTERED_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
+
+  function enterNovara() {
+    try {
+      sessionStorage.setItem(ENTERED_KEY, '1')
+    } catch {
+      /* ignore */
+    }
+    setEntered(true)
+    ambient.enterAndPlay()
+  }
+
   return (
     <div className="app-shell home">
       <section className="landing-hero">
-        <div className="hero-atmosphere" aria-hidden />
+        <HeroVideoBackground />
         <div className="container hero-shell">
           <nav className="landing-nav">
             <div className="landing-brand">
@@ -102,6 +127,7 @@ export function Landing() {
               </div>
             </div>
             <div className="hero-nav-actions">
+              {entered && <MusicControls compact className="landing-music" />}
               <a className="nav-text" href="#how">
                 How it works
               </a>
@@ -111,37 +137,75 @@ export function Landing() {
               <Link className="btn btn-secondary landing-ghost" to="/login?intent=professional">
                 Tax pros
               </Link>
-              <Link className="btn btn-primary hero-solid" to="/register">
+              <Link
+                className="btn btn-primary hero-solid"
+                to="/register"
+                onClick={() => {
+                  if (!entered) enterNovara()
+                }}
+              >
                 Start
               </Link>
             </div>
           </nav>
 
-          <div className="hero-copy">
-            <p className="hero-brand brand rise">NOVARA TAX OS</p>
-            <h1 className="rise rise-delay-1">Speak It. Upload It. File It.</h1>
-            <p className="hero-tagline rise rise-delay-2">
-              Tell NOVARA what you’re filing, upload your documents, and answer only the questions we still need.
-            </p>
-            <p className="lead rise rise-delay-2">
-              Voice, typing, and uploads share one interview — switch anytime. Tax math stays on the verified engine, not
-              conversational guesses.
-            </p>
-            <p className="lead soft rise rise-delay-3">
-              Start speaking, drop a W-2, type a correction, then finish by voice again — all on the same return.
-            </p>
-            <div className="hero-actions rise rise-delay-3">
-              <Link className="btn btn-primary hero-solid" to="/login?next=/app/taxpayer/assistant&mode=speak">
-                Start Speaking
-              </Link>
-              <Link className="btn btn-secondary landing-ghost" to="/login?next=/app/taxpayer/assistant&mode=upload">
-                Upload Documents
-              </Link>
-              <Link className="btn btn-ghost landing-ghost" to="/login?next=/app/taxpayer/assistant&mode=type">
-                Type to NOVARA
-              </Link>
+          {!entered ? (
+            <div className="hero-copy hero-welcome">
+              <p className="hero-brand brand rise">NOVARA TAX OS</p>
+              <h1 className="rise rise-delay-1">Speak It. Upload It. File It.</h1>
+              <p className="hero-tagline rise rise-delay-2">
+                A premium, voice-first tax preparation experience — tell NOVARA what you need, upload documents, and
+                answer only what’s still missing.
+              </p>
+              <div className="hero-actions rise rise-delay-3">
+                <button className="btn btn-primary hero-solid hero-enter" type="button" onClick={enterNovara}>
+                  Enter NOVARA
+                </button>
+              </div>
+              <p className="lead soft rise rise-delay-3">
+                Music starts gently after you enter (browser rules require a tap). Mute anytime — the interview stays
+                distraction-free once you’re inside.
+              </p>
             </div>
-          </div>
+          ) : (
+            <div className="hero-copy">
+              <p className="hero-brand brand rise">NOVARA TAX OS</p>
+              <h1 className="rise rise-delay-1">Speak It. Upload It. File It.</h1>
+              <p className="hero-tagline rise rise-delay-2">
+                Tell NOVARA what you’re filing, upload your documents, and answer only the questions we still need.
+              </p>
+              <p className="lead rise rise-delay-2">
+                Voice, typing, and uploads share one interview — switch anytime. Tax math stays on the verified engine,
+                not conversational guesses.
+              </p>
+              <div className="hero-actions rise rise-delay-3">
+                <Link
+                  className="btn btn-primary hero-solid"
+                  to="/login?next=/app/taxpayer/assistant&mode=speak"
+                  onClick={() => ambient.enterAndPlay()}
+                >
+                  Start Speaking
+                </Link>
+                <Link
+                  className="btn btn-secondary landing-ghost"
+                  to="/login?next=/app/taxpayer/assistant&mode=upload"
+                  onClick={() => ambient.enterAndPlay()}
+                >
+                  Upload Documents
+                </Link>
+                <Link
+                  className="btn btn-ghost landing-ghost"
+                  to="/login?next=/app/taxpayer/assistant&mode=type"
+                  onClick={() => ambient.enterAndPlay()}
+                >
+                  Type to NOVARA
+                </Link>
+              </div>
+              <div className="hero-music-row rise rise-delay-3">
+                <MusicControls />
+              </div>
+            </div>
+          )}
         </div>
       </section>
 

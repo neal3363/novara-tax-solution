@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useAmbientAudioOptional } from '../ambient/AmbientAudioContext'
 
 /** Browser TTS for NOVARA questions — optional; never auto-starts without user unmute. */
 export function NovaraSpeak(props: {
@@ -8,6 +9,7 @@ export function NovaraSpeak(props: {
 }) {
   const [speaking, setSpeaking] = useState(false)
   const utterRef = useRef<SpeechSynthesisUtterance | null>(null)
+  const ambient = useAmbientAudioOptional()
   const supported = typeof window !== 'undefined' && 'speechSynthesis' in window
 
   useEffect(() => {
@@ -17,8 +19,14 @@ export function NovaraSpeak(props: {
       } catch {
         /* ignore */
       }
+      ambient?.setVoiceSpeaking(false)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- cleanup only
   }, [])
+
+  useEffect(() => {
+    ambient?.setVoiceSpeaking(speaking)
+  }, [ambient, speaking])
 
   useEffect(() => {
     if (!props.enabled || !supported || !props.text.trim()) return

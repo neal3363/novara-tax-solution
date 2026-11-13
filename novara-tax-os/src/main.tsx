@@ -9,12 +9,15 @@ import '@fontsource/syne/600.css'
 import '@fontsource/syne/700.css'
 import '@fontsource/syne/800.css'
 import App from './App'
+import { AmbientAudioProvider } from './ambient/AmbientAudioContext'
 import './styles/global.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
-      <App />
+      <AmbientAudioProvider>
+        <App />
+      </AmbientAudioProvider>
     </BrowserRouter>
   </StrictMode>,
 )

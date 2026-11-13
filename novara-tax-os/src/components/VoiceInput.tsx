@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useAmbientAudioOptional } from '../ambient/AmbientAudioContext'
 
 type SpeechRec = {
   continuous: boolean
@@ -35,8 +36,13 @@ export function VoiceInput(props: {
   const [interim, setInterim] = useState('')
   const [permError, setPermError] = useState<string | null>(null)
   const recRef = useRef<SpeechRec | null>(null)
+  const ambient = useAmbientAudioOptional()
   const supported =
     typeof window !== 'undefined' && Boolean(window.SpeechRecognition || window.webkitSpeechRecognition)
+
+  useEffect(() => {
+    ambient?.setMicActive(listening)
+  }, [ambient, listening])
 
   useEffect(() => {
     const Ctor = window.SpeechRecognition || window.webkitSpeechRecognition
@@ -79,6 +85,7 @@ export function VoiceInput(props: {
       } catch {
         /* ignore */
       }
+      ambient?.setMicActive(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- bind once per mount
   }, [])
