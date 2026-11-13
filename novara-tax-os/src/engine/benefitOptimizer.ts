@@ -888,12 +888,11 @@ export function nextInterviewQuestions(p: TaxpayerProfile, report: OptimizationR
     })
   }
 
-  // Prioritize questions tied to open needs_info findings
+  // Prioritize needs_info — but never silently drop unlocked follow-ups (old .slice(0,6) starved the queue).
   const needed = new Set(report.findings.filter((f) => f.status === 'needs_info').flatMap((f) => f.missingAnswers))
   return qs
     .filter((q) => !answered(q.mapsTo))
     .sort((a, b) => Number(needed.has(b.mapsTo)) - Number(needed.has(a.mapsTo)))
-    .slice(0, 6)
 }
 
 function normalizeYesNo(value: string | number | boolean): string | number | boolean {
@@ -960,8 +959,9 @@ export function applyAnswer(p: TaxpayerProfile, mapsTo: string, value: string | 
     next.retirementContributions = typeof value === 'number' ? value : Number(value) || 0
     next.answers.retirement_contributions = 'yes'
   }
-  if (mapsTo === 'self_employed' && (value === 'yes' || value === true) && next.selfEmploymentIncome === 0) {
-    next.selfEmploymentIncome = 5000
+  // Do not invent self-employment income on Yes — amount comes from documents or qbi_amount / Schedule C follow-ups.
+  if (mapsTo === 'self_employed' && (value === 'no' || value === false)) {
+    // Keep document-extracted SE income; explicit No only stores the interview answer.
   }
   if (mapsTo === 'business_vehicle' && (value === 'yes' || value === true)) {
     next.answers.business_vehicle = 'yes'

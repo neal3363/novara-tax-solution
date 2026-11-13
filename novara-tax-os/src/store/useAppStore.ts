@@ -79,6 +79,7 @@ import {
   runBenefitOptimization,
   type TaxpayerProfile,
 } from '../engine/benefitOptimizer'
+import { answerPresent, unapplyAnswerSideEffects } from '../engine/benefitAnswers'
 import {
   applyFilingStatusAnswer,
   conversationalReply,
@@ -223,10 +224,10 @@ function clearAnswerTree(mapsTo: string) {
   removed.forEach((key) => {
     const m = /^dep_(\d+)_(.+)$/.exec(key)
     if (!m) return
-    const idx = Number(m[1])
+    const i = Number(m[1])
     const field = m[2]
-    if (!dependents[idx]) return
-    const dep = { ...dependents[idx] }
+    if (!dependents[i]) return
+    const dep = { ...dependents[i] }
     if (field === 'name') dep.fullLegalName = ''
     if (field === 'dob') {
       dep.dateOfBirth = ''
@@ -241,29 +242,27 @@ function clearAnswerTree(mapsTo: string) {
     if (field === 'student') dep.isStudent = null
     if (field === 'disabled') dep.isDisabled = null
     dep.interviewComplete = false
-    dependents[idx] = dep
+    dependents[i] = dep
   })
-
-  let childcarePaid = state.taxProfile.childcarePaid
-  if (removed.has('paid_childcare') || removed.has('childcare_amount')) {
-    childcarePaid = 0
-  }
 
   let filingStatus = state.taxProfile.filingStatus
   if (removed.has('married_dec31') || removed.has('married_filing_plan') || removed.has('maintained_home')) {
     filingStatus = 'single'
   }
 
+  const baseProfile = {
+    ...state.taxProfile,
+    answers,
+    dependents,
+    filingStatus,
+    unresolvedKeys: state.taxProfile.unresolvedKeys.filter((k) => !removed.has(k)),
+  }
+  // Reverse applyAnswer side-effects (SE income, miles, tuition, etc.) so Edit can reopen
+  const taxProfile = unapplyAnswerSideEffects(baseProfile, removed)
+
   return {
     interviewAnswers: keep,
-    taxProfile: {
-      ...state.taxProfile,
-      answers,
-      dependents,
-      childcarePaid,
-      filingStatus,
-      unresolvedKeys: state.taxProfile.unresolvedKeys.filter((k) => !removed.has(k)),
-    },
+    taxProfile,
   }
 }
 
@@ -1447,12 +1446,14 @@ export const actions = {
     const benefitReport = toSnapshot(cleared.taxProfile)
     const reopen = nextInterviewTurn(cleared.taxProfile)
     const progress = buildInterviewProgress(cleared.taxProfile)
+    // Prefer reopening the edited key when it is now unanswered (Edit must not silently jump away)
+    const focusMapsTo = !answerPresent(cleared.taxProfile, mapsTo) ? mapsTo : reopen?.mapsTo ?? mapsTo
+    const focusedPrompt =
+      progress.questions.find((q) => q.mapsTo === focusMapsTo)?.prompt ?? reopen?.prompt ?? mapsTo
     const chat = {
       id: uid('iv'),
       role: 'assistant' as const,
-      text: reopen
-        ? `${progress.greeting} Let’s update that answer. ${reopen.prompt}`
-        : `${progress.greeting} Answer cleared. Continue when you are ready.`,
+      text: `${progress.greeting} Let’s update that answer. ${focusedPrompt}`,
       at: new Date().toISOString(),
     }
     const inPrepareInterview = state.prepStep === 2 || state.prepStep === 3 || state.prepStep === 4
@@ -1464,7 +1465,7 @@ export const actions = {
       filingAuthorized: false,
       returns: syncReturnRefund(benefitReport),
       prepStep: inPrepareInterview ? 2 : state.prepStep,
-      interviewFocusMapsTo: reopen?.mapsTo ?? mapsTo,
+      interviewFocusMapsTo: focusMapsTo,
       interviewChat: [...state.interviewChat, chat],
       auditEvents: appendAudit('interview_answer_changed', `Changed answer tree from ${mapsTo}`, {
         mapsTo,
@@ -2177,6 +2178,7 @@ export const actions = {
     const taxProfile = applyAnswer(state.taxProfile, mapsTo, value)
     const benefitReport = toSnapshot(taxProfile, `You confirmed “${String(display)}” on a savings follow-up.`)
     const questionPrompt = prompt ?? mapsTo
+    const nextTurn = nextInterviewTurn(taxProfile)
     state = {
       ...state,
       taxProfile,
@@ -2184,6 +2186,7 @@ export const actions = {
       benefitReviewSigned: false,
       returns: syncReturnRefund(benefitReport),
       interviewAnswers: recordInterviewAnswer(mapsTo, questionPrompt, display as string | number),
+      interviewFocusMapsTo: nextTurn?.mapsTo ?? mapsTo,
       auditEvents: appendAudit('benefit_answer', `Confirmed benefit follow-up for ${mapsTo}.`, { mapsTo }),
     }
     emit()
