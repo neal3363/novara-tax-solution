@@ -31,8 +31,30 @@ export function answerPresent(p: TaxpayerProfile, key: string): boolean {
   if (key === 'educator_expenses') return p.educatorExpenses > 0 || p.isEducator || !!v
   if (key === 'filing_status') return p.filingStatus !== 'unknown' || !!v
   if (key === 'earned_income_band') return p.wages + p.selfEmploymentIncome > 0 || !!v
-  if (key === 'self_employed') return p.selfEmploymentIncome > 0 || v === 'yes' || v === true
-  if (key === 'has_earned_income_q') return p.wages + p.selfEmploymentIncome > 0 || v === 'yes' || v === true
+  // Explicit No must count as answered — otherwise discovery/mileage loops forever on
+  // the business / self-employment gate (clients stuck around questions ~0–17).
+  if (key === 'self_employed') {
+    return (
+      p.selfEmploymentIncome > 0 ||
+      v === 'yes' ||
+      v === 'no' ||
+      v === true ||
+      v === false ||
+      v === 'Yes' ||
+      v === 'No'
+    )
+  }
+  if (key === 'has_earned_income_q') {
+    return (
+      p.wages + p.selfEmploymentIncome > 0 ||
+      v === 'yes' ||
+      v === 'no' ||
+      v === true ||
+      v === false ||
+      v === 'Yes' ||
+      v === 'No'
+    )
+  }
   if (key === 'business_vehicle') return p.businessMileage > 0 || v === 'yes' || v === 'no' || v === true || v === false
   if (key === 'total_miles') return typeof v === 'number' || !!v
   if (key === 'paid_childcare') return p.childcarePaid > 0 || v === 'yes' || v === 'no' || v === true || v === false
