@@ -9,7 +9,7 @@ mkdirSync(tmp, { recursive: true })
 writeFileSync(
   join(tmp, 'run.ts'),
   `
-import { DEV_DEMO_USERS, DEV_SEED_DOCS, DEV_SEED_RETURNS } from '../src/data/seed.dev.ts'
+import { DEV_DEMO_USERS, DEV_SEED_DOCS, DEV_SEED_RETURNS } from '../../dev-fixtures/seed.dev.ts'
 import {
   asScopedDocument,
   asScopedReturn,

@@ -4,7 +4,7 @@
  * or if tenant isolation / role clamping regressions appear.
  */
 import { spawnSync } from 'node:child_process'
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
@@ -29,6 +29,13 @@ if (build.status !== 0) {
   process.exit(1)
 }
 
+console.log('=== Dev fixtures must not ship inside the published app tree ===')
+assert(!existsSync(join(root, 'src/data/seed.dev.ts')), 'src/data/seed.dev.ts removed from app tree')
+assert(!existsSync(join(root, 'src/data/seed.dev.js')), 'src/data/seed.dev.js absent from app tree')
+assert(!existsSync(join(root, 'src/components/VoiceInputDev.tsx')), 'vendor STT helper removed from app tree')
+assert(existsSync(join(root, '../dev-fixtures/seed.dev.ts')), 'fixtures remain available outside app tree for local tests')
+assert(existsSync(join(root, '../dev-fixtures/VoiceInputDev.tsx')), 'DEV voice helper remains outside app tree')
+
 console.log('=== Production bundle must not expose multi-tenant / demo PII seed ===')
 const assetsDir = join(root, 'dist/assets')
 const jsFiles = readdirSync(assetsDir).filter((f) => f.endsWith('.js'))
@@ -51,6 +58,11 @@ const forbidden = [
   'LoginDev',
   'TP — Solo',
   'u-owner-lakes',
+  'Continue & edit sample',
+  'Enter sample sandbox',
+  'webkitSpeechRecognition',
+  'SpeechRecognition',
+  'VoiceInputDev',
 ]
 
 for (const needle of forbidden) {
@@ -58,6 +70,10 @@ for (const needle of forbidden) {
 }
 
 assert(!/role-card panel/.test(bundle), 'bundle excludes role-card picker markup')
+assert(
+  bundle.includes('Cloud speech recognition is disabled') || bundle.includes('type to NOVARA'),
+  'production discloses typing-only voice path',
+)
 
 console.log('=== Role clamp helpers ===')
 const clampMod = await import(pathToFileURL(join(root, 'src/auth/sessionClient.ts')).href)

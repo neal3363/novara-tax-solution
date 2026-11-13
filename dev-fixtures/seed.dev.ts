@@ -1,17 +1,16 @@
 /**
  * Multi-tenant demo fixtures for LOCAL DEV only.
- * Never import this module from production login/store paths —
- * Vite must not ship other tenants' records in the published bundle.
+ * Lives outside novara-tax-os/ so Cursor App publish does not ship these files.
  */
-import type { DocumentRecord, OfficeStaffMember, TaxReturn, UserAccount } from './types'
+import type { DocumentRecord, OfficeStaffMember, TaxReturn, UserAccount } from '../novara-tax-os/src/data/types'
 import {
   OFFICE_PERSONAL_FEE,
   TC_PERSONAL_FEE,
   TP_BUSINESS_FEE,
   TP_PERSONAL_FEE,
-} from './fees'
-import { vaultStoragePath } from '../engine/tenantIsolation'
-import { seedVerifiedCredential } from '../engine/credentials'
+} from '../novara-tax-os/src/data/fees'
+import { vaultStoragePath } from '../novara-tax-os/src/engine/tenantIsolation'
+import { seedVerifiedCredential } from '../novara-tax-os/src/engine/credentials'
 
 export const DEV_DEMO_USERS: UserAccount[] = [
   {

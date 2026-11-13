@@ -26,7 +26,7 @@ import { mapReturnToOfficeStatus, officeDashboardMetrics, OFFICE_PIPELINE_STATUS
 import { buildClientNotification, shouldSuppressDuplicate } from '../src/engine/clientNotifications.ts'
 import { wispSummary } from '../src/engine/securityPlan.ts'
 import { decryptCredentialValue, submitCredential, credentialFingerprint } from '../src/engine/credentials.ts'
-import { DEV_DEMO_USERS } from '../src/data/seed.dev.ts'
+import { DEV_DEMO_USERS } from '../../dev-fixtures/seed.dev.ts'
 import type { TaxReturn } from '../src/data/types.ts'
 
 let failed = 0

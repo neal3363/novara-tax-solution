@@ -1,0 +1,74 @@
+.music-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+
+.music-controls .music-btn {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.1);
+  color: inherit;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  cursor: pointer;
+  min-height: 2rem;
+}
+
+.music-controls .music-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.music-controls .music-btn:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.music-controls .music-vol {
+  display: inline-flex;
+  align-items: center;
+  min-width: 5.5rem;
+}
+
+.music-controls .music-vol input {
+  width: 5.5rem;
+  accent-color: #2dd4bf;
+}
+
+.music-controls .music-status {
+  font-size: 0.72rem;
+  opacity: 0.78;
+  white-space: nowrap;
+}
+
+.music-controls.compact .music-status {
+  display: none;
+}
+
+/* App nav (light chrome) */
+.top-nav .music-controls .music-btn {
+  border-color: rgba(15, 23, 42, 0.14);
+  background: rgba(15, 23, 42, 0.04);
+  color: var(--ink, #0f172a);
+}
+
+.top-nav .music-controls .music-status {
+  color: var(--muted, #64748b);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}

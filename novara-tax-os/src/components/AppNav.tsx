@@ -1,5 +1,6 @@
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { BrandMark } from './BrandMark'
+import { MusicControls } from './MusicControls'
 import { actions, useAppStore } from '../store/useAppStore'
 import './AppNav.css'
 
@@ -70,6 +71,7 @@ export function AppNav() {
             ))}
           </nav>
           <div className="top-user">
+            <MusicControls compact className="nav-music" />
             <div className="user-chip">
               <span className="user-name">{currentUser.name}</span>
               <span className="user-role">

@@ -141,7 +141,7 @@ export function isSampleSandboxSession(): boolean {
   return sessionStorage.getItem(SAMPLE_SANDBOX_KEY) === '1'
 }
 
-type DevSeedModule = typeof import('../data/seed.dev')
+type DevSeedModule = typeof import('@dev-fixtures/seed.dev')
 let devSeedCache: DevSeedModule | null = null
 
 async function loadDevSeed(): Promise<DevSeedModule> {
@@ -149,7 +149,8 @@ async function loadDevSeed(): Promise<DevSeedModule> {
     throw new Error('Dev seed is unavailable outside local development')
   }
   if (devSeedCache) return devSeedCache
-  devSeedCache = await import('../data/seed.dev')
+  // Fixtures live outside the published app tree (see /dev-fixtures).
+  devSeedCache = await import('@dev-fixtures/seed.dev')
   return devSeedCache
 }
 
@@ -505,22 +506,14 @@ function persist() {
 }
 
 function resolveStoredUser(role: Role | null, userId: string | null): UserAccount | null {
-  // Production: only restore a client-stored user for the sample sandbox (taxpayer-clamped).
-  // Cursor-verified sessions are rebound from /api/session in RequireAuth.
-  if (!import.meta.env.DEV && !isSampleSandboxSession()) return null
+  // Production: never restore identity from client storage — RequireAuth rebinds from /api/session.
+  if (!import.meta.env.DEV) return null
   if (!role) return null
   try {
     const raw = sessionStorage.getItem(USER_JSON_KEY)
     if (raw) {
       const user = JSON.parse(raw) as UserAccount
       if ((!userId || user.id === userId) && user.role === role) {
-        if (!import.meta.env.DEV) {
-          return {
-            ...user,
-            role: clampProductionRole(user.role),
-            accountType: clampProductionAccountType(user.accountType),
-          }
-        }
         return user
       }
     }
@@ -664,10 +657,13 @@ export const actions = {
     emit()
   },
   /**
-   * Sample sandbox for the published demo: any visitor can enter an editable
-   * taxpayer workspace on this device. No multi-tenant seed; no role elevation.
+   * Local-dev only guest workspace. Production requires a verified Cursor session.
    */
   loginAsSampleSandbox(label?: string) {
+    if (!import.meta.env.DEV) {
+      console.warn('Sample sandbox is disabled outside local development')
+      return
+    }
     sessionStorage.setItem(SAMPLE_SANDBOX_KEY, '1')
     const guestKey =
       sessionStorage.getItem('novara-sample-guest-key') ||

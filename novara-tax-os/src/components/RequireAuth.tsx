@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Navigate, Outlet } from 'react-router-dom'
 import { fetchViewerSession } from '../auth/sessionClient'
-import { actions, isSampleSandboxSession, useAppStore } from '../store/useAppStore'
+import { actions, useAppStore } from '../store/useAppStore'
 import { AppNav } from './AppNav'
 
 const IS_DEV = import.meta.env.DEV
 
 /**
- * Production: prefer Cursor-verified identity; otherwise allow the sample
- * sandbox session so owners and demo viewers can stay in and edit.
+ * Production: Cursor-verified identity only (GET /api/session).
+ * Sample / guest sandbox entry is local-dev only.
  */
 export function RequireAuth() {
   const { currentUser } = useAppStore()
@@ -19,6 +19,12 @@ export function RequireAuth() {
     if (IS_DEV) return
     let cancelled = false
     ;(async () => {
+      // Drop any leftover guest-sandbox flag from older builds.
+      try {
+        sessionStorage.removeItem('novara-tax-os-sample-sandbox')
+      } catch {
+        /* ignore */
+      }
       const session = await fetchViewerSession()
       if (cancelled) return
       if (session.verified) {
@@ -27,21 +33,13 @@ export function RequireAuth() {
         setReady(true)
         return
       }
-      // Keep sample sandbox users in (editable demo on this device).
-      if (isSampleSandboxSession()) {
-        if (!currentUser) actions.loginAsSampleSandbox()
-        setDenied(false)
-        setReady(true)
-        return
-      }
+      actions.clearSession()
       setDenied(true)
       setReady(true)
     })()
     return () => {
       cancelled = true
     }
-    // Intentionally once on mount — sample/current user rebound inside.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   if (!IS_DEV && !ready) {
@@ -55,16 +53,14 @@ export function RequireAuth() {
   if (!IS_DEV && denied && !currentUser) return <Navigate to="/login" replace />
   if (!currentUser) return <Navigate to="/login" replace />
 
-  const sample = !IS_DEV && isSampleSandboxSession()
-
   return (
     <div className="app-shell">
       <AppNav />
       <main className="app-main">
         <div className="container" style={{ paddingTop: '0.85rem' }}>
           <div className="sample-banner" role="status">
-            {sample
-              ? 'Sample sandbox — editable on this device. Not a live IRS filing connection.'
+            {IS_DEV
+              ? 'Local development workspace — not a live IRS filing connection.'
               : 'Signed in with Cursor — editable taxpayer workspace on this device. Not a live IRS filing connection.'}
           </div>
         </div>

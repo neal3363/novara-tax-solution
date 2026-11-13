@@ -10,22 +10,21 @@ const IS_DEV = import.meta.env.DEV
 /** Role picker lives in a DEV-only chunk — never shipped in production. */
 const LoginDev = IS_DEV ? lazy(() => import('./LoginDev').then((m) => ({ default: m.LoginDev }))) : null
 
-function enterSampleSandbox(navigate: ReturnType<typeof useNavigate>, name?: string) {
-  actions.loginAsSampleSandbox(name)
-  navigate('/app/taxpayer', { replace: true })
-}
-
 export function Login() {
   const navigate = useNavigate()
   const [busy, setBusy] = useState(!IS_DEV)
   const [error, setError] = useState<string | null>(null)
-  const [ownerName, setOwnerName] = useState('')
 
   useEffect(() => {
     if (IS_DEV) return
     let cancelled = false
     ;(async () => {
       setBusy(true)
+      try {
+        sessionStorage.removeItem('novara-tax-os-sample-sandbox')
+      } catch {
+        /* ignore */
+      }
       const session = await fetchViewerSession()
       if (cancelled) return
       if (session.verified) {
@@ -33,9 +32,10 @@ export function Login() {
         navigate('/app/taxpayer', { replace: true })
         return
       }
+      actions.clearSession()
       setError(
         session.error === 'unauthorized' || session.error === 'person_required'
-          ? 'Cursor sign-in was not available for this visit.'
+          ? 'Cursor sign-in was not available for this visit. Sign in to Cursor, then retry.'
           : `Could not verify Cursor session (${session.error}).`,
       )
       setBusy(false)
@@ -61,38 +61,22 @@ export function Login() {
           <div>
             <h1 className="brand">NOVARA</h1>
             <p>
-              Sample tax sandbox — owners signed in to Cursor open automatically. Anyone viewing this demo can also
-              enter an editable sample workspace on this device.
+              Private taxpayer workspace. Access requires a verified Cursor sign-in for this app — there is no guest
+              sandbox on the published site.
             </p>
           </div>
         </div>
         {busy && <p className="muted">Checking your Cursor session…</p>}
         {!busy && (
           <div className="panel rise">
-            <strong>Enter sample sandbox</strong>
+            <strong>Sign in required</strong>
             <p className="muted" style={{ marginTop: '0.35rem' }}>
-              Open an editable taxpayer workspace. Upload docs, answer questions, and change return data — saved only in
-              this browser session.
+              Open this app while signed in to Cursor (and invited, if the app is Private). Your workspace binds only
+              after session verification succeeds.
             </p>
-            <label className="field" style={{ display: 'block', marginTop: '0.75rem' }}>
-              <span className="muted">Display name (optional)</span>
-              <input
-                value={ownerName}
-                onChange={(e) => setOwnerName(e.target.value)}
-                placeholder="e.g. App Owner"
-                autoComplete="name"
-              />
-            </label>
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.85rem' }}>
               <button
                 className="btn btn-primary"
-                type="button"
-                onClick={() => enterSampleSandbox(navigate, ownerName)}
-              >
-                Continue & edit sample
-              </button>
-              <button
-                className="btn btn-secondary"
                 type="button"
                 onClick={() => {
                   setBusy(true)
@@ -103,7 +87,8 @@ export function Login() {
                       navigate('/app/taxpayer', { replace: true })
                       return
                     }
-                    setError(`Cursor session still unavailable (${session.error}). Use sample sandbox below.`)
+                    actions.clearSession()
+                    setError(`Cursor session still unavailable (${session.error}).`)
                     setBusy(false)
                   })
                 }}
@@ -113,8 +98,8 @@ export function Login() {
             </div>
             {error && (
               <p className="muted" style={{ marginTop: '0.75rem' }} role="status">
-                {error} If this app is Private, invite viewers in Publish Settings or switch visibility to Team/Public
-                so others can open it.
+                {error} If this app is Private, invite viewers in Publish Settings or switch visibility to Team so
+                teammates can open it after signing in.
               </p>
             )}
           </div>
