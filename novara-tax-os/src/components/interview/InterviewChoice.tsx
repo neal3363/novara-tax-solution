@@ -212,11 +212,16 @@ export function AnswerHistory({
       <h3>Your confirmed answers</h3>
       <div className="iv-history-list">
         {items.map((item) => (
-          <div className="iv-history-item" key={item.id}>
-            <p className="iv-history-q">Question: {item.prompt}</p>
+          <div className="iv-history-item iv-history-answered" key={item.id}>
+            <p className="iv-history-q">
+              <span className="iv-status-pill iv-status-green" title="Answered">
+                ✓ Answered
+              </span>{' '}
+              Question: {item.prompt}
+            </p>
             <p className="iv-history-a">
               <span>
-                Your answer: <strong>{displayAnswer(item.answer)} ✓</strong>
+                Your answer: <strong>{displayAnswer(item.answer)}</strong>
               </span>
               <button type="button" className="iv-history-edit" onClick={() => onEdit(item.mapsTo)}>
                 Change Answer

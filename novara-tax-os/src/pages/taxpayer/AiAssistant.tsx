@@ -6,11 +6,8 @@ import { formatMoney } from '../../data/fees'
 import { RefundTracker } from '../../components/benefits/RefundTracker'
 import { InterviewChoice } from '../../components/interview/InterviewChoice'
 import { VoiceInput } from '../../components/VoiceInput'
-import {
-  nextBenefitDiscoveryTurn,
-  nextFilingStatusTurn,
-} from '../../engine/smartInterview'
-import { nextDependentQuestion } from '../../engine/dependentsEngine'
+import { nextInterviewTurn } from '../../engine/questionProgress'
+import { QuestionOverview, QuestionProgressBar } from '../../components/interview/QuestionProgress'
 import {
   DOCUMENT_REQUESTS,
   docsAlreadySatisfied,
@@ -57,21 +54,7 @@ export function AiAssistant() {
     [taxProfile, documents, mine, benefitReviewSigned],
   )
 
-  const filingTurn = nextFilingStatusTurn(taxProfile)
-  const depQ = filingTurn ? null : nextDependentQuestion(taxProfile.answers, taxProfile.dependents)
-  const benefitTurn = filingTurn || depQ ? null : nextBenefitDiscoveryTurn(taxProfile)
-  const activeTurn = filingTurn
-    ? { ...filingTurn, phase: 'filing_status' as const }
-    : depQ
-      ? {
-          id: depQ.id,
-          phase: 'dependents' as const,
-          prompt: depQ.prompt,
-          kind: (depQ.kind === 'date' ? 'text' : depQ.kind) as 'yesno' | 'choice' | 'number' | 'text',
-          choices: depQ.choices,
-          mapsTo: depQ.mapsTo,
-        }
-      : benefitTurn
+  const activeTurn = nextInterviewTurn(taxProfile)
 
   const rel = nextRelationshipPrompt(householdIntake)
 
@@ -211,6 +194,7 @@ export function AiAssistant() {
 
       <section className="list-panel panel rise" style={{ marginTop: '1rem' }}>
         <h2>3. Ask me anything · type or speak</h2>
+        <QuestionProgressBar profile={taxProfile} />
         <div className="chat-log" style={{ maxHeight: 220, overflow: 'auto', marginBottom: '0.75rem' }}>
           {interviewChat.slice(-8).map((m) => (
             <div key={m.id} className={`chat-bubble ${m.role}`}>
@@ -232,6 +216,12 @@ export function AiAssistant() {
         ) : (
           <p className="muted">No required question right now. Upload more docs or continue to review.</p>
         )}
+        <QuestionOverview
+          profile={taxProfile}
+          focusMapsTo={activeTurn?.mapsTo}
+          onSelectUnanswered={(q) => actions.focusInterviewQuestion(q.mapsTo)}
+          onEditAnswered={(mapsTo) => actions.editInterviewAnswer(mapsTo)}
+        />
 
         <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap', marginTop: '0.75rem', alignItems: 'flex-end' }}>
           <div className="field" style={{ flex: 1, minWidth: 180 }}>

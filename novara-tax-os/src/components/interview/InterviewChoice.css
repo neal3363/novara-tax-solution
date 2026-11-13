@@ -192,3 +192,31 @@
   padding: 0.25rem 0;
   min-height: 2.5rem;
 }
+
+.iv-history-answered {
+  border-color: color-mix(in srgb, #1f8a5b 35%, var(--line));
+  background: color-mix(in srgb, #1f8a5b 8%, #fff);
+}
+
+.iv-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  margin-right: 0.35rem;
+}
+
+.iv-status-green {
+  background: #1f8a5b;
+  color: #fff;
+}
+
+.iv-status-orange {
+  background: #e8a54b;
+  color: #1a2b32;
+}

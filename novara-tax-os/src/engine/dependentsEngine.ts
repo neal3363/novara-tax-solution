@@ -378,7 +378,9 @@ export function nextDependentQuestion(
         dependentIndex: i,
       }
     }
-    if (dep.tinStatus === 'missing') {
+    // TIN path: never re-ask once chosen — route to last4 or continue
+    const tinPath = answers[`dep_${i}_tin_path`]
+    if (!tinPath && dep.tinStatus === 'missing') {
       return {
         id: `dep_${i}_tin`,
         prompt: `Do you have ${label}'s Social Security number or ITIN? (Enter last 4 only on the next screen, or confirm you will upload ID.)`,
@@ -388,11 +390,7 @@ export function nextDependentQuestion(
         dependentIndex: i,
       }
     }
-    // If path chosen to enter last 4 but not yet entered
-    if (
-      answers[`dep_${i}_tin_path`] === 'I will enter last 4 now' &&
-      !dep.tinLast4
-    ) {
+    if (tinPath === 'I will enter last 4 now' && !dep.tinLast4) {
       return {
         id: `dep_${i}_tin_last4`,
         prompt: `Enter only the last 4 digits of ${label}'s SSN/ITIN (full number is never shown on screen).`,

@@ -81,6 +81,7 @@ import {
   nextFilingStatusTurn,
   syncProfileFromDocuments,
 } from '../engine/smartInterview'
+import { buildInterviewProgress, nextInterviewTurn } from '../engine/questionProgress'
 import {
   classifyDocumentName,
   detectDocumentConflicts,
@@ -130,16 +131,30 @@ function appendAudit(action: string, summary: string, meta?: AuditEvent['meta'])
   return [...state.auditEvents, evt].slice(-200)
 }
 
-function recordInterviewAnswer(mapsTo: string, prompt: string, answer: string | number) {
+function recordInterviewAnswer(
+  mapsTo: string,
+  prompt: string,
+  answer: string | number,
+  meta?: { benefitRuleId?: string },
+) {
   const existing = state.interviewAnswers.filter((a) => a.mapsTo !== mapsTo)
+  const active =
+    state.returns.find((r) => r.id === state.activeReturnId) ??
+    state.returns.find((r) => r.clientId === state.currentUser?.id && r.taxYear === state.activeTaxYear)
   return [
     ...existing,
     {
       id: uid(`ans-${mapsTo}`),
       mapsTo,
+      questionId: mapsTo,
       prompt,
       answer,
       at: new Date().toISOString(),
+      tenantId: state.currentUser?.tenantId ?? active?.tenantId,
+      clientId: state.currentUser?.id ?? active?.clientId,
+      taxYear: state.activeTaxYear,
+      returnId: active?.id ?? state.activeReturnId,
+      benefitRuleId: meta?.benefitRuleId,
     },
   ]
 }
@@ -160,12 +175,36 @@ function clearAnswerTree(mapsTo: string) {
   })
 
   // Side-effect fields that were seeded from interview answers
-  let dependents = state.taxProfile.dependents
-  if (removed.has('has_qualifying_person') || removed.has('has_dependents') || removed.has('has_child')) {
-    if (!answers.has_dependents && !answers.has_qualifying_person) {
+  let dependents = state.taxProfile.dependents.map((d) => ({ ...d }))
+  if (removed.has('has_qualifying_person') || removed.has('has_dependents') || removed.has('has_child') || removed.has('potential_dependents')) {
+    if (!answers.has_dependents && !answers.has_qualifying_person && !answers.potential_dependents) {
       dependents = []
     }
   }
+  // Clear dependent object fields when their answer keys are removed so questions reopen
+  removed.forEach((key) => {
+    const m = /^dep_(\d+)_(.+)$/.exec(key)
+    if (!m) return
+    const idx = Number(m[1])
+    const field = m[2]
+    if (!dependents[idx]) return
+    const dep = { ...dependents[idx] }
+    if (field === 'name') dep.fullLegalName = ''
+    if (field === 'dob') {
+      dep.dateOfBirth = ''
+      dep.age = -1
+    }
+    if (field === 'tin_path' || field === 'tin_last4') {
+      dep.tinLast4 = ''
+      dep.tinStatus = 'missing'
+    }
+    if (field === 'rel' || field === 'relationship') dep.relationship = ''
+    if (field === 'months') dep.monthsLivedWith = null
+    if (field === 'student') dep.isStudent = null
+    if (field === 'disabled') dep.isDisabled = null
+    dep.interviewComplete = false
+    dependents[idx] = dep
+  })
 
   let childcarePaid = state.taxProfile.childcarePaid
   if (removed.has('paid_childcare') || removed.has('childcare_amount')) {
@@ -402,6 +441,7 @@ let state: Store = {
     },
   ],
   interviewAnswers: [],
+  interviewFocusMapsTo: null,
   auditEvents: [],
   uploadIssues: [],
   accountTier: undefined,
@@ -511,6 +551,7 @@ function hydrate() {
         benefitReviewSigned: parsed.benefitReviewSigned ?? false,
         interviewChat: parsed.interviewChat?.length ? parsed.interviewChat : state.interviewChat,
         interviewAnswers: parsed.interviewAnswers ?? [],
+        interviewFocusMapsTo: parsed.interviewFocusMapsTo ?? null,
         auditEvents: parsed.auditEvents ?? [],
         uploadIssues: parsed.uploadIssues ?? [],
         registrationPayments: parsed.registrationPayments ?? [],
@@ -1181,8 +1222,8 @@ export const actions = {
     const reply = conversationalReply(mapsTo, strVal, taxProfile)
     const benefitReport = toSnapshot(taxProfile, `You confirmed “${strVal}” for a tax interview question.`)
 
-    const filingNext = nextFilingStatusTurn(taxProfile)
-    const benefitNext = filingNext ? null : nextBenefitDiscoveryTurn(taxProfile)
+    const nextTurn = nextInterviewTurn(taxProfile)
+    const progress = buildInterviewProgress(taxProfile)
 
     const assistantMsgs = [
       {
@@ -1191,30 +1232,24 @@ export const actions = {
         text: `${reply} ${benefitReport.lastChangeNote ?? ''}`,
         at: new Date().toISOString(),
       },
+      {
+        id: uid('iv'),
+        role: 'assistant' as const,
+        text: progress.greeting,
+        at: new Date().toISOString(),
+      },
     ]
 
-    if (filingNext) {
+    if (nextTurn) {
       assistantMsgs.push({
         id: uid('iv'),
         role: 'assistant',
-        text: `${filingNext.aiLead} ${filingNext.prompt}`,
+        text:
+          'aiLead' in nextTurn && nextTurn.aiLead
+            ? `${nextTurn.aiLead} ${nextTurn.prompt}`
+            : nextTurn.prompt,
         at: new Date().toISOString(),
       })
-    } else if (benefitNext) {
-      assistantMsgs.push({
-        id: uid('iv'),
-        role: 'assistant',
-        text: benefitNext.aiLead === benefitNext.prompt ? benefitNext.prompt : `${benefitNext.aiLead}`,
-        at: new Date().toISOString(),
-      })
-      if (benefitNext.aiLead !== benefitNext.prompt) {
-        assistantMsgs.push({
-          id: uid('iv'),
-          role: 'assistant',
-          text: benefitNext.prompt,
-          at: new Date().toISOString(),
-        })
-      }
     } else {
       assistantMsgs.push({
         id: uid('iv'),
@@ -1229,30 +1264,43 @@ export const actions = {
       taxProfile,
       benefitReport,
       benefitReviewSigned: false,
+      filingAuthorized: false,
       returns: syncReturnRefund(benefitReport),
       interviewChat: [...state.interviewChat, userMsg, ...assistantMsgs],
       interviewAnswers: recordInterviewAnswer(mapsTo, questionPrompt, value),
+      interviewFocusMapsTo: nextTurn?.mapsTo ?? null,
       auditEvents: appendAudit('interview_answer', `Confirmed interview answer for ${mapsTo} (answer text omitted from audit when sensitive).`, {
         mapsTo,
+        taxYear: state.activeTaxYear,
+        answered: progress.answeredCount,
+        remaining: progress.unansweredCount,
       }),
-      prepStep: filingNext || benefitNext ? 2 : state.prepStep,
+      prepStep: nextTurn ? 2 : state.prepStep,
     }
     emit()
 
     // Do not auto-jump past interview — taxpayer presses Calculate when ready
   },
+  focusInterviewQuestion(mapsTo: string) {
+    state = {
+      ...state,
+      interviewFocusMapsTo: mapsTo,
+      prepStep: Math.max(state.prepStep, 2),
+      auditEvents: appendAudit('interview_focus', `Focused interview on ${mapsTo}`, { mapsTo }),
+    }
+    emit()
+  },
   editInterviewAnswer(mapsTo: string) {
     const cleared = clearAnswerTree(mapsTo)
     const benefitReport = toSnapshot(cleared.taxProfile)
-    const filingNext = nextFilingStatusTurn(cleared.taxProfile)
-    const benefitNext = filingNext ? null : nextBenefitDiscoveryTurn(cleared.taxProfile)
-    const reopen = filingNext ?? benefitNext
+    const reopen = nextInterviewTurn(cleared.taxProfile)
+    const progress = buildInterviewProgress(cleared.taxProfile)
     const chat = {
       id: uid('iv'),
       role: 'assistant' as const,
       text: reopen
-        ? `Let’s update that answer. ${reopen.prompt}`
-        : 'Answer cleared. Continue when you are ready.',
+        ? `${progress.greeting} Let’s update that answer. ${reopen.prompt}`
+        : `${progress.greeting} Answer cleared. Continue when you are ready.`,
       at: new Date().toISOString(),
     }
     const inPrepareInterview = state.prepStep === 2 || state.prepStep === 3 || state.prepStep === 4
@@ -1261,9 +1309,15 @@ export const actions = {
       ...cleared,
       benefitReport,
       benefitReviewSigned: false,
+      filingAuthorized: false,
       returns: syncReturnRefund(benefitReport),
       prepStep: inPrepareInterview ? 2 : state.prepStep,
+      interviewFocusMapsTo: reopen?.mapsTo ?? mapsTo,
       interviewChat: [...state.interviewChat, chat],
+      auditEvents: appendAudit('interview_answer_changed', `Changed answer tree from ${mapsTo}`, {
+        mapsTo,
+        remaining: progress.unansweredCount,
+      }),
     }
     emit()
   },
@@ -1905,15 +1959,30 @@ export const actions = {
       taxProfile,
       `Dependent information updated (“${String(display)}”). Return recalculated.`,
     )
+    const nextTurn = nextInterviewTurn(taxProfile)
+    const progress = buildInterviewProgress(taxProfile)
     state = {
       ...state,
       taxProfile,
       benefitReport,
       benefitReviewSigned: false,
+      filingAuthorized: false,
       returns: syncReturnRefund(benefitReport),
       interviewAnswers: recordInterviewAnswer(mapsTo, prompt ?? mapsTo, display as string | number),
+      interviewFocusMapsTo: nextTurn?.mapsTo ?? null,
+      interviewChat: [
+        ...state.interviewChat,
+        {
+          id: uid('iv'),
+          role: 'assistant',
+          text: progress.greeting,
+          at: new Date().toISOString(),
+        },
+      ],
       auditEvents: appendAudit('dependent_answer', `Updated dependent fact ${mapsTo} (sensitive values omitted).`, {
         mapsTo,
+        taxYear: state.activeTaxYear,
+        remaining: progress.unansweredCount,
       }),
     }
     emit()
@@ -2091,6 +2160,7 @@ export const actions = {
         },
       ],
       interviewAnswers: [],
+      interviewFocusMapsTo: null,
       auditEvents: [],
       uploadIssues: [],
       accountTier: roleToTier(state.currentUser?.role ?? '') ?? undefined,

@@ -896,24 +896,35 @@ export function nextInterviewQuestions(p: TaxpayerProfile, report: OptimizationR
     .slice(0, 6)
 }
 
+function normalizeYesNo(value: string | number | boolean): string | number | boolean {
+  if (typeof value !== 'string') return value
+  const t = value.trim().toLowerCase()
+  if (t === 'yes' || t === 'y') return 'yes'
+  if (t === 'no' || t === 'n') return 'no'
+  return value
+}
+
 export function applyAnswer(p: TaxpayerProfile, mapsTo: string, value: string | number | boolean): TaxpayerProfile {
+  const normalized = normalizeYesNo(value)
   const next: TaxpayerProfile = {
     ...p,
-    answers: { ...p.answers, [mapsTo]: value },
+    answers: { ...p.answers, [mapsTo]: normalized },
     unresolvedKeys: p.unresolvedKeys.filter((k) => k !== mapsTo),
   }
+  value = normalized
 
-  if (mapsTo === 'has_child' && (value === 'yes' || value === true)) {
+  if (mapsTo === 'has_child' && (value === 'yes' || value === true || value === 'Yes')) {
     // Do not invent a dependent — open the dependent interview instead
     next.answers.potential_dependents = next.answers.potential_dependents ?? 'yes'
+    next.answers.has_dependents = next.answers.has_dependents ?? 'yes'
   }
-  if (mapsTo === 'has_child' && (value === 'no' || value === false)) {
+  if (mapsTo === 'has_child' && (value === 'no' || value === false || value === 'No')) {
     next.answers.potential_dependents = next.answers.potential_dependents ?? 'no'
   }
-  if (mapsTo === 'has_dependents' && (value === 'yes' || value === true)) {
+  if (mapsTo === 'has_dependents' && (value === 'yes' || value === true || value === 'Yes')) {
     next.answers.potential_dependents = next.answers.potential_dependents ?? 'yes'
   }
-  if (mapsTo === 'has_dependents' && (value === 'no' || value === false)) {
+  if (mapsTo === 'has_dependents' && (value === 'no' || value === false || value === 'No')) {
     next.answers.potential_dependents = 'no'
     next.answers.dependent_count = 0
     next.dependents = []

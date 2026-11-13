@@ -6,13 +6,12 @@ import { formatMoney } from '../../data/fees'
 import { AppliedBenefitBanner } from '../../components/benefits/AppliedBenefitBanner'
 import { RefundTracker } from '../../components/benefits/RefundTracker'
 import { AnswerHistory, InterviewChoice } from '../../components/interview/InterviewChoice'
+import { QuestionOverview, QuestionProgressBar } from '../../components/interview/QuestionProgress'
 import {
   extractConfirmedFields,
   knownFactsSummary,
-  nextBenefitDiscoveryTurn,
-  nextFilingStatusTurn,
 } from '../../engine/smartInterview'
-import { nextDependentQuestion } from '../../engine/dependentsEngine'
+import { nextInterviewTurn } from '../../engine/questionProgress'
 import {
   DOCUMENT_REQUESTS,
   RELATIONSHIP_CHOICES,
@@ -75,21 +74,7 @@ export function Prepare() {
   const outstanding = outstandingDocumentRequests(documents, householdIntake)
   const checklist = useMemo(() => buildDocumentChecklist(taxProfile, documents), [taxProfile, documents])
 
-  const filingTurn = nextFilingStatusTurn(taxProfile)
-  const depQ = filingTurn ? null : nextDependentQuestion(taxProfile.answers, taxProfile.dependents)
-  const dependentTurn = depQ
-    ? {
-        id: depQ.id,
-        phase: 'dependents' as const,
-        prompt: depQ.prompt,
-        kind: (depQ.kind === 'date' ? 'text' : depQ.kind) as 'yesno' | 'choice' | 'number' | 'text',
-        choices: depQ.choices,
-        mapsTo: depQ.mapsTo,
-        aiLead: 'We need exact dependent facts before any dependent credit can change a verified refund.',
-      }
-    : null
-  const benefitTurn = filingTurn || dependentTurn ? null : nextBenefitDiscoveryTurn(taxProfile)
-  const activeTurn = filingTurn ?? dependentTurn ?? benefitTurn
+  const activeTurn = nextInterviewTurn(taxProfile)
   const relPrompt = nextRelationshipPrompt(householdIntake)
   const qualifyPrompt = nextDependentQualifyPrompt(householdIntake)
 
@@ -488,9 +473,10 @@ export function Prepare() {
             <div className="list-panel panel interview-chat">
               <h2>Tax questions &amp; benefits</h2>
               <p className="muted" style={{ marginTop: 0 }}>
-                Filing status, dependent verification, then benefit discovery. Refund recalculates when household facts
-                change.
+                Green means answered. Orange means unanswered. Continue opens the next unanswered question — never
+                restarts completed ones.
               </p>
+              <QuestionProgressBar profile={taxProfile} />
               <div className="chat-log" role="log" aria-live="polite">
                 {interviewChat.map((m) => (
                   <div key={m.id} className={`chat-bubble ${m.role}`}>
@@ -503,10 +489,10 @@ export function Prepare() {
                 <div className="active-turn">
                   <p className="turn-label">
                     {activeTurn.phase === 'filing_status'
-                      ? 'Filing status'
+                      ? 'Filing status · next unanswered'
                       : activeTurn.phase === 'dependents'
-                        ? 'Dependent verification'
-                        : 'Tax benefit discovery'}
+                        ? 'Dependent verification · next unanswered'
+                        : 'Tax benefit discovery · next unanswered'}
                   </p>
                   <InterviewChoice
                     key={activeTurn.id}
@@ -530,6 +516,17 @@ export function Prepare() {
                   </button>
                 </div>
               )}
+
+              <QuestionOverview
+                profile={taxProfile}
+                focusMapsTo={activeTurn?.mapsTo}
+                onSelectUnanswered={(q) => {
+                  actions.focusInterviewQuestion(q.mapsTo)
+                  // Scroll active turn into view
+                  document.querySelector('.active-turn')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+                }}
+                onEditAnswered={(mapsTo) => actions.editInterviewAnswer(mapsTo)}
+              />
 
               <AnswerHistory items={interviewAnswers} onEdit={(mapsTo) => actions.editInterviewAnswer(mapsTo)} />
             </div>
