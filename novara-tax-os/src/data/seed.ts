@@ -24,9 +24,9 @@ export const DEMO_USERS: UserAccount[] = [
     role: 'preparer',
     tenantId: 'tenant-summit',
     accountType: 'office_preparer',
-    ptin: 'P12345678',
+    // Full PTIN never stored on the account — fingerprint + last-four only (demo format examples)
     credentials: {
-      ptin: seedVerifiedCredential('ptin', 'P12345678'),
+      ptin: seedVerifiedCredential('ptin', 'P00000001'),
       efileProvider: { providerName: 'Summit Tax Office MeF', status: 'associated', associatedAt: new Date().toISOString() },
     },
   },
@@ -37,9 +37,8 @@ export const DEMO_USERS: UserAccount[] = [
     role: 'preparer',
     tenantId: 'tenant-kim-tp',
     accountType: 'independent_tp',
-    ptin: 'P87654321',
     credentials: {
-      ptin: seedVerifiedCredential('ptin', 'P87654321'),
+      ptin: seedVerifiedCredential('ptin', 'P00000002'),
       efileProvider: { providerName: 'Authorized E-File Partner (demo)', status: 'associated', associatedAt: new Date().toISOString() },
       businessName: 'Kim Tax Preparation',
     },
@@ -52,8 +51,8 @@ export const DEMO_USERS: UserAccount[] = [
     tenantId: 'tenant-summit',
     accountType: 'office_owner',
     credentials: {
-      efin: seedVerifiedCredential('efin', '123456'),
-      ein: seedVerifiedCredential('ein', '12-3456789'),
+      efin: seedVerifiedCredential('efin', '000001'),
+      ein: seedVerifiedCredential('ein', '00-0000001'),
       businessName: 'Summit Tax Office LLC',
       businessAddress: '100 Market St, Austin, TX',
       efileProvider: { providerName: 'NOVARA MeF Adapter', status: 'associated', associatedAt: new Date().toISOString() },
@@ -67,8 +66,8 @@ export const DEMO_USERS: UserAccount[] = [
     tenantId: 'tenant-lakeside',
     accountType: 'office_owner',
     credentials: {
-      efin: seedVerifiedCredential('efin', '654321'),
-      ein: seedVerifiedCredential('ein', '98-7654321'),
+      efin: seedVerifiedCredential('efin', '000002'),
+      ein: seedVerifiedCredential('ein', '00-0000002'),
       businessName: 'Lakeside Tax LLC',
       businessAddress: '22 Harbor Rd, Chicago, IL',
       efileProvider: { providerName: 'NOVARA MeF Adapter', status: 'associated', associatedAt: new Date().toISOString() },
@@ -104,7 +103,7 @@ export const SEED_OFFICE_STAFF: OfficeStaffMember[] = [
     kind: 'preparer',
     status: 'active',
     invitedAt: new Date(Date.now() - 86400000 * 60).toISOString(),
-    ptinDisplay: '····5678',
+    ptinDisplay: '····0001',
     ptinStatus: 'verified',
   },
   {
