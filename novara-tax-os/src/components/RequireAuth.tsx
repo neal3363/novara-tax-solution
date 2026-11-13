@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Navigate, Outlet } from 'react-router-dom'
-import { fetchViewerSession } from '../auth/sessionClient'
+import { clampProductionRole, fetchViewerSession } from '../auth/sessionClient'
 import { actions, useAppStore } from '../store/useAppStore'
 import { AppNav } from './AppNav'
 
@@ -9,6 +9,7 @@ const IS_DEV = import.meta.env.DEV
 /**
  * Production: Cursor-verified identity only (GET /api/session).
  * Sample / guest sandbox entry is local-dev only.
+ * Server-assigned role is reapplied on every bind — client cannot keep an elevated role.
  */
 export function RequireAuth() {
   const { currentUser } = useAppStore()
@@ -28,7 +29,10 @@ export function RequireAuth() {
       const session = await fetchViewerSession()
       if (cancelled) return
       if (session.verified) {
-        actions.loginWithVerifiedViewer(session)
+        actions.loginWithVerifiedViewer({
+          ...session,
+          role: clampProductionRole(session.role),
+        })
         setDenied(false)
         setReady(true)
         return
