@@ -12,13 +12,11 @@ const SERVER_ASSIGNED_ACCOUNT_TYPE = 'tc' as const
 export async function GET(request: Request) {
   const identity = await getIdentity(request)
   if (!identity.verified) {
-    return new Response(
-      JSON.stringify({ verified: false, error: identity.reason || 'unauthorized' }),
-      {
-        status: 401,
-        headers: { 'content-type': 'application/json', 'cache-control': 'private, no-store' },
-      },
-    )
+    const reason = typeof identity.reason === 'string' ? identity.reason : 'unauthorized'
+    return new Response(JSON.stringify({ verified: false, error: reason, reason }), {
+      status: 401,
+      headers: { 'content-type': 'application/json', 'cache-control': 'private, no-store' },
+    })
   }
   // Prefer person identity; if the host only supplies a key, still open a sandbox
   // workspace bound to that subject so the owner/developer is not locked out.
