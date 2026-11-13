@@ -84,6 +84,20 @@ assert(clampMod.clampProductionRole('taxpayer') === 'taxpayer', 'taxpayer remain
 assert(clampMod.clampProductionAccountType('office_owner') === 'tc', 'accountType clamps to tc')
 assert(clampMod.PRODUCTION_ALLOWED_ROLES.length === 1, 'only taxpayer allowed in production')
 
+console.log('=== Production session / RoleGate hardening ===')
+const storeSrc = readFileSync(join(root, 'src/store/useAppStore.ts'), 'utf8')
+const roleGateSrc = readFileSync(join(root, 'src/components/RoleGate.tsx'), 'utf8')
+assert(storeSrc.includes('novara-tax-os-session-v15'), 'session key bumped to v15')
+assert(storeSrc.includes('PRODUCTION_MEMORY_ONLY'), 'production memory-only field list present')
+assert(storeSrc.includes('freshWorkspaceForViewer'), 'viewer switch wipes via fresh workspace helper')
+assert(storeSrc.includes('wipeLegacySessionKeys'), 'legacy session keys wiped on viewer switch')
+assert(
+  /IS_BROWSER_PROD[\s\S]*sessionStorage\.setItem\(SESSION_KEY/.test(storeSrc) ||
+    storeSrc.includes('tax content stays in tab memory'),
+  'production persist avoids writing full tax workspace',
+)
+assert(roleGateSrc.includes("!roles.includes('taxpayer')"), 'RoleGate refuses elevated-only routes in production')
+assert(roleGateSrc.includes('clampProductionRole'), 'RoleGate clamps production role')
 console.log('=== Tenant isolation engine ===')
 const iso = spawnSync('npm', ['run', 'test:isolation'], { cwd: root, encoding: 'utf8', shell: true })
 assert(iso.status === 0, 'tenant isolation tests pass')

@@ -133,8 +133,38 @@ const USER_KEY = 'novara-tax-os-user-id'
 const USER_JSON_KEY = 'novara-tax-os-user-json'
 /** Sample sandbox flag — allows editable demo sessions without elevating roles */
 export const SAMPLE_SANDBOX_KEY = 'novara-tax-os-sample-sandbox'
-/** Session-scoped app state (clears when the tab closes) */
-const SESSION_KEY = 'novara-tax-os-session-v14'
+/**
+ * Session-scoped UI progress (clears when the tab closes).
+ * Production never writes tax PII / interview answers into this key — those stay in memory only.
+ */
+const SESSION_KEY = 'novara-tax-os-session-v15'
+const IS_BROWSER_PROD = !import.meta.env.DEV
+
+/** Fields that must not be written to sessionStorage on the published host. */
+const PRODUCTION_MEMORY_ONLY = [
+  'documents',
+  'returns',
+  'messages',
+  'questions',
+  'entryPlan',
+  'preEntryNotes',
+  'taxProfile',
+  'benefitReport',
+  'interviewChat',
+  'interviewAnswers',
+  'interviewFocusMapsTo',
+  'auditEvents',
+  'uploadIssues',
+  'registrationPayments',
+  'officeStaff',
+  'householdIntake',
+  'multiYearEngagements',
+  'uploadInvites',
+  'clientNotifications',
+  'lastQaReport',
+  'calcAuditTrail',
+  'filingAuth',
+] as const
 
 export function isSampleSandboxSession(): boolean {
   if (typeof sessionStorage === 'undefined') return false
@@ -486,18 +516,111 @@ function emit() {
   persist()
 }
 
+function wipeLegacySessionKeys() {
+  if (typeof sessionStorage === 'undefined') return
+  for (let i = 2; i <= 14; i++) {
+    sessionStorage.removeItem(`novara-tax-os-session-v${i}`)
+  }
+  sessionStorage.removeItem(SESSION_KEY)
+  sessionStorage.removeItem(USER_JSON_KEY)
+  sessionStorage.removeItem(SAMPLE_SANDBOX_KEY)
+}
+
+/** Empty tax workspace for a viewer — used on first bind and when switching Cursor identities. */
+function freshWorkspaceForViewer(ws: {
+  user: UserAccount
+  documents: DocumentRecord[]
+  returns: TaxReturn[]
+}): Omit<Store, 'hydrated'> {
+  const taxProfile = defaultProfile()
+  return {
+    currentUser: ws.user,
+    documents: ws.documents,
+    returns: ws.returns,
+    messages: [
+      {
+        id: 'm0',
+        role: 'assistant',
+        text: EMPTY_BOOT_MESSAGE,
+        at: new Date().toISOString(),
+      },
+    ],
+    prepStep: 0,
+    questions: SMART_QUESTIONS,
+    vaultFilter: 'all',
+    entryPlan: [],
+    entryPlanStatus: 'awaiting_approval',
+    preEntryNotes: [],
+    activeReturnId: ws.returns[0]?.id || '',
+    binderTab: 'forms',
+    taxProfile,
+    benefitReport: toSnapshot(taxProfile),
+    benefitReviewSigned: false,
+    interviewChat: [
+      {
+        id: 'iv0',
+        role: 'assistant',
+        text: 'Upload your documents first — ID, W-2s, 1099s, and supporting forms. I’ll extract what I can and only ask what’s still missing.',
+        at: new Date().toISOString(),
+      },
+    ],
+    interviewAnswers: [],
+    interviewFocusMapsTo: null,
+    auditEvents: [],
+    uploadIssues: [],
+    accountTier: roleToTier(ws.user.role) ?? 'TC',
+    registrationPayments: [],
+    officeStaff: [],
+    householdIntake: emptyHouseholdIntake(),
+    multiYearEngagements: [],
+    activeTaxYear: resolveFilingSeason().currentTaxYear,
+    uploadInvites: [],
+    clientNotifications: [],
+    lastQaReport: null,
+    calcAuditTrail: null,
+    filingAuthorized: false,
+    filingAuth: null,
+  }
+}
+
 function persist() {
   if (!state.hydrated || typeof window === 'undefined') return
   try {
     if (state.currentUser) {
-      localStorage.setItem(ROLE_KEY, state.currentUser.role)
-      localStorage.setItem(USER_KEY, state.currentUser.id)
-      sessionStorage.setItem(USER_JSON_KEY, JSON.stringify(state.currentUser))
+      // Production: never persist role elevation hints in localStorage for route spoofing.
+      if (IS_BROWSER_PROD) {
+        localStorage.removeItem(ROLE_KEY)
+        localStorage.removeItem(USER_KEY)
+        sessionStorage.removeItem(USER_JSON_KEY)
+      } else {
+        localStorage.setItem(ROLE_KEY, state.currentUser.role)
+        localStorage.setItem(USER_KEY, state.currentUser.id)
+        sessionStorage.setItem(USER_JSON_KEY, JSON.stringify(state.currentUser))
+      }
     } else {
       localStorage.removeItem(ROLE_KEY)
       localStorage.removeItem(USER_KEY)
       sessionStorage.removeItem(USER_JSON_KEY)
     }
+
+    if (IS_BROWSER_PROD) {
+      // Published host: UI progress only — tax content stays in tab memory until Sign out / viewer switch.
+      const light = {
+        prepStep: state.prepStep,
+        activeTaxYear: state.activeTaxYear,
+        vaultFilter: state.vaultFilter,
+        binderTab: state.binderTab,
+        activeReturnId: state.activeReturnId,
+        entryPlanStatus: state.entryPlanStatus,
+        benefitReviewSigned: state.benefitReviewSigned,
+        filingAuthorized: state.filingAuthorized,
+        accountTier: state.accountTier,
+        viewerId: state.currentUser?.id ?? null,
+      }
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(light))
+      return
+    }
+
     const { hydrated: _, currentUser: __, ...sessionRest } = state
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(sessionRest))
   } catch {
@@ -542,24 +665,62 @@ function ensureTenantFields(returns: TaxReturn[], documents: DocumentRecord[]) {
 function hydrate() {
   if (state.hydrated || typeof window === 'undefined') return
   try {
-    // Migrate away from older plaintext localStorage payload
+    // Migrate away from older plaintext localStorage / session payloads
     localStorage.removeItem('novara-tax-os-v1')
-    sessionStorage.removeItem('novara-tax-os-session-v2')
-    sessionStorage.removeItem('novara-tax-os-session-v3')
-    sessionStorage.removeItem('novara-tax-os-session-v4')
-    sessionStorage.removeItem('novara-tax-os-session-v5')
-    sessionStorage.removeItem('novara-tax-os-session-v6')
-    sessionStorage.removeItem('novara-tax-os-session-v7')
-    sessionStorage.removeItem('novara-tax-os-session-v8')
-    sessionStorage.removeItem('novara-tax-os-session-v9')
-    sessionStorage.removeItem('novara-tax-os-session-v10')
-    sessionStorage.removeItem('novara-tax-os-session-v11')
-    sessionStorage.removeItem('novara-tax-os-session-v12')
-    sessionStorage.removeItem('novara-tax-os-session-v13')
+    for (let i = 2; i <= 14; i++) {
+      sessionStorage.removeItem(`novara-tax-os-session-v${i}`)
+    }
 
     const role = localStorage.getItem(ROLE_KEY) as Role | null
     const userId = localStorage.getItem(USER_KEY)
     const sessionRaw = sessionStorage.getItem(SESSION_KEY)
+
+    // Published host: never restore tax PII from storage — RequireAuth binds a fresh memory workspace.
+    if (IS_BROWSER_PROD) {
+      if (sessionRaw) {
+        try {
+          const light = JSON.parse(sessionRaw) as Partial<AppState> & { viewerId?: string | null }
+          for (const key of PRODUCTION_MEMORY_ONLY) {
+            delete (light as Record<string, unknown>)[key]
+          }
+          state = {
+            ...state,
+            prepStep: typeof light.prepStep === 'number' ? light.prepStep : 0,
+            activeTaxYear: light.activeTaxYear ?? resolveFilingSeason().currentTaxYear,
+            vaultFilter: light.vaultFilter ?? 'all',
+            binderTab: light.binderTab ?? 'forms',
+            activeReturnId: light.activeReturnId ?? '',
+            entryPlanStatus: light.entryPlanStatus ?? 'awaiting_approval',
+            benefitReviewSigned: light.benefitReviewSigned ?? false,
+            filingAuthorized: light.filingAuthorized ?? false,
+            accountTier: light.accountTier,
+            taxProfile: defaultProfile(),
+            benefitReport: toSnapshot(defaultProfile()),
+            currentUser: null,
+            hydrated: true,
+          }
+        } catch {
+          state = {
+            ...state,
+            taxProfile: defaultProfile(),
+            benefitReport: toSnapshot(defaultProfile()),
+            currentUser: null,
+            hydrated: true,
+          }
+        }
+      } else {
+        state = {
+          ...state,
+          taxProfile: defaultProfile(),
+          benefitReport: toSnapshot(defaultProfile()),
+          currentUser: null,
+          hydrated: true,
+        }
+      }
+      emit()
+      return
+    }
+
     if (sessionRaw) {
       const parsed = JSON.parse(sessionRaw) as Omit<AppState, 'currentUser'>
       const taxProfile = parsed.taxProfile ?? defaultProfile()
@@ -647,13 +808,24 @@ function uid(prefix: string) {
 }
 
 export const actions = {
-  /** Clear signed-in identity (used when Cursor session verification fails). */
+  /** Clear signed-in identity and wipe in-memory tax workspace (used when Cursor session fails / signs out). */
   clearSession() {
     localStorage.removeItem(ROLE_KEY)
     localStorage.removeItem(USER_KEY)
-    sessionStorage.removeItem(USER_JSON_KEY)
-    sessionStorage.removeItem(SAMPLE_SANDBOX_KEY)
-    state = { ...state, currentUser: null, accountTier: undefined }
+    wipeLegacySessionKeys()
+    const empty = freshWorkspaceForViewer({
+      user: {
+        id: '',
+        name: '',
+        email: '',
+        role: 'taxpayer',
+        accountType: 'tc',
+        tenantId: '',
+      },
+      documents: EMPTY_DOCS,
+      returns: EMPTY_RETURNS,
+    })
+    state = { ...empty, currentUser: null, accountTier: undefined, hydrated: true }
     emit()
   },
   /**
@@ -718,12 +890,21 @@ export const actions = {
       state.currentUser?.id === ws.user.id &&
       state.currentUser?.tenantId === ws.user.tenantId &&
       state.returns.length > 0
-    const scopedReturns = sameTenant
-      ? state.returns.filter((r) => r.tenantId === ws.user.tenantId && r.clientId === ws.user.id)
-      : ws.returns
-    const scopedDocs = sameTenant
-      ? state.documents.filter((d) => d.tenantId === ws.user.tenantId && (d.clientId === ws.user.id || d.ownerId === ws.user.id))
-      : ws.documents
+
+    if (!sameTenant) {
+      // Different Cursor viewer (or first bind): wipe prior interview/docs/answers — do not leak.
+      wipeLegacySessionKeys()
+      state = { ...freshWorkspaceForViewer(ws), hydrated: true }
+      emit()
+      return
+    }
+
+    const scopedReturns = state.returns.filter(
+      (r) => r.tenantId === ws.user.tenantId && r.clientId === ws.user.id,
+    )
+    const scopedDocs = state.documents.filter(
+      (d) => d.tenantId === ws.user.tenantId && (d.clientId === ws.user.id || d.ownerId === ws.user.id),
+    )
     state = {
       ...state,
       currentUser: ws.user,
@@ -731,20 +912,7 @@ export const actions = {
       documents: scopedDocs,
       returns: scopedReturns,
       officeStaff: [],
-      activeReturnId: scopedReturns[0]?.id || ws.returns[0]?.id || '',
-      entryPlan: sameTenant ? state.entryPlan : [],
-      entryPlanStatus: sameTenant ? state.entryPlanStatus : 'awaiting_approval',
-      preEntryNotes: sameTenant ? state.preEntryNotes : [],
-      messages: sameTenant
-        ? state.messages
-        : [
-            {
-              id: 'm0',
-              role: 'assistant',
-              text: EMPTY_BOOT_MESSAGE,
-              at: new Date().toISOString(),
-            },
-          ],
+      activeReturnId: scopedReturns[0]?.id || state.activeReturnId || '',
     }
     emit()
   },
@@ -2310,10 +2478,7 @@ export const actions = {
   },
   resetDemo() {
     localStorage.removeItem('novara-tax-os-v1')
-    sessionStorage.removeItem(SESSION_KEY)
-    sessionStorage.removeItem('novara-tax-os-session-v2')
-    sessionStorage.removeItem('novara-tax-os-session-v7')
-    sessionStorage.removeItem('novara-tax-os-session-v13')
+    wipeLegacySessionKeys()
     const current = state.currentUser
     const taxProfile = defaultProfile()
 
