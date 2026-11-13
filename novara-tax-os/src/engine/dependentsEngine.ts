@@ -553,11 +553,19 @@ export function applyDependentAnswer(
   let dep = { ...nextDeps[idx] }
 
   switch (field) {
-    case 'name':
-      dep.fullLegalName = String(value).trim()
+    case 'name': {
+      const name = String(value).trim()
+      // Ignore blank submits so Answer cannot create an empty "saved" dependent name
+      if (name) dep.fullLegalName = name
+      else delete nextAnswers[mapsTo]
       break
+    }
     case 'dob': {
       const raw = String(value).trim()
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+        delete nextAnswers[mapsTo]
+        break
+      }
       dep.dateOfBirth = raw
       dep.age = computeAgeFromDob(raw, taxYear)
       break

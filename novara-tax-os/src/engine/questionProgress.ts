@@ -11,7 +11,7 @@ import {
   nextBenefitSpecificQuestion,
   listSupportedBenefitQuestionnaires,
 } from './benefitQuestionnaires'
-import { nextDependentQuestion } from './dependentsEngine'
+import { applyDependentAnswer, emptyDependent, nextDependentQuestion } from './dependentsEngine'
 import { nextBenefitDiscoveryTurn, nextFilingStatusTurn } from './smartInterview'
 
 export type QuestionStatus = 'answered' | 'unanswered' | 'awaiting_verification' | 'not_applicable'
@@ -100,7 +100,7 @@ export function nextInterviewTurn(profile: TaxpayerProfile) {
       phase: 'dependents' as const,
       category: 'dependents' as const,
       prompt: depQ.prompt,
-      kind: (depQ.kind === 'date' ? 'text' : depQ.kind) as 'yesno' | 'choice' | 'number' | 'text',
+      kind: depQ.kind as 'yesno' | 'choice' | 'number' | 'text' | 'date',
       choices: depQ.choices,
       mapsTo: depQ.mapsTo,
       aiLead: 'We need exact dependent facts before any dependent credit can change a verified refund.',
@@ -162,20 +162,32 @@ export function buildInterviewProgress(profile: TaxpayerProfile): InterviewProgr
     })
   }
 
-  // Dependent interview — walk until null collecting asked + next
+  // Dependent interview — replay from discovery so answered names show GREEN,
+  // then stop at the first unanswered (Continue never restarts completed facts).
   {
-    let walkAnswers = { ...profile.answers }
-    let walkDeps = profile.dependents.map((d) => ({ ...d }))
+    let walkAnswers: Record<string, string | number | boolean | undefined> = { ...profile.answers }
+    for (const key of Object.keys(walkAnswers)) {
+      if (key.startsWith('dep_')) delete walkAnswers[key]
+    }
+    const declared =
+      typeof profile.answers.dependent_count === 'number'
+        ? profile.answers.dependent_count
+        : Number(profile.answers.dependent_count) || profile.dependents.length
+    let walkDeps = Array.from({ length: Math.max(0, declared) }, (_, i) => emptyDependent(i))
     const guard = new Set<string>()
     for (let i = 0; i < 40; i++) {
       const q = nextDependentQuestion(walkAnswers, walkDeps)
       if (!q) break
       if (guard.has(q.mapsTo)) break
       guard.add(q.mapsTo)
-      const answered = isAnswered({ ...profile, answers: walkAnswers }, q.mapsTo) ||
-        // structural answers already on dependent object for name/dob etc.
-        (q.mapsTo.endsWith('_name') && Boolean(walkDeps[q.dependentIndex ?? 0]?.fullLegalName)) ||
-        (q.mapsTo.endsWith('_dob') && Boolean(walkDeps[q.dependentIndex ?? 0]?.dateOfBirth))
+
+      const idx = q.dependentIndex ?? -1
+      const profileDep = idx >= 0 ? profile.dependents[idx] : undefined
+      const answered =
+        isAnswered(profile, q.mapsTo) ||
+        (q.mapsTo.endsWith('_name') && Boolean(profileDep?.fullLegalName?.trim())) ||
+        (q.mapsTo.endsWith('_dob') && Boolean(profileDep?.dateOfBirth?.trim()))
+
       push({
         id: `dep:${q.mapsTo}`,
         mapsTo: q.mapsTo,
@@ -184,28 +196,16 @@ export function buildInterviewProgress(profile: TaxpayerProfile): InterviewProgr
         categoryLabel: 'Dependents',
         status: answered ? 'answered' : 'unanswered',
       })
-      // Simulate answering unanswered so we can list subsequent applicable questions
-      if (!answered) {
-        // Keep as unanswered in list; stop simulating further until answered
-        break
-      }
-      // Advance walker with existing answer
-      const val = walkAnswers[q.mapsTo]
-      if (val !== undefined) {
-        // already have it
-      }
-    }
-    // Also surface currently next unanswered if not already listed
-    const liveDep = nextDependentQuestion(profile.answers, profile.dependents)
-    if (liveDep && !seen.has(liveDep.mapsTo)) {
-      push({
-        id: `dep:${liveDep.mapsTo}`,
-        mapsTo: liveDep.mapsTo,
-        prompt: liveDep.prompt,
-        category: 'dependents',
-        categoryLabel: 'Dependents',
-        status: 'unanswered',
-      })
+
+      if (!answered) break
+
+      let val: string | number | boolean | undefined = profile.answers[q.mapsTo]
+      if (val === undefined && q.mapsTo.endsWith('_name')) val = profileDep?.fullLegalName
+      if (val === undefined && q.mapsTo.endsWith('_dob')) val = profileDep?.dateOfBirth
+      if (val === undefined) break
+      const stepped = applyDependentAnswer(walkAnswers, walkDeps, q.mapsTo, val, profile.taxYear)
+      walkAnswers = stepped.answers
+      walkDeps = stepped.dependents
     }
   }
 

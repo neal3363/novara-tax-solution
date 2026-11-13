@@ -3,6 +3,16 @@ import type { TaxpayerProfile } from './benefitOptimizer'
 /** Shared “is this answer already on the return?” check for questionnaires. */
 export function answerPresent(p: TaxpayerProfile, key: string): boolean {
   const v = p.answers[key]
+  const depName = /^dep_(\d+)_name$/.exec(key)
+  if (depName) {
+    const idx = Number(depName[1])
+    return Boolean(v) || Boolean(p.dependents[idx]?.fullLegalName?.trim())
+  }
+  const depDob = /^dep_(\d+)_dob$/.exec(key)
+  if (depDob) {
+    const idx = Number(depDob[1])
+    return Boolean(v) || Boolean(p.dependents[idx]?.dateOfBirth?.trim())
+  }
   if (key === 'childcare_amount') return p.childcarePaid > 0 || typeof v === 'number' || !!v
   if (key === 'tuition_paid') return p.tuitionPaid > 0 || !!v
   if (key === 'child_age') return p.dependents.some((d) => d.age >= 0) || v !== undefined
