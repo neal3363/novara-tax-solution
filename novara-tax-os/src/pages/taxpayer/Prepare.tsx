@@ -11,7 +11,7 @@ import {
   extractConfirmedFields,
   knownFactsSummary,
 } from '../../engine/smartInterview'
-import { nextInterviewTurn } from '../../engine/questionProgress'
+import { resolveInterviewTurn } from '../../engine/questionProgress'
 import {
   DOCUMENT_REQUESTS,
   RELATIONSHIP_CHOICES,
@@ -59,6 +59,7 @@ export function Prepare() {
     interviewAnswers,
     uploadIssues,
     householdIntake,
+    interviewFocusMapsTo,
   } = useAppStore()
   const mine = returns.find((r) => r.clientId === currentUser?.id && r.taxYear === 2025)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -74,7 +75,7 @@ export function Prepare() {
   const outstanding = outstandingDocumentRequests(documents, householdIntake)
   const checklist = useMemo(() => buildDocumentChecklist(taxProfile, documents), [taxProfile, documents])
 
-  const activeTurn = nextInterviewTurn(taxProfile)
+  const activeTurn = resolveInterviewTurn(taxProfile, interviewFocusMapsTo)
   const relPrompt = nextRelationshipPrompt(householdIntake)
   const qualifyPrompt = nextDependentQualifyPrompt(householdIntake)
 
@@ -82,7 +83,7 @@ export function Prepare() {
     if (!activeTurn) return
     // Keep the name/DOB text field on screen (especially iPad Safari)
     document.querySelector('.active-turn')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  }, [activeTurn?.id, activeTurn?.mapsTo])
+  }, [activeTurn?.id, activeTurn?.mapsTo, interviewFocusMapsTo])
 
   function onDrop(e: DragEvent) {
     e.preventDefault()
@@ -529,8 +530,9 @@ export function Prepare() {
                 focusMapsTo={activeTurn?.mapsTo}
                 onSelectUnanswered={(q) => {
                   actions.focusInterviewQuestion(q.mapsTo)
-                  // Scroll active turn into view
-                  document.querySelector('.active-turn')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+                  requestAnimationFrame(() => {
+                    document.querySelector('.active-turn')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                  })
                 }}
                 onEditAnswered={(mapsTo) => actions.editInterviewAnswer(mapsTo)}
               />
