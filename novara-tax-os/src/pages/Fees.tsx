@@ -8,6 +8,7 @@ import {
   OFFICE_SUBSCRIPTION_FLOOR,
   OFFICE_SUBSCRIPTION_HIGH,
   OFFICE_TIERS,
+  PRIOR_YEAR_SURCHARGE,
   PRICING,
   STARTER_INCLUDES,
   TC_BUSINESS_FEE,
@@ -40,6 +41,10 @@ const FAQ = [
   {
     q: 'What credentials are required to register?',
     a: 'TC: none. TP: current-year PTIN (no EFIN). Office: EFIN plus business EIN/address/owner. Manually entered PTIN/EFIN values stay pending until an authorized verification process completes — they are never auto-verified.',
+  },
+  {
+    q: 'How does prior-year pricing work?',
+    a: `During the active filing season, the current tax year is regular price. Each prior tax year adds a ${formatMoney(PRIOR_YEAR_SURCHARGE)} NOVARA surcharge once per year (not once per personal and business). Enrollment/subscription stays separate. IRS penalties are never mixed into NOVARA fees.`,
   },
   {
     q: 'Are bank-product fees included?',

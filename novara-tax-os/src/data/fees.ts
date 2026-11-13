@@ -55,6 +55,9 @@ export const PRICING = {
 
 export const UNLIMITED_CLIENTS_COPY = 'Unlimited Clients & Unlimited Tax Returns'
 
+/** Prior-year NOVARA surcharge — once per tax year in an order (not per personal/business). */
+export const PRIOR_YEAR_SURCHARGE = 250
+
 /** Named exports used across the app */
 export const TC_REGISTRATION_FEE = PRICING.TC.registration
 export const TC_PERSONAL_FEE = PRICING.TC.personalReturn
@@ -296,4 +299,127 @@ export function assertUnlimitedProfessionalAccess(tier: AccountTier) {
     return PRICING.Office.unlimitedClients && PRICING.Office.unlimitedReturns
   }
   return true
+}
+
+export type YearReturnKind = 'personal' | 'business' | 'both'
+
+export interface YearOrderSelection {
+  taxYear: number
+  /** personal | business | both — surcharge still once per year */
+  kind: YearReturnKind
+  filingMode: 'original' | 'amended'
+}
+
+export interface MultiYearFeeLine {
+  id: string
+  label: string
+  amount: number
+  taxYear?: number
+  kind: 'base' | 'prior_year_surcharge' | 'enrollment' | 'subscription'
+}
+
+export interface MultiYearOrderQuote {
+  currentTaxYear: number
+  seasonYear: number
+  lines: MultiYearFeeLine[]
+  basePreparationTotal: number
+  priorYearSurchargeTotal: number
+  priorYearCount: number
+  /** Preparation + prior-year surcharges only (excludes enrollment/subscription) */
+  preparationGrandTotal: number
+  enrollmentOrSubscription: number
+  /** Full amount if enrollment is included in display — usually kept separate */
+  displayTotalExcludingEnrollment: number
+}
+
+/**
+ * Total NOVARA fee = sum of base preparation fees + ($250 × number of prior tax years).
+ * Enrollment/subscription stays separate.
+ */
+export function quoteMultiYearOrder(
+  tier: AccountTier,
+  selections: YearOrderSelection[],
+  opts?: { currentTaxYear?: number; seasonYear?: number; includeEnrollment?: boolean },
+): MultiYearOrderQuote {
+  const currentTaxYear = opts?.currentTaxYear ?? new Date().getUTCFullYear() - 1
+  const seasonYear = opts?.seasonYear ?? currentTaxYear + 1
+  const personal = tier === 'TC' ? TC_PERSONAL_FEE : tier === 'TP' ? TP_PERSONAL_FEE : OFFICE_PERSONAL_FEE
+  const business = tier === 'TC' ? TC_BUSINESS_FEE : tier === 'TP' ? TP_BUSINESS_FEE : OFFICE_BUSINESS_FEE
+
+  const lines: MultiYearFeeLine[] = []
+  let basePreparationTotal = 0
+  const priorYears = new Set<number>()
+
+  const sorted = [...selections].sort((a, b) => b.taxYear - a.taxYear)
+  for (const sel of sorted) {
+    if (sel.kind === 'personal' || sel.kind === 'both') {
+      lines.push({
+        id: `base-personal-${sel.taxYear}`,
+        label: `${sel.taxYear} personal return (${tier})${sel.filingMode === 'amended' ? ' — amended' : ''}`,
+        amount: personal,
+        taxYear: sel.taxYear,
+        kind: 'base',
+      })
+      basePreparationTotal += personal
+    }
+    if (sel.kind === 'business' || sel.kind === 'both') {
+      lines.push({
+        id: `base-business-${sel.taxYear}`,
+        label: `${sel.taxYear} business return (${tier})${sel.filingMode === 'amended' ? ' — amended' : ''}`,
+        amount: business,
+        taxYear: sel.taxYear,
+        kind: 'base',
+      })
+      basePreparationTotal += business
+    }
+    if (sel.taxYear < currentTaxYear) priorYears.add(sel.taxYear)
+  }
+
+  let priorYearSurchargeTotal = 0
+  Array.from(priorYears)
+    .sort((a, b) => b - a)
+    .forEach((y) => {
+      lines.push({
+        id: `prior-surcharge-${y}`,
+        label: `${y} prior-year surcharge (once per year)`,
+        amount: PRIOR_YEAR_SURCHARGE,
+        taxYear: y,
+        kind: 'prior_year_surcharge',
+      })
+      priorYearSurchargeTotal += PRIOR_YEAR_SURCHARGE
+    })
+
+  let enrollmentOrSubscription = 0
+  if (opts?.includeEnrollment) {
+    if (tier === 'TP') {
+      enrollmentOrSubscription = TP_REGISTRATION_FEE
+      lines.push({
+        id: 'tp-enrollment',
+        label: 'TP registration / upfront fee (separate)',
+        amount: TP_REGISTRATION_FEE,
+        kind: 'enrollment',
+      })
+    } else if (tier === 'Office') {
+      enrollmentOrSubscription = OFFICE_SUBSCRIPTION_FLOOR
+      lines.push({
+        id: 'office-subscription',
+        label: 'Office subscription (separate — plan selected at registration)',
+        amount: OFFICE_SUBSCRIPTION_FLOOR,
+        kind: 'subscription',
+      })
+    }
+  }
+
+  const preparationGrandTotal = basePreparationTotal + priorYearSurchargeTotal
+  return {
+    currentTaxYear,
+    seasonYear,
+    lines,
+    basePreparationTotal,
+    priorYearSurchargeTotal,
+    priorYearCount: priorYears.size,
+    preparationGrandTotal,
+    enrollmentOrSubscription,
+    displayTotalExcludingEnrollment: preparationGrandTotal,
+  }
 }

@@ -7,6 +7,8 @@ import { RegisterFlow, RegisterHub } from './pages/Register'
 import { Fees } from './pages/Fees'
 import { TaxpayerHome } from './pages/taxpayer/TaxpayerHome'
 import { Prepare } from './pages/taxpayer/Prepare'
+import { YearSelect } from './pages/taxpayer/YearSelect'
+import { MultiYearDashboard } from './pages/taxpayer/MultiYearDashboard'
 import { Vault } from './pages/taxpayer/Vault'
 import { DocumentsNeeded } from './pages/taxpayer/DocumentsNeeded'
 import { Dependents } from './pages/taxpayer/Dependents'
@@ -34,6 +36,8 @@ export default function App() {
       <Route path="/register/:tier" element={<RegisterFlow />} />
       <Route path="/app" element={<RequireAuth />}>
         <Route path="taxpayer" element={<RoleGate roles={['taxpayer']}><TaxpayerHome /></RoleGate>} />
+        <Route path="taxpayer/years" element={<RoleGate roles={['taxpayer']}><MultiYearDashboard /></RoleGate>} />
+        <Route path="taxpayer/years/select" element={<RoleGate roles={['taxpayer']}><YearSelect /></RoleGate>} />
         <Route path="taxpayer/prepare" element={<RoleGate roles={['taxpayer']}><Prepare /></RoleGate>} />
         <Route path="taxpayer/vault" element={<RoleGate roles={['taxpayer']}><Vault /></RoleGate>} />
         <Route path="taxpayer/documents" element={<RoleGate roles={['taxpayer']}><DocumentsNeeded /></RoleGate>} />

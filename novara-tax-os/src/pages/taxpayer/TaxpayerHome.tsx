@@ -5,14 +5,20 @@ import { RefundTracker } from '../../components/benefits/RefundTracker'
 import '../shared.css'
 
 export function TaxpayerHome() {
-  const { currentUser, returns, documents, prepStep, benefitReport } = useAppStore()
-  const mine = returns.find((r) => r.clientId === currentUser?.id && r.taxYear === 2025) ?? returns[0]
-  const openBenefits = benefitReport?.findings.filter((f) => f.status === 'needs_info' || f.status === 'eligible_unverified') ?? []
+  const { currentUser, returns, documents, prepStep, benefitReport, activeTaxYear, multiYearEngagements } =
+    useAppStore()
+  const mine =
+    returns.find((r) => r.clientId === currentUser?.id && r.taxYear === activeTaxYear) ??
+    returns.find((r) => r.clientId === currentUser?.id) ??
+    returns[0]
+  const openBenefits =
+    benefitReport?.findings.filter((f) => f.status === 'needs_info' || f.status === 'eligible_unverified') ?? []
   const alerts = [
     documents.some((d) => d.status === 'needs_review') ? 'One document needs verification' : null,
     prepStep < 3 ? 'Finish preparation questions to unlock Your Result' : null,
     openBenefits.length ? `${openBenefits.length} tax-savings items need answers or verification` : null,
     mine?.state === 'Accepted' ? 'Refund tracker: Accepted — monitoring deposit' : null,
+    multiYearEngagements.length === 0 ? 'Select one or more tax years to start a multi-year order' : null,
   ].filter(Boolean) as string[]
 
   return (
@@ -23,11 +29,11 @@ export function TaxpayerHome() {
           <h1>Hi, {currentUser?.name.split(' ')[0]}</h1>
         </div>
         <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
-          <Link className="btn btn-secondary" to="/app/taxpayer/vault">
-            Upload documents
+          <Link className="btn btn-secondary" to="/app/taxpayer/years/select">
+            Select tax years
           </Link>
-          <Link className="btn btn-secondary" to="/app/taxpayer/benefits">
-            Tax savings
+          <Link className="btn btn-secondary" to="/app/taxpayer/years">
+            Multi-year dashboard
           </Link>
           <Link className="btn btn-primary" to="/app/taxpayer/prepare">
             {prepStep === 0 ? 'Start My Taxes' : 'Continue preparation'}
@@ -37,8 +43,8 @@ export function TaxpayerHome() {
 
       <div className="stat-row rise">
         <div className="stat panel">
-          <p className="label">Tax year</p>
-          <p className="value">2025</p>
+          <p className="label">Active tax year</p>
+          <p className="value">{activeTaxYear}</p>
         </div>
         <div className="stat panel">
           <p className="label">Readiness</p>
@@ -51,10 +57,8 @@ export function TaxpayerHome() {
           </p>
         </div>
         <div className="stat panel">
-          <p className="label">Projected refund</p>
-          <p className="value" style={{ fontSize: '1.25rem' }}>
-            {formatMoney(benefitReport?.projectedRefund ?? mine?.refundOrOwe ?? 0)}
-          </p>
+          <p className="label">Years in order</p>
+          <p className="value">{multiYearEngagements.length || 1}</p>
         </div>
       </div>
 

@@ -22,10 +22,10 @@ export function AppNav() {
     currentUser.role === 'taxpayer'
       ? [
           { to: '/app/taxpayer', label: 'Home' },
+          { to: '/app/taxpayer/years', label: 'Years' },
           { to: '/app/taxpayer/prepare', label: 'Prepare' },
           { to: '/app/taxpayer/dependents', label: 'Dependents' },
           { to: '/app/taxpayer/benefits', label: 'Savings' },
-          { to: '/app/taxpayer/documents', label: 'Documents' },
           { to: '/app/taxpayer/vault', label: 'Vault' },
         ]
       : currentUser.role === 'preparer'

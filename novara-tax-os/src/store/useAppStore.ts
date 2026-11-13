@@ -7,6 +7,7 @@ import type {
   DocumentRecord,
   EntryPlanLine,
   Message,
+  MultiYearEngagement,
   OfficeStaffMember,
   PreEntryNote,
   ReturnState,
@@ -14,6 +15,19 @@ import type {
   TaxReturn,
   UserAccount,
 } from '../data/types'
+import {
+  PRIOR_YEAR_SURCHARGE,
+  TC_PERSONAL_FEE,
+  dedupeFeeLines,
+  quoteMultiYearOrder,
+  returnSoftwareFee,
+  roleToTier,
+  type AccountTier,
+  type YearOrderSelection,
+} from '../data/fees'
+import { assessAmendment } from '../engine/amendmentEngine'
+import { estimatePenaltiesAndInterest } from '../engine/penaltyInterestEngine'
+import { getTaxYearDefinition, resolveFilingSeason } from '../engine/taxYearCatalog'
 import {
   canAssignClients,
   canCreateClients,
@@ -38,13 +52,6 @@ import {
   type HouseholdIntakeState,
   type HouseholdRelationChoice,
 } from '../engine/documentIntakeEngine'
-import {
-  TC_PERSONAL_FEE,
-  dedupeFeeLines,
-  returnSoftwareFee,
-  roleToTier,
-  type AccountTier,
-} from '../data/fees'
 import {
   asScopedDocument,
   asScopedReturn,
@@ -89,7 +96,7 @@ import type { BenefitSnapshot } from '../data/types'
 const ROLE_KEY = 'novara-tax-os-role'
 const USER_KEY = 'novara-tax-os-user-id'
 /** Session-scoped demo state (clears when the tab closes) */
-const SESSION_KEY = 'novara-tax-os-session-v10'
+const SESSION_KEY = 'novara-tax-os-session-v11'
 
 function money(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n)
@@ -385,6 +392,8 @@ let state: Store = {
   registrationPayments: [],
   officeStaff: SEED_OFFICE_STAFF,
   householdIntake: emptyHouseholdIntake(),
+  multiYearEngagements: [],
+  activeTaxYear: resolveFilingSeason().currentTaxYear,
   hydrated: false,
 }
 
@@ -456,6 +465,7 @@ function hydrate() {
     sessionStorage.removeItem('novara-tax-os-session-v7')
     sessionStorage.removeItem('novara-tax-os-session-v8')
     sessionStorage.removeItem('novara-tax-os-session-v9')
+    sessionStorage.removeItem('novara-tax-os-session-v10')
 
     const role = localStorage.getItem(ROLE_KEY) as Role | null
     const userId = localStorage.getItem(USER_KEY)
@@ -485,6 +495,8 @@ function hydrate() {
         accountTier: parsed.accountTier ?? roleToTier(role ?? '') ?? undefined,
         officeStaff: parsed.officeStaff?.length ? parsed.officeStaff : SEED_OFFICE_STAFF,
         householdIntake: parsed.householdIntake ?? emptyHouseholdIntake(),
+        multiYearEngagements: parsed.multiYearEngagements ?? [],
+        activeTaxYear: parsed.activeTaxYear ?? resolveFilingSeason().currentTaxYear,
         returns: scoped.returns,
         documents: scoped.documents,
         benefitReport,
@@ -716,11 +728,13 @@ export const actions = {
 
     const docs: DocumentRecord[] = classified.map(({ file, type }) => {
       const id = uid('d')
+      const yearFromName = file.name.match(/(20\d{2})/)
+      const taxYear = yearFromName ? Number(yearFromName[1]) : state.activeTaxYear
       return {
         id,
         name: file.name,
         type,
-        taxYear: 2025,
+        taxYear,
         sizeLabel:
           file.size > 1024 * 1024
             ? `${(file.size / 1024 / 1024).toFixed(1)} MB`
@@ -1980,9 +1994,165 @@ export const actions = {
       registrationPayments: [],
       officeStaff: SEED_OFFICE_STAFF,
       householdIntake: emptyHouseholdIntake(),
+      multiYearEngagements: [],
+      activeTaxYear: resolveFilingSeason().currentTaxYear,
       hydrated: true,
     }
     emit()
+  },
+  setActiveTaxYear(year: number) {
+    state = { ...state, activeTaxYear: year }
+    emit()
+  },
+  /**
+   * Create separate return records + document folders for each selected year.
+   * Applies $250 prior-year surcharge once per prior year in fee snapshots.
+   */
+  createMultiYearOrder(selections: {
+    taxYear: number
+    filingMode: 'original' | 'amended'
+    kind: 'personal' | 'business' | 'both'
+    hasIrsNotice: boolean
+  }[]) {
+    const actor = state.currentUser
+    if (!actor) return { ok: false as const, error: 'Not signed in' }
+    const season = resolveFilingSeason()
+    for (const sel of selections) {
+      const def = getTaxYearDefinition(sel.taxYear, season)
+      if (!def || def.status !== 'production') {
+        return { ok: false as const, error: `Tax year ${sel.taxYear} is not available for production.` }
+      }
+    }
+    const tier: AccountTier = roleToTier(actor.role) ?? state.accountTier ?? 'TC'
+    const quote = quoteMultiYearOrder(
+      tier,
+      selections.map(
+        (s): YearOrderSelection => ({
+          taxYear: s.taxYear,
+          kind: s.kind,
+          filingMode: s.filingMode,
+        }),
+      ),
+      { currentTaxYear: season.currentTaxYear, seasonYear: season.seasonYear },
+    )
+
+    const tenantId = actor.tenantId
+    const newReturns: TaxReturn[] = []
+    const engagements: MultiYearEngagement[] = []
+
+    for (const sel of selections) {
+      const folderId = `folder-${sel.taxYear}-${uid('f')}`
+      const returnIds: string[] = []
+      const kinds =
+        sel.kind === 'both' ? (['personal', 'business'] as const) : ([sel.kind] as const)
+      const amend = assessAmendment({
+        taxYear: sel.taxYear,
+        mode: sel.filingMode,
+        isBusiness: sel.kind === 'business',
+        original:
+          sel.filingMode === 'amended'
+            ? {
+                taxYear: sel.taxYear,
+                agiReported: 52000,
+                taxReported: 4200,
+                refundOrBalanceReported: 800,
+                source: 'taxpayer_recall',
+              }
+            : undefined,
+        corrections:
+          sel.filingMode === 'amended'
+            ? [{ field: 'refund', correctedAmount: 1200, explanation: 'Additional W-2 withholding' }]
+            : undefined,
+      })
+      const penalty = estimatePenaltiesAndInterest({
+        taxYear: sel.taxYear,
+        taxDue: sel.taxYear < season.currentTaxYear ? 1200 : 0,
+        amountPaidByDueDate: 0,
+        filedOn: sel.filingMode === 'amended' ? `${sel.taxYear + 1}-04-10` : undefined,
+      })
+
+      for (const k of kinds) {
+        const isBusiness = k === 'business'
+        const fee = returnSoftwareFee(tier, isBusiness)
+        const yearFees = [{ label: fee.label, amount: fee.amount, status: fee.status }]
+        const surchargeLine = quote.lines.find(
+          (l) => l.kind === 'prior_year_surcharge' && l.taxYear === sel.taxYear,
+        )
+        // Attach surcharge once on the first return of that year only
+        if (surchargeLine && k === kinds[0]) {
+          yearFees.push({
+            label: surchargeLine.label,
+            amount: PRIOR_YEAR_SURCHARGE,
+            status: 'approved',
+          })
+        }
+        const id = uid('r')
+        returnIds.push(id)
+        newReturns.push({
+          id,
+          clientName: actor.name,
+          clientId: actor.id,
+          taxYear: sel.taxYear,
+          returnType: isBusiness ? '1120-S' : '1040',
+          state: 'Intake Started',
+          readiness: 8,
+          refundOrOwe: 0,
+          preparerId: actor.role === 'preparer' ? actor.id : undefined,
+          tenantId,
+          isBusiness,
+          feeSnapshot: yearFees,
+          appliedBenefits: [],
+          updatedAt: new Date().toISOString(),
+          filingMode: sel.filingMode,
+          hasIrsNotice: sel.hasIrsNotice,
+          documentFolderId: folderId,
+          irsPenaltyInterestEstimate: penalty.totalEstimate,
+          filingMethod: amend.filingMethod,
+          refundClaimWarning: amend.refundClaimWarning,
+          assignedPreparerIds: actor.role === 'preparer' ? [actor.id] : undefined,
+        })
+      }
+
+      engagements.push({
+        id: uid('eng'),
+        taxYear: sel.taxYear,
+        filingMode: sel.filingMode,
+        kind: sel.kind,
+        hasIrsNotice: sel.hasIrsNotice,
+        returnIds,
+        documentFolderId: folderId,
+        status: 'selected',
+      })
+    }
+
+    state = {
+      ...state,
+      returns: [...newReturns, ...state.returns],
+      multiYearEngagements: [...engagements, ...state.multiYearEngagements],
+      activeTaxYear: selections[0]?.taxYear ?? state.activeTaxYear,
+      activeReturnId: newReturns[0]?.id ?? state.activeReturnId,
+      accountTier: tier,
+      auditEvents: appendAudit(
+        'multi_year_order',
+        `Created ${engagements.length} tax-year engagement(s). Preparation total ${quote.preparationGrandTotal} (base ${quote.basePreparationTotal} + prior surcharge ${quote.priorYearSurchargeTotal}).`,
+        {
+          years: engagements.length,
+          preparationTotal: quote.preparationGrandTotal,
+          priorSurcharge: quote.priorYearSurchargeTotal,
+        },
+      ),
+    }
+    emit()
+    return { ok: true as const, quote, engagements, returns: newReturns }
+  },
+  multiYearQuote(selections: YearOrderSelection[]) {
+    const tier: AccountTier =
+      state.accountTier ?? roleToTier(state.currentUser?.role ?? 'taxpayer') ?? 'TC'
+    const season = resolveFilingSeason()
+    return quoteMultiYearOrder(tier, selections, {
+      currentTaxYear: season.currentTaxYear,
+      seasonYear: season.seasonYear,
+    })
   },
 }
 
