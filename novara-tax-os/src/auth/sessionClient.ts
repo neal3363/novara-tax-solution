@@ -43,6 +43,74 @@ export function clampProductionAccountType(accountType: AccountType | null | und
   return accountType === 'tc' ? 'tc' : 'tc'
 }
 
+/** Flatten API error payloads so the UI never shows “[object Object]”. */
+export function formatSessionError(value: unknown, fallback = 'unauthorized'): string {
+  if (typeof value === 'string' && value.trim()) return value.trim()
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>
+    for (const key of ['reason', 'code', 'message', 'error', 'detail', 'type']) {
+      const nested = record[key]
+      if (typeof nested === 'string' && nested.trim()) return nested.trim()
+    }
+    try {
+      return JSON.stringify(value)
+    } catch {
+      return fallback
+    }
+  }
+  return fallback
+}
+
+export function explainSessionError(code: string): string {
+  switch (code) {
+    case 'missing_header':
+    case 'unauthorized':
+    case 'person_required':
+      return 'This browser is not signed into Cursor for this private app.'
+    case 'expired':
+      return 'Your Cursor session expired. Sign in again.'
+    case 'wrong_audience':
+    case 'wrong_issuer':
+    case 'bad_signature':
+    case 'malformed_token':
+    case 'unknown_key':
+    case 'invalid_claims':
+      return 'Cursor could not validate this visit. Sign in again with Cursor.'
+    case 'issuer_unreachable':
+    case 'network':
+      return 'Could not reach Cursor to verify your session. Check your connection and try again.'
+    case 'not_json':
+      return 'The host returned a non-session response. Open the app through Cursor sign-in.'
+    case 'http_401':
+    case 'http_403':
+      return 'Cursor did not authorize this browser for the private app.'
+    default:
+      return `Could not verify Cursor session (${code}).`
+  }
+}
+
+/**
+ * Cursor apps-gate authorize URL for this published host.
+ * Opens Cursor sign-in, then returns the viewer to the app with identity attached.
+ */
+export function cursorAppAuthorizeUrl(returnPath = '/'): string {
+  if (typeof window === 'undefined') return 'https://cursor.com'
+  const host = window.location.hostname
+  const match = host.match(/^([a-z0-9-]+)\.apps\.(.+)$/i)
+  if (!match) return 'https://cursor.com'
+  const slug = match[1]
+  const apex = `apps.${match[2]}`
+  const path = returnPath.startsWith('/') ? returnPath : `/${returnPath}`
+  const params = new URLSearchParams({
+    login: 'grok',
+    apex,
+    slug,
+    return_to: path,
+  })
+  return `https://cursor.com/api/apps-gate/authorize?${params.toString()}`
+}
+
 export async function fetchViewerSession(): Promise<
   ViewerSession | { verified: false; error: string }
 > {
@@ -53,9 +121,16 @@ export async function fetchViewerSession(): Promise<
       headers: { accept: 'application/json' },
       cache: 'no-store',
     })
-    const data = (await res.json()) as Record<string, unknown>
+    const text = await res.text()
+    let data: Record<string, unknown>
+    try {
+      data = JSON.parse(text) as Record<string, unknown>
+    } catch {
+      return { verified: false, error: 'not_json' }
+    }
     if (!res.ok || !data.verified) {
-      return { verified: false, error: String(data.error ?? `http_${res.status}`) }
+      const raw = data.error ?? data.reason ?? `http_${res.status}`
+      return { verified: false, error: formatSessionError(raw, `http_${res.status}`) }
     }
     const role = clampProductionRole(asRole(data.role) ?? 'taxpayer')
     const accountType = clampProductionAccountType(asAccountType(data.accountType) ?? 'tc')

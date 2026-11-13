@@ -2,7 +2,11 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { BrandMark } from '../components/BrandMark'
 import { actions } from '../store/useAppStore'
-import { fetchViewerSession } from '../auth/sessionClient'
+import {
+  cursorAppAuthorizeUrl,
+  explainSessionError,
+  fetchViewerSession,
+} from '../auth/sessionClient'
 import './Login.css'
 
 const IS_DEV = import.meta.env.DEV
@@ -21,6 +25,7 @@ export function Login() {
   const next = safeNext(params.get('next'))
   const [busy, setBusy] = useState(!IS_DEV)
   const [error, setError] = useState<string | null>(null)
+  const [errorCode, setErrorCode] = useState<string | null>(null)
 
   useEffect(() => {
     if (IS_DEV) return
@@ -40,17 +45,35 @@ export function Login() {
         return
       }
       actions.clearSession()
-      setError(
-        session.error === 'unauthorized' || session.error === 'person_required'
-          ? 'Cursor sign-in was not available for this visit. Sign in to Cursor, then retry.'
-          : `Could not verify Cursor session (${session.error}).`,
-      )
+      setErrorCode(session.error)
+      setError(explainSessionError(session.error))
       setBusy(false)
     })()
     return () => {
       cancelled = true
     }
   }, [navigate, next])
+
+  function startCursorSignIn() {
+    const returnTo = next.startsWith('/app/') ? next : '/'
+    window.location.assign(cursorAppAuthorizeUrl(returnTo))
+  }
+
+  async function retrySession() {
+    setBusy(true)
+    setError(null)
+    setErrorCode(null)
+    const session = await fetchViewerSession()
+    if (session.verified) {
+      actions.loginWithVerifiedViewer(session)
+      navigate(next, { replace: true })
+      return
+    }
+    actions.clearSession()
+    setErrorCode(session.error)
+    setError(explainSessionError(session.error))
+    setBusy(false)
+  }
 
   if (IS_DEV && LoginDev) {
     return (
@@ -78,35 +101,22 @@ export function Login() {
           <div className="panel rise">
             <strong>Sign in required</strong>
             <p className="muted" style={{ marginTop: '0.35rem' }}>
-              Open this app while signed in to Cursor (and invited, if the app is Private). Your workspace binds only
-              after session verification succeeds.
+              On iPad Safari or another browser, open the Cursor sign-in link below so Cursor can attach your session to
+              this private app. Retry alone only works after that sign-in completes.
             </p>
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.85rem' }}>
-              <button
-                className="btn btn-primary"
-                type="button"
-                onClick={() => {
-                  setBusy(true)
-                  setError(null)
-                  void fetchViewerSession().then((session) => {
-                    if (session.verified) {
-                      actions.loginWithVerifiedViewer(session)
-                      navigate(next, { replace: true })
-                      return
-                    }
-                    actions.clearSession()
-                    setError(`Cursor session still unavailable (${session.error}).`)
-                    setBusy(false)
-                  })
-                }}
-              >
-                Retry Cursor sign-in
+              <button className="btn btn-primary" type="button" onClick={startCursorSignIn}>
+                Sign in with Cursor
+              </button>
+              <button className="btn btn-secondary" type="button" onClick={() => void retrySession()}>
+                Retry session check
               </button>
             </div>
             {error && (
               <p className="muted" style={{ marginTop: '0.75rem' }} role="status">
-                {error} If this app is Private, invite viewers in Publish Settings or switch visibility to Team so
-                teammates can open it after signing in.
+                {error}
+                {errorCode ? ` (${errorCode})` : ''} If this app is Private, only the owner (and invited viewers) can
+                open it after Cursor sign-in. Change visibility or invites in Publish Settings.
               </p>
             )}
           </div>
