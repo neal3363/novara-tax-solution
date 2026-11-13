@@ -856,7 +856,14 @@ export const actions = {
   },
   addMessage(role: Message['role'], text: string) {
     const msg: Message = { id: uid('m'), role, text, at: new Date().toISOString() }
-    state = { ...state, messages: [...state.messages, msg] }
+    // Keep the conversational assistant transcript in sync (AiAssistant reads interviewChat).
+    const interviewRole = role === 'user' || role === 'assistant' || role === 'system' ? role : 'system'
+    const chat = { id: msg.id, role: interviewRole as 'user' | 'assistant' | 'system', text, at: msg.at }
+    state = {
+      ...state,
+      messages: [...state.messages, msg],
+      interviewChat: [...state.interviewChat, chat],
+    }
     emit()
   },
   askAi(prompt: string) {
