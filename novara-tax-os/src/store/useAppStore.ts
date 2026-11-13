@@ -130,8 +130,15 @@ const ROLE_KEY = 'novara-tax-os-role'
 const USER_KEY = 'novara-tax-os-user-id'
 /** Signed-in account JSON (session-scoped; avoids shipping other tenants in the bundle) */
 const USER_JSON_KEY = 'novara-tax-os-user-json'
+/** Sample sandbox flag — allows editable demo sessions without elevating roles */
+export const SAMPLE_SANDBOX_KEY = 'novara-tax-os-sample-sandbox'
 /** Session-scoped app state (clears when the tab closes) */
 const SESSION_KEY = 'novara-tax-os-session-v14'
+
+export function isSampleSandboxSession(): boolean {
+  if (typeof sessionStorage === 'undefined') return false
+  return sessionStorage.getItem(SAMPLE_SANDBOX_KEY) === '1'
+}
 
 type DevSeedModule = typeof import('../data/seed.dev')
 let devSeedCache: DevSeedModule | null = null
@@ -499,14 +506,24 @@ function persist() {
 }
 
 function resolveStoredUser(role: Role | null, userId: string | null): UserAccount | null {
-  // Production never trusts a client-stored role — RequireAuth rebinds from /api/session.
-  if (!import.meta.env.DEV) return null
+  // Production: only restore a client-stored user for the sample sandbox (taxpayer-clamped).
+  // Cursor-verified sessions are rebound from /api/session in RequireAuth.
+  if (!import.meta.env.DEV && !isSampleSandboxSession()) return null
   if (!role) return null
   try {
     const raw = sessionStorage.getItem(USER_JSON_KEY)
     if (raw) {
       const user = JSON.parse(raw) as UserAccount
-      if ((!userId || user.id === userId) && user.role === role) return user
+      if ((!userId || user.id === userId) && user.role === role) {
+        if (!import.meta.env.DEV) {
+          return {
+            ...user,
+            role: clampProductionRole(user.role),
+            accountType: clampProductionAccountType(user.accountType),
+          }
+        }
+        return user
+      }
     }
   } catch {
     /* ignore */
@@ -643,11 +660,61 @@ export const actions = {
     localStorage.removeItem(ROLE_KEY)
     localStorage.removeItem(USER_KEY)
     sessionStorage.removeItem(USER_JSON_KEY)
+    sessionStorage.removeItem(SAMPLE_SANDBOX_KEY)
     state = { ...state, currentUser: null, accountTier: undefined }
+    emit()
+  },
+  /**
+   * Sample sandbox for the published demo: any visitor can enter an editable
+   * taxpayer workspace on this device. No multi-tenant seed; no role elevation.
+   */
+  loginAsSampleSandbox(label?: string) {
+    sessionStorage.setItem(SAMPLE_SANDBOX_KEY, '1')
+    const guestKey =
+      sessionStorage.getItem('novara-sample-guest-key') ||
+      `guest-${Math.random().toString(36).slice(2, 10)}`
+    sessionStorage.setItem('novara-sample-guest-key', guestKey)
+    const display = (label || 'Sample Taxpayer').trim() || 'Sample Taxpayer'
+    const ws = buildViewerWorkspace({
+      sub: guestKey,
+      name: display,
+      email: `${guestKey}@sample.novara.local`,
+      role: 'taxpayer',
+      accountType: 'tc',
+    })
+    const sameTenant =
+      state.currentUser?.id === ws.user.id &&
+      state.currentUser?.tenantId === ws.user.tenantId &&
+      state.returns.length > 0
+    state = {
+      ...state,
+      currentUser: ws.user,
+      accountTier: 'TC',
+      documents: sameTenant ? state.documents : ws.documents,
+      returns: sameTenant ? state.returns : ws.returns,
+      officeStaff: [],
+      activeReturnId: sameTenant
+        ? state.activeReturnId || ws.returns[0]?.id || ''
+        : ws.returns[0]?.id || '',
+      entryPlan: sameTenant ? state.entryPlan : [],
+      entryPlanStatus: sameTenant ? state.entryPlanStatus : 'awaiting_approval',
+      preEntryNotes: sameTenant ? state.preEntryNotes : [],
+      messages: sameTenant
+        ? state.messages
+        : [
+            {
+              id: 'm0',
+              role: 'assistant',
+              text: 'Sample sandbox ready — upload documents, answer questions, and edit this return. Changes stay on this device.',
+              at: new Date().toISOString(),
+            },
+          ],
+    }
     emit()
   },
   /** Production: bind a private workspace to the verified Cursor viewer (no role picker). */
   loginWithVerifiedViewer(session: ViewerSession) {
+    sessionStorage.removeItem(SAMPLE_SANDBOX_KEY)
     const role = clampProductionRole(session.role)
     const accountType = clampProductionAccountType(session.accountType)
     const ws = buildViewerWorkspace({ ...session, role, accountType })
