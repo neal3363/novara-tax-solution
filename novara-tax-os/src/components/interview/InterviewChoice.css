@@ -155,6 +155,17 @@
   align-items: center;
 }
 
+.iv-tap-hint,
+.iv-saving-hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.9rem;
+}
+
+.iv-saving-hint {
+  font-weight: 600;
+  color: var(--teal, #0a5c54);
+}
+
 .iv-actions .btn {
   min-height: 3rem;
   padding-inline: 1.25rem;

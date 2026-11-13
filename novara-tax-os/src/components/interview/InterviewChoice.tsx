@@ -117,28 +117,25 @@ export function InterviewChoice({
     setLocalSaving(false)
   }, [questionId, initialSelected, kind, mapsTo, prompt])
 
-  function pick(choice: string) {
-    if (isSaving || locked || submitting.current) return
-    setError(null)
-    setSelected(choice)
-  }
-
   function changeAnswer() {
     if (isSaving || submitting.current) return
     setLocked(false)
     setError(null)
-    // iPad: unlock then focus so the keyboard can open
     requestAnimationFrame(() => inputRef.current?.focus())
   }
 
-  function validate(): { ok: true; value: string | number } | { ok: false; message: string } {
+  function validateWith(
+    draftSelected: string | null,
+    draftAmount: string,
+    draftText: string,
+  ): { ok: true; value: string | number } | { ok: false; message: string } {
     if (kind === 'number' && !isFreeText) {
-      const n = Number(String(amount).replace(/[,$]/g, ''))
+      const n = Number(String(draftAmount).replace(/[,$]/g, ''))
       if (!Number.isFinite(n) || n < 0) return { ok: false, message: 'Enter a valid amount (0 or greater).' }
       return { ok: true, value: n }
     }
     if (isFreeText) {
-      const raw = textValue.trim()
+      const raw = draftText.trim()
       if (!raw) {
         return {
           ok: false,
@@ -164,14 +161,17 @@ export function InterviewChoice({
       }
       return { ok: true, value: raw }
     }
-    if (selected && selected.trim() !== '') return { ok: true, value: selected }
+    if (draftSelected && draftSelected.trim() !== '') return { ok: true, value: draftSelected }
     return { ok: false, message: 'Select an answer before continuing.' }
   }
 
-  async function continueAnswer() {
+  async function continueAnswer(overrideSelected?: string) {
     if (submitting.current || isSaving || locked) return
 
-    const result = validate()
+    const draftSelected = overrideSelected ?? selected
+    if (overrideSelected) setSelected(overrideSelected)
+
+    const result = validateWith(draftSelected, amount, textValue)
     if (!result.ok) {
       setError(result.message)
       inputRef.current?.focus()
@@ -184,17 +184,28 @@ export function InterviewChoice({
 
     submitting.current = true
     setLocalSaving(true)
-    setLocked(true)
     setError(null)
     try {
       await Promise.resolve(onConfirm(value))
-      await new Promise((r) => setTimeout(r, 180))
+      // Keep controls usable if the parent did not remount onto a new question
+      // (that used to look like a freeze: locked, no Answer button).
+      setLocked(false)
     } catch (err) {
       setLocked(false)
       setError(err instanceof Error ? err.message : 'Could not save that answer. Try again.')
     } finally {
       submitting.current = false
       setLocalSaving(false)
+    }
+  }
+
+  function pick(choice: string) {
+    if (isSaving || locked || submitting.current) return
+    setError(null)
+    setSelected(choice)
+    // Yes/No (and short choice lists): one tap saves and advances — no second Answer tap.
+    if (isBinaryYesNo || (options.length > 0 && options.length <= 6 && kind !== 'number' && !isFreeText)) {
+      void continueAnswer(choice)
     }
   }
 
@@ -270,7 +281,6 @@ export function InterviewChoice({
             value={textValue}
             readOnly={locked || isSaving}
             onFocus={(e) => {
-              // iPad Safari: select existing text so replace is easy
               if (!locked && textValue) e.currentTarget.select()
             }}
             onChange={(e) => {
@@ -315,17 +325,27 @@ export function InterviewChoice({
       {shownAnswer != null && String(shownAnswer).trim() !== '' && !error && (
         <p className="iv-confirm-line" aria-live="polite">
           Your answer: <span>{displayAnswer(shownAnswer, kind === 'number' && !isFreeText)}</span>
-          {locked ? ' ✓' : ''}
+          {isSaving ? ' · Saving…' : locked ? ' ✓' : ''}
         </p>
       )}
 
       <div className="iv-actions">
-        {!locked && (
+        {!locked && (isFreeText || kind === 'number') && (
           <button className="btn btn-primary" type="submit" disabled={!canContinue}>
             {isSaving ? 'Saving…' : 'Answer'}
           </button>
         )}
-        {(selected || amount || textValue || locked) && (
+        {!locked && !isFreeText && kind !== 'number' && !isBinaryYesNo && options.length > 6 && (
+          <button className="btn btn-primary" type="submit" disabled={!canContinue}>
+            {isSaving ? 'Saving…' : 'Answer'}
+          </button>
+        )}
+        {isSaving && (
+          <p className="iv-saving-hint" role="status">
+            Saving answer…
+          </p>
+        )}
+        {(selected || amount || textValue || locked) && !isSaving && (
           <button className="btn btn-secondary" type="button" disabled={isSaving} onClick={changeAnswer}>
             Change Answer
           </button>
@@ -336,6 +356,9 @@ export function InterviewChoice({
           </button>
         )}
       </div>
+      {!isFreeText && kind !== 'number' && isBinaryYesNo && !locked && !isSaving && (
+        <p className="iv-tap-hint muted">Tap Yes or No — it saves and moves on automatically.</p>
+      )}
     </form>
   )
 }

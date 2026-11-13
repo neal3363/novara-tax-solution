@@ -81,9 +81,9 @@ export function Prepare() {
 
   useEffect(() => {
     if (!activeTurn) return
-    // Keep the name/DOB text field on screen (especially iPad Safari)
-    document.querySelector('.active-turn')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  }, [activeTurn?.id, activeTurn?.mapsTo, interviewFocusMapsTo])
+    // Instant scroll only when focus target changes — smooth scroll felt frozen on iPad
+    document.querySelector('.active-turn')?.scrollIntoView({ behavior: 'auto', block: 'nearest' })
+  }, [interviewFocusMapsTo])
 
   function onDrop(e: DragEvent) {
     e.preventDefault()
@@ -531,7 +531,7 @@ export function Prepare() {
                 onSelectUnanswered={(q) => {
                   actions.focusInterviewQuestion(q.mapsTo)
                   requestAnimationFrame(() => {
-                    document.querySelector('.active-turn')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                    document.querySelector('.active-turn')?.scrollIntoView({ behavior: 'auto', block: 'center' })
                   })
                 }}
                 onEditAnswered={(mapsTo) => actions.editInterviewAnswer(mapsTo)}
