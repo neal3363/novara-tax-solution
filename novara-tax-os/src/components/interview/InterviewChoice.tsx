@@ -1,17 +1,19 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import './InterviewChoice.css'
 
+export type InterviewChoiceKind = 'yesno' | 'choice' | 'number' | 'text' | 'date'
+
 export type InterviewChoiceProps = {
   questionId: string
   prompt: string
   choices?: string[]
-  kind?: 'yesno' | 'choice' | 'number' | 'text'
+  kind?: InterviewChoiceKind
   /** Already-confirmed display value (from history), if reopening */
   initialSelected?: string | null
   saving?: boolean
   secondaryLabel?: string
   onSecondary?: () => void
-  /** Called only when Continue is pressed after a clear selection */
+  /** Called only when Answer is pressed after a valid value */
   onConfirm: (value: string | number) => void | Promise<void>
 }
 
@@ -29,7 +31,15 @@ function displayAnswer(value: string | number) {
       return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n)
     }
   }
-  return s.toUpperCase()
+  return s
+}
+
+function isIsoDate(raw: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return false
+  const [y, m, d] = raw.split('-').map(Number)
+  if (!y || m < 1 || m > 12 || d < 1 || d > 31) return false
+  const dt = new Date(y, m - 1, d)
+  return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d
 }
 
 export function InterviewChoice({
@@ -44,12 +54,18 @@ export function InterviewChoice({
   onConfirm,
 }: InterviewChoiceProps) {
   const labelId = useId()
+  const inputRef = useRef<HTMLInputElement>(null)
   const [selected, setSelected] = useState<string | null>(initialSelected)
   const [amount, setAmount] = useState(initialSelected && kind === 'number' ? String(initialSelected) : '')
+  const [textValue, setTextValue] = useState(
+    initialSelected && (kind === 'text' || kind === 'date') ? String(initialSelected) : '',
+  )
   const [locked, setLocked] = useState(Boolean(initialSelected))
   const [localSaving, setLocalSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const submitting = useRef(false)
   const isSaving = saving || localSaving
+  const isFreeText = kind === 'text' || kind === 'date'
 
   const options =
     choices && choices.length > 0
@@ -67,43 +83,86 @@ export function InterviewChoice({
     // Reset local draft when the active question changes
     setSelected(initialSelected)
     setAmount(initialSelected && kind === 'number' ? String(initialSelected) : '')
+    setTextValue(initialSelected && (kind === 'text' || kind === 'date') ? String(initialSelected) : '')
     setLocked(Boolean(initialSelected))
+    setError(null)
     submitting.current = false
     setLocalSaving(false)
+    if (kind === 'text' || kind === 'date') {
+      // iPad Safari: focus the field so the keyboard opens when the question appears
+      requestAnimationFrame(() => inputRef.current?.focus())
+    }
   }, [questionId, initialSelected, kind])
 
   function pick(choice: string) {
     if (isSaving || locked || submitting.current) return
+    setError(null)
     setSelected(choice)
   }
 
   function changeAnswer() {
     if (isSaving || submitting.current) return
     setLocked(false)
-    // Keep current selection visible so the taxpayer sees what they are changing
+    setError(null)
+  }
+
+  function validate(): { ok: true; value: string | number } | { ok: false; message: string } {
+    if (kind === 'number') {
+      const n = Number(String(amount).replace(/[,$]/g, ''))
+      if (!Number.isFinite(n) || n < 0) return { ok: false, message: 'Enter a valid amount (0 or greater).' }
+      return { ok: true, value: n }
+    }
+    if (isFreeText) {
+      const raw = textValue.trim()
+      if (!raw) {
+        return {
+          ok: false,
+          message:
+            kind === 'date'
+              ? 'Enter the date of birth as YYYY-MM-DD before answering.'
+              : 'Enter the full legal name before answering.',
+        }
+      }
+      if (kind === 'date') {
+        if (!isIsoDate(raw)) {
+          return { ok: false, message: 'Use date format YYYY-MM-DD (for example 2016-03-15).' }
+        }
+        return { ok: true, value: raw }
+      }
+      if (raw.length < 2) {
+        return { ok: false, message: 'Enter the dependent’s full legal name (at least 2 characters).' }
+      }
+      return { ok: true, value: raw }
+    }
+    if (selected && selected.trim() !== '') return { ok: true, value: selected }
+    return { ok: false, message: 'Select an answer before continuing.' }
   }
 
   async function continueAnswer() {
     if (submitting.current || isSaving || locked) return
 
-    let value: string | number | null = null
-    if (kind === 'number') {
-      const n = Number(String(amount).replace(/[,$]/g, ''))
-      if (!Number.isFinite(n) || n < 0) return
-      value = n
-      setSelected(String(n))
-    } else if (selected) {
-      value = selected
+    const result = validate()
+    if (!result.ok) {
+      setError(result.message)
+      inputRef.current?.focus()
+      return
     }
-    if (value == null || value === '') return
+
+    const value = result.value
+    if (kind === 'number') setSelected(String(value))
+    else if (isFreeText) setSelected(String(value))
 
     submitting.current = true
     setLocalSaving(true)
     setLocked(true)
+    setError(null)
     try {
       await Promise.resolve(onConfirm(value))
       // Brief settle so double-taps during sync store updates are ignored
       await new Promise((r) => setTimeout(r, 180))
+    } catch (err) {
+      setLocked(false)
+      setError(err instanceof Error ? err.message : 'Could not save that answer. Try again.')
     } finally {
       submitting.current = false
       setLocalSaving(false)
@@ -113,9 +172,13 @@ export function InterviewChoice({
   const canContinue =
     !isSaving &&
     !locked &&
-    (kind === 'number' ? amount.trim() !== '' && Number.isFinite(Number(String(amount).replace(/[,$]/g, ''))) : Boolean(selected))
+    (kind === 'number'
+      ? amount.trim() !== '' && Number.isFinite(Number(String(amount).replace(/[,$]/g, '')))
+      : isFreeText
+        ? textValue.trim() !== ''
+        : Boolean(selected))
 
-  const shownAnswer = kind === 'number' && amount.trim() ? amount : selected
+  const shownAnswer = kind === 'number' && amount.trim() ? amount : isFreeText && textValue.trim() ? textValue : selected
 
   return (
     <div className="iv-choice" role="group" aria-labelledby={labelId} data-question-id={questionId}>
@@ -126,6 +189,7 @@ export function InterviewChoice({
       {kind === 'number' ? (
         <div className="iv-amount-row">
           <input
+            ref={inputRef}
             type="text"
             inputMode="decimal"
             aria-label="Amount in USD"
@@ -134,8 +198,42 @@ export function InterviewChoice({
             disabled={locked || isSaving}
             onChange={(e) => {
               if (locked || isSaving) return
+              setError(null)
               setAmount(e.target.value)
               setSelected(e.target.value)
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                void continueAnswer()
+              }
+            }}
+          />
+        </div>
+      ) : isFreeText ? (
+        <div className="iv-amount-row">
+          <input
+            ref={inputRef}
+            type={kind === 'date' ? 'text' : 'text'}
+            inputMode={kind === 'date' ? 'numeric' : 'text'}
+            autoComplete={kind === 'date' ? 'bday' : 'name'}
+            autoCapitalize={kind === 'date' ? 'off' : 'words'}
+            enterKeyHint="done"
+            aria-label={kind === 'date' ? 'Date of birth YYYY-MM-DD' : 'Full legal name'}
+            placeholder={kind === 'date' ? 'YYYY-MM-DD' : 'Full legal name'}
+            value={textValue}
+            disabled={locked || isSaving}
+            onChange={(e) => {
+              if (locked || isSaving) return
+              setError(null)
+              setTextValue(e.target.value)
+              setSelected(e.target.value)
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                void continueAnswer()
+              }
             }}
           />
         </div>
@@ -164,7 +262,13 @@ export function InterviewChoice({
         </div>
       )}
 
-      {shownAnswer != null && String(shownAnswer).trim() !== '' && (
+      {error && (
+        <p className="iv-error" role="alert">
+          {error}
+        </p>
+      )}
+
+      {shownAnswer != null && String(shownAnswer).trim() !== '' && !error && (
         <p className="iv-confirm-line" aria-live="polite">
           Your answer: <span>{displayAnswer(shownAnswer)}</span>
           {locked ? ' ✓' : ''}
@@ -174,10 +278,10 @@ export function InterviewChoice({
       <div className="iv-actions">
         {!locked && (
           <button className="btn btn-primary" type="button" disabled={!canContinue} onClick={() => void continueAnswer()}>
-            {isSaving ? 'Saving…' : 'Continue'}
+            {isSaving ? 'Saving…' : 'Answer'}
           </button>
         )}
-        {(selected || amount) && (
+        {(selected || amount || textValue) && (
           <button className="btn btn-secondary" type="button" disabled={isSaving} onClick={changeAnswer}>
             Change Answer
           </button>

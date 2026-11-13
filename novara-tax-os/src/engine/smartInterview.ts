@@ -23,7 +23,7 @@ export interface SmartTurn {
   id: string
   phase: 'filing_status' | 'benefits'
   prompt: string
-  kind: 'yesno' | 'choice' | 'number' | 'text'
+  kind: 'yesno' | 'choice' | 'number' | 'text' | 'date'
   choices?: string[]
   mapsTo: string
   aiLead: string

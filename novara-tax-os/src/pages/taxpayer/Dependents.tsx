@@ -147,7 +147,7 @@ export function Dependents() {
               key={active.id}
               questionId={active.id}
               prompt={active.prompt}
-              kind={active.kind === 'date' ? 'text' : active.kind}
+              kind={active.kind}
               choices={active.choices}
               saving={saving}
               onConfirm={(value) => confirm(value)}
