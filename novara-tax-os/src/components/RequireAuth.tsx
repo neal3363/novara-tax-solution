@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Navigate, Outlet } from 'react-router-dom'
 import { fetchViewerSession } from '../auth/sessionClient'
-import { actions, useAppStore } from '../store/useAppStore'
+import { actions, isSampleSandboxSession, useAppStore } from '../store/useAppStore'
 import { AppNav } from './AppNav'
 
 const IS_DEV = import.meta.env.DEV
 
 /**
- * Production: re-verify Cursor identity on every protected load and rebind the
- * server-assigned role so sessionStorage cannot elevate privileges.
+ * Production: prefer Cursor-verified identity; otherwise allow the sample
+ * sandbox session so owners and demo viewers can stay in and edit.
  */
 export function RequireAuth() {
   const { currentUser } = useAppStore()
@@ -21,31 +21,41 @@ export function RequireAuth() {
     ;(async () => {
       const session = await fetchViewerSession()
       if (cancelled) return
-      if (!session.verified) {
-        actions.clearSession()
-        setDenied(true)
+      if (session.verified) {
+        actions.loginWithVerifiedViewer(session)
+        setDenied(false)
         setReady(true)
         return
       }
-      actions.loginWithVerifiedViewer(session)
-      setDenied(false)
+      // Keep sample sandbox users in (editable demo on this device).
+      if (isSampleSandboxSession()) {
+        if (!currentUser) actions.loginAsSampleSandbox()
+        setDenied(false)
+        setReady(true)
+        return
+      }
+      setDenied(true)
       setReady(true)
     })()
     return () => {
       cancelled = true
     }
+    // Intentionally once on mount — sample/current user rebound inside.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   if (!IS_DEV && !ready) {
     return (
       <div className="app-shell container" style={{ padding: '2rem' }}>
-        <p className="muted">Verifying your Cursor session…</p>
+        <p className="muted">Opening your workspace…</p>
       </div>
     )
   }
 
-  if (!IS_DEV && denied) return <Navigate to="/login" replace />
+  if (!IS_DEV && denied && !currentUser) return <Navigate to="/login" replace />
   if (!currentUser) return <Navigate to="/login" replace />
+
+  const sample = !IS_DEV && isSampleSandboxSession()
 
   return (
     <div className="app-shell">
@@ -53,8 +63,9 @@ export function RequireAuth() {
       <main className="app-main">
         <div className="container" style={{ paddingTop: '0.85rem' }}>
           <div className="sample-banner" role="status">
-            Private sandbox — identity verified by Cursor. Role is server-assigned (taxpayer). Session only on this
-            device.
+            {sample
+              ? 'Sample sandbox — editable on this device. Not a live IRS filing connection.'
+              : 'Signed in with Cursor — editable taxpayer workspace on this device. Not a live IRS filing connection.'}
           </div>
         </div>
         <Outlet />
