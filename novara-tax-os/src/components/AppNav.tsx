@@ -25,7 +25,7 @@ export function AppNav() {
           { to: '/app/taxpayer/assistant', label: 'Assistant' },
           { to: '/app/taxpayer/years', label: 'Years' },
           { to: '/app/taxpayer/prepare', label: 'Prepare' },
-          { to: '/app/taxpayer/benefits', label: 'Savings' },
+          { to: '/app/taxpayer/final-review', label: 'Sign & file' },
           { to: '/app/taxpayer/vault', label: 'Vault' },
         ]
       : currentUser.role === 'preparer'
@@ -33,8 +33,8 @@ export function AppNav() {
             { to: '/app/preparer', label: 'Inbox' },
             { to: '/app/preparer/clients', label: 'Clients' },
             { to: '/app/preparer/request-docs', label: 'Request' },
-            { to: '/app/preparer/workspace', label: 'Workspace' },
             { to: '/app/preparer/return', label: 'Return' },
+            { to: '/app/preparer/final-review', label: 'Sign & file' },
             { to: '/app/preparer/benefits', label: 'Benefits' },
           ]
         : currentUser.role === 'efin_owner'

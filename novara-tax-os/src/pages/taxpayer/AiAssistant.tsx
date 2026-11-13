@@ -299,8 +299,8 @@ export function AiAssistant() {
             <Link className="btn btn-secondary" to="/app/taxpayer/prepare">
               Full prepare flow
             </Link>
-            <Link className="btn btn-primary" to="/app/taxpayer/benefits/review">
-              Review &amp; authorize
+            <Link className="btn btn-primary" to="/app/taxpayer/final-review">
+              Checklist, return &amp; sign
             </Link>
           </div>
         </section>

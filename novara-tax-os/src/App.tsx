@@ -30,6 +30,7 @@ import { AiAssistant } from './pages/taxpayer/AiAssistant'
 import { PriorReturnImport } from './pages/taxpayer/PriorReturnImport'
 import { RequestDocuments } from './pages/preparer/RequestDocuments'
 import { SecureUpload } from './pages/public/SecureUpload'
+import { FinalReview } from './pages/taxpayer/FinalReview'
 
 export default function App() {
   return (
@@ -49,8 +50,10 @@ export default function App() {
         <Route path="taxpayer/vault" element={<RoleGate roles={['taxpayer']}><Vault /></RoleGate>} />
         <Route path="taxpayer/documents" element={<RoleGate roles={['taxpayer']}><DocumentsNeeded /></RoleGate>} />
         <Route path="taxpayer/dependents" element={<RoleGate roles={['taxpayer']}><Dependents /></RoleGate>} />
+        <Route path="taxpayer/final-review" element={<RoleGate roles={['taxpayer']}><FinalReview /></RoleGate>} />
         <Route path="preparer/documents" element={<RoleGate roles={['preparer']}><DocumentsNeeded /></RoleGate>} />
         <Route path="preparer/dependents" element={<RoleGate roles={['preparer']}><Dependents /></RoleGate>} />
+        <Route path="preparer/final-review" element={<RoleGate roles={['preparer']}><FinalReview /></RoleGate>} />
         <Route path="taxpayer/ai" element={<RoleGate roles={['taxpayer']}><TaxpayerAi /></RoleGate>} />
         <Route path="taxpayer/benefits" element={<RoleGate roles={['taxpayer']}><BenefitDashboard /></RoleGate>} />
         <Route path="taxpayer/benefits/interview" element={<RoleGate roles={['taxpayer']}><BenefitInterview /></RoleGate>} />
