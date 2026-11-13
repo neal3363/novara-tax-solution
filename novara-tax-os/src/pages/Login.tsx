@@ -111,12 +111,15 @@ export function Login() {
               <button className="btn btn-secondary" type="button" onClick={() => void retrySession()}>
                 Retry session check
               </button>
+              <a className="btn btn-ghost" href="/">
+                Back to welcome
+              </a>
             </div>
             {error && (
               <p className="muted" style={{ marginTop: '0.75rem' }} role="status">
                 {error}
-                {errorCode ? ` (${errorCode})` : ''} If this app is Private, only the owner (and invited viewers) can
-                open it after Cursor sign-in. Change visibility or invites in Publish Settings.
+                {errorCode ? ` (${errorCode})` : ''} Use <strong>Sign in with Cursor</strong> so this browser gets a
+                verified session. The welcome page at the home URL stays available without signing in.
               </p>
             )}
           </div>

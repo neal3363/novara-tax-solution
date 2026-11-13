@@ -82,9 +82,13 @@ export function explainSessionError(code: string): string {
       return 'Could not reach Cursor to verify your session. Check your connection and try again.'
     case 'not_json':
       return 'The host returned a non-session response. Open the app through Cursor sign-in.'
+    case 'session_handler_failed':
+      return 'Sign-in service had an error. Use Sign in with Cursor, or open the welcome page and try again.'
     case 'http_401':
     case 'http_403':
-      return 'Cursor did not authorize this browser for the private app.'
+      return 'Cursor did not authorize this browser for the app yet.'
+    case 'http_500':
+      return 'Sign-in service is temporarily unavailable. Try Sign in with Cursor again in a moment.'
     default:
       return `Could not verify Cursor session (${code}).`
   }
