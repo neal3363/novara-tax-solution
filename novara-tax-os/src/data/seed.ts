@@ -18,18 +18,24 @@ export function buildViewerWorkspace(viewer: {
   sub: string
   name: string
   email: string
+  /** Server-assigned only; non-taxpayer values are ignored in production workspaces. */
+  role?: UserAccount['role']
+  accountType?: UserAccount['accountType']
 }): { user: UserAccount; returns: TaxReturn[]; documents: DocumentRecord[] } {
   const season = resolveFilingSeason()
   const tenantId = `tenant-viewer-${viewer.sub.replace(/[^a-zA-Z0-9]/g, '').slice(0, 24) || 'owner'}`
   const userId = `u-${viewer.sub.replace(/[^a-zA-Z0-9]/g, '').slice(0, 24) || 'owner'}`
   const displayName = viewer.name?.trim() || viewer.email?.split('@')[0] || 'Taxpayer'
+  // Published app never elevates: only taxpayer/tc workspaces are built from identity.
+  const role = viewer.role === 'taxpayer' ? 'taxpayer' : 'taxpayer'
+  const accountType = viewer.accountType === 'tc' ? 'tc' : 'tc'
   const user: UserAccount = {
     id: userId,
     name: displayName,
     email: viewer.email || `${userId}@novara.local`,
-    role: 'taxpayer',
+    role,
     tenantId,
-    accountType: 'tc',
+    accountType,
   }
   const returnId = `r-${userId}-ty${season.currentTaxYear}`
   const returns: TaxReturn[] = [

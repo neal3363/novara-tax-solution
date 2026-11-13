@@ -1,6 +1,10 @@
 import { useSyncExternalStore } from 'react'
 import { buildViewerWorkspace, EMPTY_DOCS, EMPTY_RETURNS, SMART_QUESTIONS } from '../data/seed'
-import type { ViewerSession } from '../auth/sessionClient'
+import {
+  clampProductionAccountType,
+  clampProductionRole,
+  type ViewerSession,
+} from '../auth/sessionClient'
 import type {
   AccountType,
   AppState,
@@ -495,6 +499,8 @@ function persist() {
 }
 
 function resolveStoredUser(role: Role | null, userId: string | null): UserAccount | null {
+  // Production never trusts a client-stored role — RequireAuth rebinds from /api/session.
+  if (!import.meta.env.DEV) return null
   if (!role) return null
   try {
     const raw = sessionStorage.getItem(USER_JSON_KEY)
@@ -632,24 +638,42 @@ function uid(prefix: string) {
 }
 
 export const actions = {
+  /** Clear signed-in identity (used when Cursor session verification fails). */
+  clearSession() {
+    localStorage.removeItem(ROLE_KEY)
+    localStorage.removeItem(USER_KEY)
+    sessionStorage.removeItem(USER_JSON_KEY)
+    state = { ...state, currentUser: null, accountTier: undefined }
+    emit()
+  },
   /** Production: bind a private workspace to the verified Cursor viewer (no role picker). */
   loginWithVerifiedViewer(session: ViewerSession) {
-    const ws = buildViewerWorkspace(session)
-    const sameUser = state.currentUser?.id === ws.user.id && state.returns.length > 0
+    const role = clampProductionRole(session.role)
+    const accountType = clampProductionAccountType(session.accountType)
+    const ws = buildViewerWorkspace({ ...session, role, accountType })
+    // Always take identity + role from the server response; never keep a client-elevated role.
+    const sameTenant =
+      state.currentUser?.id === ws.user.id &&
+      state.currentUser?.tenantId === ws.user.tenantId &&
+      state.returns.length > 0
+    const scopedReturns = sameTenant
+      ? state.returns.filter((r) => r.tenantId === ws.user.tenantId && r.clientId === ws.user.id)
+      : ws.returns
+    const scopedDocs = sameTenant
+      ? state.documents.filter((d) => d.tenantId === ws.user.tenantId && (d.clientId === ws.user.id || d.ownerId === ws.user.id))
+      : ws.documents
     state = {
       ...state,
       currentUser: ws.user,
       accountTier: 'TC',
-      documents: sameUser ? state.documents : ws.documents,
-      returns: sameUser ? state.returns : ws.returns,
+      documents: scopedDocs,
+      returns: scopedReturns,
       officeStaff: [],
-      activeReturnId: sameUser
-        ? state.activeReturnId || ws.returns[0]?.id || ''
-        : ws.returns[0]?.id || '',
-      entryPlan: sameUser ? state.entryPlan : [],
-      entryPlanStatus: sameUser ? state.entryPlanStatus : 'awaiting_approval',
-      preEntryNotes: sameUser ? state.preEntryNotes : [],
-      messages: sameUser
+      activeReturnId: scopedReturns[0]?.id || ws.returns[0]?.id || '',
+      entryPlan: sameTenant ? state.entryPlan : [],
+      entryPlanStatus: sameTenant ? state.entryPlanStatus : 'awaiting_approval',
+      preEntryNotes: sameTenant ? state.preEntryNotes : [],
+      messages: sameTenant
         ? state.messages
         : [
             {
@@ -688,11 +712,12 @@ export const actions = {
     emit()
   },
   /** @deprecated Use loginAsDevRole in DEV or loginWithVerifiedViewer in production. */
-  loginAs(role: Role, userId?: string) {
+  loginAs(_role: Role, _userId?: string) {
     if (import.meta.env.DEV) {
-      void actions.loginAsDevRole(role, userId)
+      void actions.loginAsDevRole(_role, _userId)
       return
     }
+    // Production: role selection / elevation is disabled.
   },
   /** Tenant-scoped returns for the signed-in actor (authorization enforced). */
   visibleReturns(): TenantScopedReturn[] {
@@ -1796,6 +1821,12 @@ export const actions = {
     lines: { id: string; label: string; amount: number }[]
     planAmount: number
   }) {
+    if (!import.meta.env.DEV) {
+      return {
+        ok: false as const,
+        error: 'Self-service role registration is disabled in the published app. Roles are server-assigned.',
+      }
+    }
     const accountType: AccountType =
       input.tier === 'TC' ? 'tc' : input.tier === 'TP' ? 'independent_tp' : 'office_owner'
     const role: Role = input.tier === 'TC' ? 'taxpayer' : input.tier === 'TP' ? 'preparer' : 'efin_owner'
