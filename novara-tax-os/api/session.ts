@@ -1,8 +1,13 @@
 /**
  * Verified Cursor viewer session for the published private app.
  * Browser never receives the identity token — only name/email/sub for workspace binding.
+ * Account role is assigned here (server-enforced) and cannot be chosen by the client.
  */
 import { requireIdentity } from '../cursor/identity'
+
+/** Private published app: every verified person opens as a TC taxpayer. */
+const SERVER_ASSIGNED_ROLE = 'taxpayer' as const
+const SERVER_ASSIGNED_ACCOUNT_TYPE = 'tc' as const
 
 export async function GET(request: Request) {
   const identity = await requireIdentity(request)
@@ -25,6 +30,9 @@ export async function GET(request: Request) {
       name: identity.name || 'Taxpayer',
       email: identity.email || '',
       appVisibility: identity.appVisibility,
+      /** Server-assigned — client must not elevate past this. */
+      role: SERVER_ASSIGNED_ROLE,
+      accountType: SERVER_ASSIGNED_ACCOUNT_TYPE,
     },
     { headers: { 'cache-control': 'private, no-store' } },
   )

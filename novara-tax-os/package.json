@@ -18,7 +18,8 @@
     "test:multiyear": "node scripts/test-multi-year-pricing.mjs",
     "test:master": "node scripts/test-master-platform.mjs",
     "test:progress": "node scripts/test-question-progress.mjs",
-    "test:filing": "node scripts/test-final-filing.mjs"
+    "test:filing": "node scripts/test-final-filing.mjs",
+    "test:publish-security": "node scripts/test-publish-security.mjs"
   },
   "dependencies": {
     "@fontsource/figtree": "^5.3.0",

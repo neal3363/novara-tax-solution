@@ -214,7 +214,7 @@ export function Prepare() {
             <span className="badge">Start with documents</span>
             <h2>Drop ID, SSN docs, W-2s, 1099s, and family records</h2>
             <p>
-              Tip for this demo: name files like <code>ID_Jordan_Blake.pdf</code>, <code>license_Mary_Johnson.pdf</code>,{' '}
+              Tip for this demo: name files like <code>ID_First_Last.pdf</code>, <code>license_Mary_Johnson.pdf</code>,{' '}
               <code>ssn_Emma_Blake.pdf</code> so multiple people are extracted for relationship questions.
             </p>
             <input
