@@ -9,6 +9,7 @@ import { useAmbientAudio } from '../ambient/AmbientAudioContext'
 import { detectFilingIntent } from '../engine/conversationIntent'
 import { PUBLIC_DEMO_BANNER, isPublicDemoMode } from '../engine/demo/publicDemo'
 import { stashLandingUploads } from '../engine/pendingLandingUploads'
+import { summarizeUploadRouting } from '../engine/documentProcessing'
 import { actions } from '../store/useAppStore'
 import {
   OFFICE_SUBSCRIPTION_BUSINESS,
@@ -149,11 +150,12 @@ export function Landing() {
       setUploadNote('Choose one or more documents (W-2s, 1099s, IDs, receipts) to upload together.')
       return
     }
+    const routing = summarizeUploadRouting(list.map((f) => f.name))
     // Public demo: open guest workspace and classify into the vault immediately.
     if (ensureWorkspace()) {
       actions.uploadFiles(list)
       setUploadNote(
-        `${list.length} document${list.length === 1 ? '' : 's'} sorted into your return. Add more anytime for credits you discover later.`,
+        `${list.length} document${list.length === 1 ? '' : 's'} sorted automatically: ${routing}. Add more anytime for credits you discover later.`,
       )
       goToPrepare({ uploadedCount: list.length })
       return
@@ -161,7 +163,7 @@ export function Landing() {
     // DEV login gate: stash in-tab until Prepare mounts after login.
     stashLandingUploads(list)
     setUploadNote(
-      `${list.length} document${list.length === 1 ? '' : 's'} ready — they will sort into your return after you continue.`,
+      `${list.length} document${list.length === 1 ? '' : 's'} ready — will sort on continue: ${routing}.`,
     )
     goToPrepare({ uploadedCount: list.length })
   }
@@ -305,9 +307,9 @@ export function Landing() {
                 </p>
               )}
               <p className="hero-compose-note">
-                Speak your situation, type it, or drop every document at once — W-2s, 1099s, IDs, and receipts. NOVARA
-                sorts each file into the right place. If you learn about a credit later, upload supporting docs anytime
-                from Documents or the Vault. Human review is required before e-file.
+                Speak your situation, type it, or drop every document at once — driver’s license, Social Security card,
+                W-2s, 1099s, and receipts. NOVARA sorts each file into Personal, Income, or Credits automatically. Upload
+                more anytime from Documents or the Vault. Human review is required before e-file.
               </p>
             </div>
           </div>

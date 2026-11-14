@@ -106,6 +106,8 @@ import {
   extractFactsForType,
   findDuplicateUploads,
   plainLanguageExtractionSummary,
+  routingPlaceForDocType,
+  summarizeUploadRouting,
 } from '../engine/documentProcessing'
 import { applyParsedFacts, parseTaxpayerStatement } from '../engine/naturalLanguageFacts'
 import { evaluateDependent } from '../engine/dependentsEngine'
@@ -1294,9 +1296,10 @@ export const actions = {
       ),
     }
     emit()
+    const routeSummary = summarizeUploadRouting(docs.map((d) => d.name))
     actions.addMessage(
       'assistant',
-      `Received ${docs.length} file${docs.length === 1 ? '' : 's'}. Identifying document types and extracting tax fields…${
+      `Received ${docs.length} file${docs.length === 1 ? '' : 's'} and sorted each into place: ${routeSummary}. Extracting tax fields…${
         dupes.length ? ` Flagged ${dupes.length} possible duplicate(s) for review.` : ''
       }`,
     )
@@ -1369,10 +1372,17 @@ export const actions = {
         }
         emit()
         if (i === docs.length - 1) {
+          const placed = categorized
+            .filter((d) => docs.some((u) => u.id === d.id))
+            .map((d) => {
+              const place = routingPlaceForDocType(d.type)
+              return `${d.type} → ${place.placeLabel}`
+            })
+          const uniquePlaces = Array.from(new Set(placed)).join('; ')
           const chat = {
             id: uid('iv'),
             role: 'assistant' as const,
-            text: `Extraction complete. I found ${candidates.length} person(s) on your documents. Confirm extracted fields, then tell me who is filing — I will not assume relationships from names or ages.`,
+            text: `Extraction complete. Sorted into vault: ${uniquePlaces || routeSummary}. I found ${candidates.length} person(s) on your documents. Confirm extracted fields, then tell me who is filing — I will not assume relationships from names or ages.`,
             at: new Date().toISOString(),
           }
           state = { ...state, interviewChat: [...state.interviewChat, chat], prepStep: Math.max(state.prepStep, 1) }
