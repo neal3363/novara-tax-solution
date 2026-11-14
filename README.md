@@ -37,5 +37,11 @@ All operational data in this build is **synthetic** and labeled.
 ## Scripts
 
 - `npm run dev` — local preview server
-- `npm run build` — production build
+- `npm run build` — production build (+ migrate when `DATABASE_URL` is set)
 - `npm test` — security, isolation, workflow, and AI control tests
+- `npm run export:ai` — secrets-free export pack for transfer to `neal3363/novara-asset-intelligence`
+
+## Authentication vs live data
+
+Configuring the nine auth variables (see `docs/AUTH_CONFIGURATION.md`) enables portal login only.
+It does **not** enable live asset connectors. Synthetic data remains labeled until connectors are separately approved.

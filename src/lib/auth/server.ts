@@ -32,7 +32,7 @@ export async function requirePortalUser(role: PortalRole): Promise<UserSession> 
     redirect(`/login?next=${encodeURIComponent(`/app/${role}`)}`);
   }
   if (user.role !== role) {
-    appendAuditEvent({
+    await appendAuditEvent({
       actor: user.id,
       action: "portal_isolation_block",
       resource: `/app/${role}`,

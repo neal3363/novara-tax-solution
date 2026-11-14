@@ -1,24 +1,23 @@
 # DEVELOPMENT_PROGRESS.md
 
-## Security & isolation cycle (current)
+## Current cycle — OIDC + durable security + export prep
 
 ### Implemented
-- Per-user auth via `AUTH_USERS_JSON` (no shared password)
-- HMAC session cookies v2 + legacy session invalidation
-- TOTP MFA gate for privileged portal access (`mfaVerified` only after code check)
-- Login rate limiting / lockout
-- Server `requirePortalUser` on all portal layouts
-- Document matter/org authorization + `/api/documents/[id]` download guard
-- Attorney evidence page filtered to authorized matters only
-- OIDC start route + MFA claim helper; callback intentionally closed (501) until IdP wired
-- Separation evidence doc for shared GitHub repository risk
+- Production OIDC authorize + PKCE + state/nonce + token exchange + JWKS ID-token validation + MFA claim enforcement
+- OIDC users must be pre-provisioned in `AUTH_USERS_JSON` (no privileged self-registration)
+- Durable rate-limit + audit stores (Postgres when `DATABASE_URL` set; PGlite locally)
+- `cursor-app.json` declares postgres for multi-instance persistence
+- `PREVIEW_AUTH_PASSWORD` removed from application code
+- Secrets-free export script for transfer to `neal3363/novara-asset-intelligence`
+- Registration page clarified: interest only, creates no accounts
 
-### Documented / blocked
-- Creating dedicated GitHub repo `novara-asset-intelligence` (agent cannot create repositories)
-- Full OIDC token exchange / JWKS validation against a chosen IdP
-- Publishing corrected deployment (prepared for review; not published in this cycle)
+### Remaining blockers
+- Human must create GitHub repo `neal3363/novara-asset-intelligence` and push export
+- Confirm removal of obsolete `PREVIEW_AUTH_PASSWORD` in Cursor Secrets UI if still bound
+- Choose/configure real IdP values (issuer/client) before production OIDC login works end-to-end
+- Republish deferred until review approval
 
 ### Preserved
-- Design system, portals, synthetic labeled data, business model rules
-- No Tax OS branch merges or renames
-- No live connectors / paid licenses / DNS / irreversible migrations
+- Tax OS branches untouched
+- Synthetic data labeled; live connectors disabled
+- Design/portals/business model unchanged

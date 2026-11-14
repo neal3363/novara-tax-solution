@@ -5,15 +5,16 @@ import { formatDate } from "@/lib/utils";
 
 export const metadata = { title: "Audit Log" };
 
-export default function AuditPage() {
-  const events = listAuditEvents();
+export default async function AuditPage() {
+  const events = await listAuditEvents();
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-4xl text-white">Immutable audit log</h1>
         <p className="mt-2 text-sm text-silver">
-          Append-only preview store. Events cannot be edited or deleted through application APIs.
+          Append-only durable store. Events cannot be edited or deleted through application APIs.
+          Persists across restarts via Postgres when `DATABASE_URL` is set (PGlite locally).
         </p>
       </div>
       <div className="space-y-3">

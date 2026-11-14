@@ -1,31 +1,70 @@
 import type { AuditEvent } from "@/lib/types";
 import { auditEvents as seedEvents } from "@/lib/synthetic/data";
+import { sql } from "@/lib/db";
 
-/**
- * Preview immutable audit log.
- * Events can be appended but never mutated or deleted through this API.
- */
-const events: AuditEvent[] = [...seedEvents];
+let seeded = false;
 
-export function listAuditEvents(): readonly AuditEvent[] {
-  return Object.freeze([...events].sort((a, b) => (a.at < b.at ? 1 : -1)));
+async function ensureSeeded(): Promise<void> {
+  if (seeded) return;
+  const existing = await sql<{ count: string }>(
+    "select count(*)::text as count from security_audit_events",
+  );
+  if (Number(existing[0]?.count ?? 0) === 0) {
+    for (const event of seedEvents) {
+      await sql(
+        `insert into security_audit_events (id, at, actor, action, resource, outcome)
+         values ($1, $2::timestamptz, $3, $4, $5, $6)
+         on conflict (id) do nothing`,
+        [event.id, event.at, event.actor, event.action, event.resource, event.outcome],
+      );
+    }
+  }
+  seeded = true;
 }
 
-export function appendAuditEvent(input: {
+export async function listAuditEvents(): Promise<readonly AuditEvent[]> {
+  await ensureSeeded();
+  const rows = await sql<{
+    id: string;
+    at: string | Date;
+    actor: string;
+    action: string;
+    resource: string;
+    outcome: "allowed" | "denied";
+  }>("select id, at, actor, action, resource, outcome from security_audit_events order by at desc");
+
+  return Object.freeze(
+    rows.map((row) => ({
+      id: row.id,
+      at: new Date(row.at).toISOString(),
+      actor: row.actor,
+      action: row.action,
+      resource: row.resource,
+      outcome: row.outcome,
+    })),
+  );
+}
+
+export async function appendAuditEvent(input: {
   actor: string;
   action: string;
   resource: string;
   outcome: "allowed" | "denied";
-}): AuditEvent {
+}): Promise<AuditEvent> {
+  await ensureSeeded();
   const event: AuditEvent = {
-    id: `aud_${Date.now()}_${events.length + 1}`,
+    id: `aud_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     at: new Date().toISOString(),
     actor: input.actor,
     action: input.action,
     resource: input.resource,
     outcome: input.outcome,
   };
-  events.push(event);
+  await sql(
+    `insert into security_audit_events (id, at, actor, action, resource, outcome)
+     values ($1, $2::timestamptz, $3, $4, $5, $6)`,
+    [event.id, event.at, event.actor, event.action, event.resource, event.outcome],
+  );
   return event;
 }
 

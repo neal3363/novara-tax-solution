@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   const decision = canExportOpportunity(user, opportunity);
   const allowed = territory.allowed && decision.allowed;
 
-  appendAuditEvent({
+  await appendAuditEvent({
     actor: user.id,
     action: "export_opportunity",
     resource: opportunity.id,

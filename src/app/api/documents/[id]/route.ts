@@ -20,7 +20,7 @@ export async function GET(
   }
 
   const decision = canAccessDocument(user, document, cases);
-  appendAuditEvent({
+  await appendAuditEvent({
     actor: user.id,
     action: "document_download",
     resource: document.id,

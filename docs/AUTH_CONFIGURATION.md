@@ -1,47 +1,45 @@
 # Authentication configuration — NOVARA Asset Intelligence
 
-## Implemented now
+Authentication configuration controls **who can open portals**. It does **not** enable live asset connectors, official-source ingestion, or real recovery data. Synthetic data remains labeled until connectors are separately licensed and approved.
 
-| Capability | Status |
-|------------|--------|
-| Per-user password verification (`AUTH_USERS_JSON`) | Implemented |
-| HMAC-signed session cookies v2 | Implemented |
-| TOTP MFA challenge before portal access | Implemented |
-| Login rate limiting / lockout | Implemented |
-| Legacy shared-password sessions invalidated | Implemented (cookie renamed + versioned) |
-| Server-side portal layout auth checks | Implemented |
-| Document/matter authorization + download API | Implemented |
-| OIDC start route + MFA claim helper | Scaffolded (callback returns 501 until IdP wired) |
+## The nine authentication variables
+
+| Variable | Purpose | Where the value comes from | Secret? |
+|----------|---------|----------------------------|---------|
+| `AUTH_SECRET` | HMAC key for signing portal session cookies | Generate a long random string (≥32 chars) in your secret store | **Yes** |
+| `AUTH_MODE` | `password`, `oidc`, or `both` | Operator choice for the environment | No (non-sensitive config) |
+| `AUTH_SESSION_VERSION` | Bump to invalidate all existing sessions | Operator-set version string (e.g. `2`) | No |
+| `AUTH_USERS_JSON` | Provisioned user roster: ids, roles, orgs, territories, scrypt password hashes, TOTP secrets | Admin-managed JSON in secret store; emails must match IdP users for OIDC | **Yes** |
+| `AUTH_OIDC_ISSUER` | OIDC issuer URL (discovery base) | Your IdP tenant/issuer URL | No (public issuer URL) |
+| `AUTH_OIDC_CLIENT_ID` | OIDC confidential client id | IdP application settings | Treat as sensitive |
+| `AUTH_OIDC_CLIENT_SECRET` | OIDC client secret | IdP application settings | **Yes** |
+| `AUTH_OIDC_REDIRECT_URI` | Exact callback URL registered with IdP | Your deployed `/api/auth/oidc/callback` URL | No |
+| `AUTH_OIDC_SCOPES` | OIDC scopes (default `openid profile email`) | IdP-allowed scopes | No |
+
+### Related platform variable (not one of the nine auth vars)
+
+| Variable | Purpose | Secret? |
+|----------|---------|---------|
+| `DATABASE_URL` | Shared Postgres for durable rate-limit + audit across instances (set by Cursor when `cursor-app.json` declares postgres) | **Yes** (platform-managed) |
+
+## Auth vs live-data connectors
+
+| Concern | Variables / gates | Effect |
+|---------|-------------------|--------|
+| Portal login / MFA / isolation | The nine auth vars above | Users can open role portals on **synthetic** data |
+| Live state/federal connectors | Separate Data Rights Records, connector secrets, legal memos (not configured here) | **Still disabled** |
+
+Adding auth values does **not** turn on real asset discovery feeds.
+
+## Implemented behavior
+
+- Per-user passwords + TOTP MFA (password mode)
+- Full OIDC authorization-code + PKCE + state/nonce + JWKS ID-token validation + MFA claim enforcement
+- OIDC users must already exist in `AUTH_USERS_JSON` (no self-registration into privileged roles)
+- Durable rate limits + audit via Postgres/`DATABASE_URL` (PGlite locally)
+- Session cookie `novara_ai_session_v2` invalidates legacy shared-password sessions
+- `PREVIEW_AUTH_PASSWORD` removed from application code
 
 ## Closed when misconfigured
 
-If `AUTH_SECRET` / `AUTH_MODE` / user or OIDC config is missing, login returns **503** and portals redirect to login.
-
-## Required secrets (never paste values in chat)
-
-### Password mode (preview / staging)
-
-- `AUTH_SECRET`
-- `AUTH_MODE=password`
-- `AUTH_SESSION_VERSION`
-- `AUTH_USERS_JSON`
-
-### Production OIDC mode
-
-- `AUTH_SECRET`
-- `AUTH_MODE=oidc` (or `both`)
-- `AUTH_OIDC_ISSUER`
-- `AUTH_OIDC_CLIENT_ID`
-- `AUTH_OIDC_CLIENT_SECRET`
-- `AUTH_OIDC_REDIRECT_URI`
-- `AUTH_OIDC_SCOPES` (optional)
-
-Privileged access requires IdP MFA assertions (`amr`/`acr`) once the OIDC callback is fully wired.
-
-## Secure setup steps
-
-1. Create secrets in Cursor app Secrets / your host secret store (not in git).
-2. Generate unique passwords and TOTP secrets per user; store only scrypt hashes + TOTP secrets in `AUTH_USERS_JSON`.
-3. Set `AUTH_SESSION_VERSION` to a new value whenever rotating credentials.
-4. For production, set OIDC variables for your IdP and complete callback token/JWKS validation.
-5. Confirm portals stay unavailable until secrets are present.
+Missing `AUTH_SECRET` / `AUTH_MODE` / roster or OIDC settings → login **503**, portals redirect to login.

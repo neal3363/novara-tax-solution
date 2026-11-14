@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
   appendAuditEvent,
   listAuditEvents,
@@ -6,17 +6,22 @@ import {
   tryMutateAuditEvent,
 } from "@/lib/audit/store";
 
-describe("immutable audit store", () => {
-  it("appends events without mutating prior entries", () => {
-    const before = listAuditEvents();
+describe("immutable durable audit store", () => {
+  beforeEach(async () => {
+    // PGlite boots lazily on first sql call inside append/list.
+    await listAuditEvents();
+  });
+
+  it("appends events without mutating prior entries", async () => {
+    const before = await listAuditEvents();
     const firstId = before[0]?.id;
-    const created = appendAuditEvent({
+    const created = await appendAuditEvent({
       actor: "test",
       action: "unit_test_append",
       resource: "audit",
       outcome: "allowed",
     });
-    const after = listAuditEvents();
+    const after = await listAuditEvents();
     expect(after.some((e) => e.id === created.id)).toBe(true);
     if (firstId) {
       expect(after.find((e) => e.id === firstId)?.action).toBe(

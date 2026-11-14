@@ -3,7 +3,7 @@ import { clearAuthCookies } from "@/lib/auth/cookies";
 import { appendAuditEvent } from "@/lib/audit/store";
 
 export async function POST() {
-  appendAuditEvent({
+  await appendAuditEvent({
     actor: "session",
     action: "logout",
     resource: "auth",
