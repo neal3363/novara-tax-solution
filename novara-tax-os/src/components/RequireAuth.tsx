@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { clampProductionRole, fetchViewerSession } from '../auth/sessionClient'
+import { PUBLIC_DEMO_BANNER, isPublicDemoMode } from '../engine/demo/publicDemo'
 import { actions, useAppStore } from '../store/useAppStore'
 import { AppNav } from './AppNav'
 
 const IS_DEV = import.meta.env.DEV
+const PUBLIC_DEMO = isPublicDemoMode()
 
 /**
  * Production (public host): prefer a verified Cursor session when present;
@@ -75,9 +77,11 @@ export function RequireAuth() {
       <main className="app-main">
         <div className="container" style={{ paddingTop: '0.85rem' }}>
           <div className="sample-banner" role="status">
-            {IS_DEV
-              ? 'Local development workspace — not a live IRS filing connection.'
-              : 'Browser tax workspace on this device — not a live IRS filing connection. Data stays in this tab.'}
+            {PUBLIC_DEMO
+              ? PUBLIC_DEMO_BANNER
+              : IS_DEV
+                ? 'Local development workspace — not a live IRS filing connection.'
+                : 'Browser tax workspace on this device — not a live IRS filing connection. Data stays in this tab.'}
           </div>
         </div>
         <Outlet />

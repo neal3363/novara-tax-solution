@@ -7,6 +7,7 @@ import { MusicControls } from '../components/MusicControls'
 import { VoiceInput } from '../components/VoiceInput'
 import { useAmbientAudio } from '../ambient/AmbientAudioContext'
 import { detectFilingIntent } from '../engine/conversationIntent'
+import { PUBLIC_DEMO_BANNER, isPublicDemoMode } from '../engine/demo/publicDemo'
 import { actions } from '../store/useAppStore'
 import {
   OFFICE_BUSINESS_FEE,
@@ -269,6 +270,14 @@ export function Landing() {
           </div>
         </div>
       </section>
+
+      {isPublicDemoMode() && (
+        <div className="container" style={{ paddingTop: '0.85rem', paddingBottom: '0.25rem' }}>
+          <div className="sample-banner" role="status">
+            {PUBLIC_DEMO_BANNER}
+          </div>
+        </div>
+      )}
 
       <section className="section" id="how">
         <div className="container">

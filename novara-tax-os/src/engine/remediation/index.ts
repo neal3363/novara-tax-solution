@@ -27,6 +27,8 @@ export type { PaymentsReadinessItem } from './paymentsReadiness'
 export { buildRecoveryChecklist } from './recoveryReadiness'
 export type { RecoveryItem } from './recoveryReadiness'
 
+export { assertDemoSafetyLocks, publicDemoStatusPayload } from './publicDemoSafety'
+
 import { REMEDIATION_VERSION, getRemediationFlags, resetRemediationFlags, assertRemediationStagingOnly } from './config'
 import { resetSecurityRemediationForTests } from './security/index'
 import { TC_PERSONAL_FEE, TC_BUSINESS_FEE } from '../../data/fees'
