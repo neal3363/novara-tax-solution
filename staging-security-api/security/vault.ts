@@ -3,9 +3,11 @@
  * Auth required for every operation; short-lived signed tokens for download.
  */
 
-import { json, loadPhase7, sessionIdFrom } from './_shared.js'
+import { json, loadPhase7, sessionIdFrom, refuseUnlessStagingEnabled} from './_shared.js'
 
 export async function POST(request: Request) {
+  const __denied = refuseUnlessStagingEnabled()
+  if (__denied) return __denied
   try {
     const p7 = await loadPhase7()
     const body = (await request.json()) as Record<string, unknown>

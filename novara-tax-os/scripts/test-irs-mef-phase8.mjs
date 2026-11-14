@@ -2,6 +2,7 @@
  * Phase 8 IRS MeF tests — synthetic data only.
  * STOP before production IRS transmission / live e-file.
  */
+process.env.NOVARA_STAGING_SECURITY_API = "1"
 import { spawnSync } from 'node:child_process'
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
@@ -63,8 +64,10 @@ import {
   resetSessionStoreForTests,
 } from '../src/engine/security/phase6/index.ts'
 import { serverAuthorize, bootstrapStagingSecurity, resetStagingForTests } from '../src/engine/security/phase7/index.ts'
-import * as MefApi from '../api/security/mef.ts'
-import * as SessionApi from '../api/security/session.ts'
+process.env.NOVARA_STAGING_SECURITY_API = '1'
+import * as MefApi from '../../staging-security-api/security/mef.ts'
+process.env.NOVARA_STAGING_SECURITY_API = '1'
+import * as SessionApi from '../../staging-security-api/security/session.ts'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join as pathJoin } from 'node:path'
@@ -416,7 +419,7 @@ process.exit(failed > 0 ? 1 : 0)
 const r = spawnSync('npx', ['--yes', 'tsx', join(tmp, 'run.ts')], {
   cwd: root,
   encoding: 'utf8',
-  env: { ...process.env },
+  env: { ...process.env, NOVARA_STAGING_SECURITY_API: '1' },
 })
 if (r.stdout) process.stdout.write(r.stdout)
 if (r.stderr) process.stderr.write(r.stderr)

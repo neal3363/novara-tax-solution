@@ -2,6 +2,7 @@
  * Security remediation negative + positive tests (synthetic only).
  * productionEnforcement remains OFF.
  */
+process.env.NOVARA_STAGING_SECURITY_API = "1"
 import { spawnSync } from 'node:child_process'
 import { mkdirSync, writeFileSync, rmSync, mkdtempSync } from 'node:fs'
 import { join } from 'node:path'
@@ -54,7 +55,8 @@ import {
   serverAuthorize,
 } from '../src/engine/security/phase7/index.ts'
 import { resetSessionStoreForTests, resetMfaStoreForTests } from '../src/engine/security/phase6/index.ts'
-import * as PwApi from '../api/security/password-reset.ts'
+process.env.NOVARA_STAGING_SECURITY_API = '1'
+import * as PwApi from '../../staging-security-api/security/password-reset.ts'
 
 let failed = 0
 function assert(c: boolean, m: string) {
@@ -164,7 +166,7 @@ process.exit(failed > 0 ? 1 : 0)
 const r = spawnSync('npx', ['--yes', 'tsx', join(tmp, 'run.ts')], {
   cwd: root,
   encoding: 'utf8',
-  env: { ...process.env },
+  env: { ...process.env, NOVARA_STAGING_SECURITY_API: '1' },
 })
 if (r.stdout) process.stdout.write(r.stdout)
 if (r.stderr) process.stderr.write(r.stderr)

@@ -3,13 +3,15 @@
  * Live IRS transmission hard-blocked. Synthetic data only.
  */
 
-import { json, loadPhase6, loadPhase7, sessionIdFrom } from './_shared.js'
+import { json, loadPhase6, loadPhase7, sessionIdFrom, refuseUnlessStagingEnabled} from './_shared.js'
 
 async function loadMef() {
-  return import('../../src/engine/irs/mef/index.js')
+  return import('../../novara-tax-os/src/engine/irs/mef/index.js')
 }
 
 export async function GET(request: Request) {
+  const __denied = refuseUnlessStagingEnabled()
+  if (__denied) return __denied
   try {
     const mef = await loadMef()
     const url = new URL(request.url)
@@ -40,6 +42,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const __denied = refuseUnlessStagingEnabled()
+  if (__denied) return __denied
   try {
     const p6 = await loadPhase6()
     const p7 = await loadPhase7()

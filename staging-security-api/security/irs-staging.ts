@@ -4,13 +4,15 @@
  * Synthetic / staging only — never taxpayer-visible; cutover OFF.
  */
 
-import { json, loadPhase7, sessionIdFrom } from './_shared.js'
+import { json, loadPhase7, sessionIdFrom, refuseUnlessStagingEnabled} from './_shared.js'
 
 async function loadPhase9() {
-  return import('../../src/engine/irs/phase9/index.js')
+  return import('../../novara-tax-os/src/engine/irs/phase9/index.js')
 }
 
 export async function GET() {
+  const __denied = refuseUnlessStagingEnabled()
+  if (__denied) return __denied
   try {
     const p9 = await loadPhase9()
     return json(200, {
@@ -27,6 +29,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const __denied = refuseUnlessStagingEnabled()
+  if (__denied) return __denied
   try {
     const p7 = await loadPhase7()
     const p9 = await loadPhase9()

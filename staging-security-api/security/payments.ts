@@ -3,13 +3,15 @@
  * Live payments hard-blocked. No raw card storage.
  */
 
-import { json, loadPhase7, sessionIdFrom } from './_shared.js'
+import { json, loadPhase7, sessionIdFrom, refuseUnlessStagingEnabled} from './_shared.js'
 
 async function loadP10() {
-  return import('../../src/engine/payments/phase10/index.js')
+  return import('../../novara-tax-os/src/engine/payments/phase10/index.js')
 }
 
 export async function GET() {
+  const __denied = refuseUnlessStagingEnabled()
+  if (__denied) return __denied
   try {
     const p10 = await loadP10()
     return json(200, {
@@ -26,6 +28,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const __denied = refuseUnlessStagingEnabled()
+  if (__denied) return __denied
   try {
     const p7 = await loadPhase7()
     const p10 = await loadP10()

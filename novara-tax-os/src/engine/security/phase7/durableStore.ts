@@ -5,7 +5,8 @@
  */
 
 import { mkdirSync, appendFileSync, readFileSync, writeFileSync, existsSync, renameSync, unlinkSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, resolve, sep } from 'node:path'
+import { tmpdir } from 'node:os'
 import { createHash } from 'node:crypto'
 import type { AuditRecord } from '../phase6/types'
 
@@ -49,8 +50,27 @@ function defaultRoot(): string {
 
 let root = defaultRoot()
 
+/**
+ * Restrict durable roots to staging-safe directories (tmpdir, cwd staging dir, or env dir).
+ * Blocks client-controlled path traversal outside those trees.
+ */
 export function setDurableRoot(path: string): void {
-  root = path
+  const resolved = resolve(path)
+  const allowedPrefixes = [
+    resolve(tmpdir()) + sep,
+    resolve(process.cwd(), '.novara-staging-security'),
+  ]
+  if (process.env.NOVARA_STAGING_SECURITY_DIR) {
+    allowedPrefixes.push(resolve(process.env.NOVARA_STAGING_SECURITY_DIR))
+  }
+  const ok = allowedPrefixes.some((prefix) => {
+    if (prefix.endsWith(sep)) return resolved.startsWith(prefix) || resolved + sep === prefix
+    return resolved === prefix || resolved.startsWith(prefix + sep)
+  })
+  if (!ok) {
+    throw new Error('durable_root_not_allowed')
+  }
+  root = resolved
 }
 
 export function getDurableRoot(): string {
