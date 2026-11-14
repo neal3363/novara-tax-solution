@@ -3,6 +3,7 @@ import { formatMoney } from '../../data/fees'
 import { buildRefundTrackingSnapshot } from '../../engine/refundTracking'
 import { RefundMaximizer } from '../../components/benefits/RefundMaximizer'
 import { BalanceDuePanel } from '../../components/filing/BalanceDuePanel'
+import { RefundSettlementPanel } from '../../components/filing/RefundSettlementPanel'
 import { buildBalanceDueGuidance } from '../../engine/balanceDuePayments'
 import { actions, useAppStore } from '../../store/useAppStore'
 import '../shared.css'
@@ -96,6 +97,8 @@ export function RefundTrackingPage() {
           ))}
         </ul>
       </section>
+
+      <RefundSettlementPanel verifiedRefund={snap.verifiedRefund > 0 ? snap.verifiedRefund : 7000} />
 
       <BalanceDuePanel guidance={balanceGuidance} />
       <RefundMaximizer report={benefitReport} profile={taxProfile} />
