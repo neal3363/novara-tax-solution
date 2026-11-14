@@ -87,3 +87,38 @@ export {
   resubmitCorrection,
   mefPackageSummary,
 } from './pipeline'
+
+export {
+  OFFICIAL_IRS_EFILE_LINKS,
+  recommendedNovaraProviderRoles,
+  ownerEservicesApplicationChecklist,
+  identifiersRequiredForNovaraModel,
+} from './authorization/irsProviderRoles'
+export type {
+  OfficialIrsLink,
+  NovaraProviderRolePlan,
+  OwnerEservicesChecklistItem,
+  IrsProviderOption,
+} from './authorization/irsProviderRoles'
+
+export {
+  evaluateOfficialAtsReadiness,
+  assertNotMockAsOfficialAts,
+  officialAtsFromProviderBundle,
+} from './ats/officialAtsGate'
+export type { AtsChannel, OfficialAtsReadiness, OfficialAtsCredentials } from './ats/officialAtsGate'
+
+export {
+  individualAtsScenarioCatalog,
+  scenariosAwaitingOfficialIrsIds,
+  markScenarioOfficialPass,
+  ATS_DISCLAIMER,
+  SUPPORTED_ATS_TAX_YEAR,
+} from './ats/scenarioCatalog'
+export type { AtsFormFamily, AtsScenarioSpec } from './ats/scenarioCatalog'
+
+export {
+  buildSyntheticReturnForScenario,
+  buildAllSyntheticAtsPacks,
+} from './ats/syntheticTestReturns'
+export type { SyntheticAtsReturn } from './ats/syntheticTestReturns'

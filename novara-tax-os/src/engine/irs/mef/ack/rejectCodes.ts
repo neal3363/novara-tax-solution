@@ -47,6 +47,36 @@ export const REJECT_CODE_CATALOG: Record<string, RejectCodeInfo> = {
     category: 'business_rule',
     correctionHint: 'Review AGI/tax/payment consistency and form attachments.',
   },
+  'IND-031': {
+    code: 'IND-031',
+    message: 'Dependent TIN / relationship inconsistency',
+    category: 'identity',
+    correctionHint: 'Correct dependent TIN and relationship; resubmit as correction.',
+  },
+  'F1040-017': {
+    code: 'F1040-017',
+    message: 'Filing status inconsistent with return data',
+    category: 'business_rule',
+    correctionHint: 'Align filing status with taxpayer profile and recompute.',
+  },
+  'PYADJ-903': {
+    code: 'PYADJ-903',
+    message: 'Prior-year AGI / PIN authentication failed (when required)',
+    category: 'authorization',
+    correctionHint: 'Obtain correct prior-year AGI or self-select PIN before resubmit.',
+  },
+  'BANK-001': {
+    code: 'BANK-001',
+    message: 'Direct deposit routing / account validation failed',
+    category: 'business_rule',
+    correctionHint: 'Verify routing and account numbers; do not use refund bank partner fields here.',
+  },
+  'SOFT-ID-001': {
+    code: 'SOFT-ID-001',
+    message: 'Software Identification Number missing or not authorized for tax year',
+    category: 'transmitter',
+    correctionHint: 'Register Software ID for the tax year; complete ATS questionnaire.',
+  },
 }
 
 export function interpretRejectCodes(codes: string[]): RejectCodeInfo[] {

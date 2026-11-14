@@ -1,0 +1,30 @@
+# EXAMPLE ONLY — copy to wrangler.toml after owner authorization.
+# Never commit real account_id, API tokens, or production secrets.
+
+name = "novara-tax-os-api-scaffold"
+main = "worker-api.example.ts"
+compatibility_date = "2025-11-01"
+workers_dev = true
+
+# [env.production]
+# name = "novara-tax-os-api"
+# routes = [{ pattern = "api.example.com/*", zone_name = "example.com" }]
+
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "novara_tax_os"
+# database_id = "REPLACE_AFTER_CREATE"
+
+# [[r2_buckets]]
+# binding = "VAULT"
+# bucket_name = "novara-tax-vault"
+
+# [[queues.producers]]
+# binding = "MEF_QUEUE"
+# queue = "novara-mef-jobs"
+
+[vars]
+LIVE_IRS_TRANSMIT = "false"
+LIVE_PAYMENTS = "false"
+LIVE_REFUND_SETTLEMENT = "false"
+ENVIRONMENT = "scaffold"

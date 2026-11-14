@@ -110,6 +110,14 @@ export type { LedgerEntry, LedgerEntryKind } from './ledger'
 export { buildFinancialReport, buildReconciliationDashboard } from './reports'
 export type { FinancialReport } from './reports'
 
+export {
+  approvedSoftwareStripePriceCatalog,
+  isStripeLiveEnabled,
+  resolveStripePriceId,
+  REFUND_SETTLEMENT_STRIPE_BAN,
+} from './stripePriceCatalog'
+export type { StripeBillingChannel, StripePriceSlot } from './stripePriceCatalog'
+
 import { PHASE10_VERSION, getPhase10Flags, resetPhase10Flags } from './config'
 import { assertApprovedPricingIntact } from './quotes'
 import { bankingPartnerConnectionStatus } from './bankingAdapter'

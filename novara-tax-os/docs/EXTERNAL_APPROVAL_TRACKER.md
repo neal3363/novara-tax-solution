@@ -4,8 +4,9 @@ Items Cursor **cannot** complete through code alone. Do **not** mark complete wi
 
 | ID | Item | Owner | Status | Evidence required |
 |----|------|-------|--------|-------------------|
-| EXT-IRS-PROVIDER | IRS e-file provider authorization | Compliance / ops | **BLOCKED** | IRS provider letter / authorization record |
-| EXT-IRS-ATS | Official IRS ATS testing | E-file / transmitter | **BLOCKED** | ATS acceptance documentation (not mock) |
+| EXT-IRS-PROVIDER | IRS e-file provider authorization (NOVARA Software Developer + Transmitter) | Compliance / ops | **BLOCKED** | IRS provider letter / authorization record; see `OWNER_AUTHORIZATION_AND_LAUNCH_REQUIREMENTS.md` |
+| EXT-IRS-EFIN-ETIN | NOVARA EFIN + Test/Production ETINs + Software IDs | Owner / RO | **BLOCKED** | IRS-assigned identifiers in secrets vault (not git); office EFIN ≠ NOVARA transmit auth |
+| EXT-IRS-ATS | Official IRS ATS testing | E-file / transmitter | **BLOCKED** | ATS acceptance documentation (not mock); Pub 1436 scenario evidence |
 | EXT-STATE-EFILE | Applicable state e-file approvals | Compliance | **BLOCKED** | Per-state approval letters for states to be filed |
 | EXT-PAY-LIVE | Payment processor live-account approval | Finance | **BLOCKED** | Merchant agreement + live keys in secrets manager |
 | EXT-STRIPE-PRICES | Live Stripe Price IDs matching `fees.ts` | Finance | **BLOCKED** | Price IDs for TP $89/$119/$249, Office $899/$1199/$1499, TC $300/$399 |

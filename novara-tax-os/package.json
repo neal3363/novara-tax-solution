@@ -51,7 +51,8 @@
     "test:landing-speak-upload": "node scripts/test-landing-speak-upload.mjs",
     "test:speak-fill-personal": "node scripts/test-speak-fill-personal.mjs",
     "test:refund-settlement": "node scripts/test-refund-settlement-pipeline.mjs",
-    "test:prod-readiness-audit": "node scripts/test-prod-readiness-audit.mjs"
+    "test:prod-readiness-audit": "node scripts/test-prod-readiness-audit.mjs",
+    "test:direct-irs-mef-auth": "node scripts/test-direct-irs-mef-auth.mjs"
   },
   "dependencies": {
     "@fontsource/figtree": "^5.3.0",
