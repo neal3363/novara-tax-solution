@@ -27,3 +27,4 @@ Items Cursor **cannot** complete through code alone. Do **not** mark complete wi
 - Mock ATS / sandbox Stripe / staging security tests are **not** substitutes for the rows above.
 - Synthetic public demo may proceed under `GO_SYNTHETIC_ONLY` without completing this tracker.
 - Real taxpayer production remains **NO-GO** until every critical row has evidence.
+- **Release fence (2026-11-14):** public synthetic demo is live and locked — see `RELEASE_FENCE.md` (`fence/public-demo-live-4bf9`).
