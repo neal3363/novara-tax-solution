@@ -19,6 +19,19 @@
   object-position: center;
 }
 
+/* Dual-buffer seamless loop — active layer visible, idle layer primed at t=0 */
+.hero-video-el.is-active {
+  opacity: 1;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.hero-video-el.is-idle {
+  opacity: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
 @media (max-width: 768px) {
   .hero-video-el,
   .hero-video-poster {
