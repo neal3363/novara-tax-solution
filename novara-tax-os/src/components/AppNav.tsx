@@ -24,6 +24,7 @@ export function AppNav() {
       ? [
           { to: '/app/taxpayer', label: 'Home' },
           { to: '/app/taxpayer/prepare', label: 'Questionnaire' },
+          { to: '/app/taxpayer/benefits', label: 'Savings' },
           { to: '/app/taxpayer/years', label: 'Years' },
           { to: '/app/taxpayer/assistant', label: 'Chat' },
           { to: '/app/taxpayer/final-review', label: 'Sign & file' },

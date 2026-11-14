@@ -3,6 +3,8 @@ import { useMemo } from 'react'
 import { useAppStore, actions } from '../../store/useAppStore'
 import { formatMoney } from '../../data/fees'
 import { RefundTracker } from '../../components/benefits/RefundTracker'
+import { SavingsOpportunityPanel } from '../../components/benefits/SavingsOpportunityPanel'
+import { AppliedBenefitBanner } from '../../components/benefits/AppliedBenefitBanner'
 import { buildInterviewProgress } from '../../engine/questionProgress'
 import '../shared.css'
 
@@ -44,6 +46,9 @@ export function TaxpayerHome() {
           <Link className="btn btn-secondary" to="/app/taxpayer/import">
             Import prior return
           </Link>
+          <Link className="btn btn-secondary" to="/app/taxpayer/benefits">
+            Tax savings
+          </Link>
           <Link className="btn btn-primary" to="/app/taxpayer/prepare">
             {progress.answeredCount === 0
               ? 'Open questionnaire'
@@ -77,6 +82,8 @@ export function TaxpayerHome() {
 
       <div style={{ marginTop: '1rem' }}>
         <RefundTracker report={benefitReport} />
+      <AppliedBenefitBanner events={benefitReport?.lastApplications} returnPath="/app/taxpayer/prepare" />
+      <SavingsOpportunityPanel report={benefitReport} compact />
       </div>
 
       <div className="grid-2" style={{ marginTop: '1rem' }}>
