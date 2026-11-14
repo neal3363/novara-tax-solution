@@ -5,6 +5,7 @@
  */
 
 import type { GoldenFixture } from './types'
+import { PHASE4_GOLDEN_FIXTURES } from './phase4Fixtures'
 
 /**
  * Bracket tax helper used ONLY while authoring fixtures (documented in derivation).
@@ -496,4 +497,5 @@ export const GOLDEN_FIXTURES: GoldenFixture[] = [
         ]).tax,
     },
   },
+  ...PHASE4_GOLDEN_FIXTURES,
 ]

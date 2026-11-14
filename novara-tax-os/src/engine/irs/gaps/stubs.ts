@@ -1,11 +1,15 @@
 /**
- * Explicit unsupported stubs — not complete implementations.
- * Calling these returns status markers only; no fake tax results.
+ * Phase 4 readiness probes — modules exist in isolation but are NOT production-ready.
+ * Calling these does not activate UI or Maximizer wiring.
  */
 
 export type StubResult = {
   form: string
-  supported: false
+  /** Isolated engine has a calculation path */
+  isolatedImplemented: boolean
+  supported: boolean
+  productionReady: false
+  readiness: 'isolated-validated' | 'isolated-partial' | 'unsupported'
   message: string
   nextStep: string
 }
@@ -13,63 +17,84 @@ export type StubResult = {
 export function stubForm8962(): StubResult {
   return {
     form: 'Form 8962',
-    supported: false,
-    message: 'Full Form 8962 not implemented; only simplified PTC estimate exists in federalReturn.',
-    nextStep: 'Approve isolated form8962.ts + Pub 974 golden fixtures before implementation.',
+    isolatedImplemented: true,
+    supported: true,
+    productionReady: false,
+    readiness: 'isolated-validated',
+    message: 'Isolated Form 8962 with SLCSP benchmark + APTC repayment; golden-tested. Not production-ready.',
+    nextStep: 'Keep dual-run only until cutover approval.',
   }
 }
 
 export function stubForm8995A(): StubResult {
   return {
     form: 'Form 8995-A',
-    supported: false,
-    message: 'Complex QBI (SSTB / W-2 / UBIA) not implemented; Form 8995 simplified path only.',
-    nextStep: 'Approve form8995A.ts after W-2 wage and UBIA inputs exist.',
+    isolatedImplemented: true,
+    supported: true,
+    productionReady: false,
+    readiness: 'isolated-validated',
+    message: 'Isolated Form 8995-A wage/UBIA/SSTB paths. Not production-ready.',
+    nextStep: 'Keep dual-run only until cutover approval.',
   }
 }
 
 export function stubForm8863(): StubResult {
   return {
     form: 'Form 8863',
-    supported: false,
-    message: 'Education credits (AOTC/LLC) not implemented.',
-    nextStep: 'Approve educationCredits.ts + Form 8863 instruction golden fixtures.',
+    isolatedImplemented: true,
+    supported: true,
+    productionReady: false,
+    readiness: 'isolated-validated',
+    message: 'Isolated Form 8863 AOTC/LLC. Not production-ready.',
+    nextStep: 'Keep dual-run only until cutover approval.',
   }
 }
 
 export function stubScheduleB(): StubResult {
   return {
     form: 'Schedule B',
-    supported: false,
-    message: 'Interest and dividend Schedule B not implemented.',
-    nextStep: 'Approve scheduleB.ts after 1099-INT/DIV structured inputs.',
+    isolatedImplemented: true,
+    supported: true,
+    productionReady: false,
+    readiness: 'isolated-validated',
+    message: 'Isolated Schedule B. Not production-ready.',
+    nextStep: 'Keep dual-run only until cutover approval.',
   }
 }
 
 export function stubScheduleD(): StubResult {
   return {
     form: 'Schedule D',
-    supported: false,
-    message: 'Capital gains Schedule D / QD-LTCG worksheet not implemented.',
-    nextStep: 'Approve scheduleD.ts with Form 8949 golden fixtures.',
+    isolatedImplemented: true,
+    supported: true,
+    productionReady: false,
+    readiness: 'isolated-validated',
+    message: 'Isolated Schedule D + QD/LTCG worksheet themes. Not production-ready.',
+    nextStep: 'Keep dual-run only until cutover approval.',
   }
 }
 
 export function stubScheduleE(): StubResult {
   return {
     form: 'Schedule E',
-    supported: false,
-    message: 'Supplemental income Schedule E not implemented.',
-    nextStep: 'Approve scheduleE.ts; passive loss rules remain unsupported until specified.',
+    isolatedImplemented: true,
+    supported: true,
+    productionReady: false,
+    readiness: 'isolated-partial',
+    message: 'Isolated Schedule E rental/K-1; Form 8582 passive limitation not complete.',
+    nextStep: 'Implement Form 8582 before claiming Schedule E complete.',
   }
 }
 
 export function stubAmendedRecalc(): StubResult {
   return {
     form: 'Form 1040-X',
-    supported: false,
-    message: 'Amended recalculation via IRS engine not wired; amendments workflow unchanged.',
-    nextStep: 'Approve amendedRecalc.ts after dual-run parity; do not alter amendments UI until then.',
+    isolatedImplemented: true,
+    supported: true,
+    productionReady: false,
+    readiness: 'isolated-validated',
+    message: 'Isolated 1040-X recalc via IRS engine; amendments UI unchanged.',
+    nextStep: 'Do not wire amendments UI until cutover approval.',
   }
 }
 

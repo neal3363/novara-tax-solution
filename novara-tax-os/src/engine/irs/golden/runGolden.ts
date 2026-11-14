@@ -35,6 +35,15 @@ export function runGoldenFixture(fixture: GoldenFixture): GoldenCheckResult[] {
     checkField(fixture, 'eitc', e.eitc, r.eitc),
     checkField(fixture, 'cdcc', e.cdcc, r.cdcc),
     checkField(fixture, 'qbiDeduction', e.qbiDeduction, r.qbiDeduction),
+    checkField(fixture, 'ptc', e.ptc, r.ptc),
+    checkField(fixture, 'excessAptcRepayment', e.excessAptcRepayment, r.excessAptcRepayment),
+    checkField(fixture, 'educationNonrefundable', e.educationNonrefundable, r.educationNonrefundable),
+    checkField(fixture, 'educationRefundable', e.educationRefundable, r.educationRefundable),
+    checkField(fixture, 'amt', e.amt, r.amt),
+    checkField(fixture, 'niit', e.niit, r.niit),
+    checkField(fixture, 'scheduleBInterestDividends', e.scheduleBInterestDividends, r.scheduleBInterestDividends),
+    checkField(fixture, 'scheduleDNet', e.scheduleDNet, r.scheduleDNet),
+    checkField(fixture, 'scheduleENet', e.scheduleENet, r.scheduleENet),
     checkField(fixture, 'refundOrBalanceDue', e.refundOrBalanceDue, r.refundOrBalanceDue),
   ]
   return checks.filter((c): c is GoldenCheckResult => c != null)

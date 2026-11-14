@@ -6,7 +6,7 @@
 export type IrsFilingStatus = 'single' | 'mfj' | 'mfs' | 'hoh' | 'qss'
 
 export interface TaxBracket {
-  /** Inclusive lower bound of taxable income for this rate */
+  /** Inclusive upper bound of taxable income for this rate band */
   upTo: number
   rate: number
 }
@@ -56,24 +56,56 @@ export interface IrsReturnInput {
   selfEmploymentNetProfit: number
   /** Qualified business income after SE adjustments (simplified) */
   qbiAmount?: number
+  /** Form 8995-A inputs — when present, complex QBI path is used */
+  qbiW2Wages?: number
+  qbiUbia?: number
+  qbiIsSstb?: boolean
+  qbiReitPtp?: number
   itemizedDeductions?: {
     mortgageInterest?: number
     stateLocalTaxes?: number
     charitable?: number
     medical?: number
-    /** Medical AGI floor applied inside calculator */
   }
   childcareExpenses?: number
   dependents?: IrsDependentInput[]
-  /** Marketplace coverage — triggers simplified PTC estimate when APTC/premiums provided */
+  /** Marketplace coverage — triggers Form 8962 when premiums/SLCSP provided */
   marketplaceCoverage?: boolean
   annualPremium?: number
+  /** SLCSP benchmark (annual); preferred over treating premium as SLCSP */
+  annualSlcsp?: number
   aptcReceived?: number
   householdIncomeForPtc?: number
+  householdSize?: number
+  /** Monthly 1095-A style rows for Form 8962 */
+  marketplaceMonths?: { enrollmentPremium: number; slcsp: number; months?: number }[]
   investmentIncome?: number
   educatorExpenses?: number
   studentLoanInterest?: number
   businessMiles?: number
+  /** Schedule B */
+  taxableInterest?: number
+  taxExemptInterest?: number
+  ordinaryDividends?: number
+  qualifiedDividends?: number
+  foreignAccounts?: boolean
+  /** Schedule D */
+  shortTermCapitalGainLoss?: number
+  longTermCapitalGainLoss?: number
+  shortTermCapitalLossCarryover?: number
+  longTermCapitalLossCarryover?: number
+  /** Schedule E */
+  rentalIncome?: number
+  rentalExpenses?: number
+  rentalActivelyParticipating?: boolean
+  royaltyIncome?: number
+  k1OrdinaryIncome?: number
+  /** Form 8863 */
+  educationStudents?: {
+    creditType: 'aotc' | 'llc'
+    qualifiedExpenses: number
+    eligible: boolean
+  }[]
 }
 
 export interface IrsReturnResult {
@@ -90,6 +122,10 @@ export interface IrsReturnResult {
   taxableIncome: number
   incomeTaxBeforeCredits: number
   seTax: number
+  /** Form 6251 AMT */
+  amt: number
+  /** Form 8960 NIIT */
+  niit: number
   totalTaxBeforeCredits: number
   nonrefundableCredits: number
   refundableCredits: number
@@ -99,9 +135,17 @@ export interface IrsReturnResult {
   eitc: number
   cdcc: number
   ptc: number
+  /** Excess APTC additional tax (Form 8962) */
+  excessAptcRepayment: number
+  educationNonrefundable: number
+  educationRefundable: number
+  scheduleBInterestDividends: number
+  scheduleDNet: number
+  scheduleENet: number
   taxAfterCredits: number
   totalPayments: number
   refundOrBalanceDue: number
   notes: string[]
   limitations: string[]
+  formReadiness: Record<string, string>
 }
