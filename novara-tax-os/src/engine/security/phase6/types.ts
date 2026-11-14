@@ -49,6 +49,9 @@ export type AuthzAction =
   | 'return.submit'
   | 'admin.audit_read'
   | 'session.revoke'
+  | 'payment.charge'
+  | 'billing.read'
+  | 'bank.apply'
 
 export interface AuthzRequest {
   session: AuthSession

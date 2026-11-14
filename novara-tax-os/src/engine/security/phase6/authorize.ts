@@ -31,6 +31,8 @@ export function authorize(req: AuthzRequest): AuthzResult {
     action.startsWith('document.') ||
     action.startsWith('client.') ||
     action === 'return.submit' ||
+    action === 'payment.charge' ||
+    action === 'bank.apply' ||
     action === 'office.manage_staff' ||
     action === 'office.manage_permissions'
   if (sensitive) {
@@ -63,10 +65,34 @@ export function authorize(req: AuthzRequest): AuthzResult {
     case 'office.manage_permissions':
       return authorizeOfficeManage(req)
     case 'admin.audit_read':
-      if (principal.role === 'admin' || (principal.officeManager && principal.accountType === 'office_owner')) {
-        return { allowed: true, reason: 'Office/admin audit read', code: 'ok' }
+    case 'billing.read':
+      if (
+        principal.role === 'admin' ||
+        (principal.officeManager && principal.accountType === 'office_owner') ||
+        principal.accountType === 'independent_tp' ||
+        (action === 'billing.read' &&
+          (principal.accountType === 'tc' ||
+            principal.accountType === 'office_preparer' ||
+            principal.accountType === 'office_owner'))
+      ) {
+        // TC billing.read is own-tenant only (already enforced above)
+        if (action === 'billing.read' && principal.accountType === 'office_preparer' && !principal.officeManager) {
+          return { allowed: false, reason: 'Preparer cannot read office financial reports', code: 'insufficient_role' }
+        }
+        return { allowed: true, reason: 'Billing/audit read authorized', code: 'ok' }
       }
-      return { allowed: false, reason: 'Insufficient role for audit', code: 'insufficient_role' }
+      return { allowed: false, reason: 'Insufficient role for billing/audit', code: 'insufficient_role' }
+    case 'payment.charge':
+      // Own-tenant charges: TC for own prep fees; TP/Office for subscriptions & client fees
+      if (principal.accountType === 'tc' || principal.accountType === 'independent_tp' || principal.accountType === 'office_owner' || principal.role === 'admin') {
+        return { allowed: true, reason: 'Payment charge authorized for account', code: 'ok' }
+      }
+      return { allowed: false, reason: 'Insufficient role to charge', code: 'insufficient_role' }
+    case 'bank.apply':
+      if (principal.accountType === 'tc' || principal.accountType === 'office_owner' || principal.accountType === 'independent_tp' || principal.role === 'admin') {
+        return { allowed: true, reason: 'Bank product apply authorized', code: 'ok' }
+      }
+      return { allowed: false, reason: 'Insufficient role for bank product', code: 'insufficient_role' }
     case 'session.revoke':
       return { allowed: true, reason: 'Principal may revoke own/admin sessions via dedicated API checks', code: 'ok' }
     default:
