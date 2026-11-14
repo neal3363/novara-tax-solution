@@ -92,10 +92,12 @@ export function buildPreSignFeeBreakdown(input: {
     })
   }
 
-  // Snapshot lines already on the return (dedupe by label)
+  // Snapshot lines already on the return — dedupe by label AND skip same-amount
+  // software fee already represented by the novara-software line (seed labels differ).
   const seen = new Set(lines.map((l) => l.label))
   for (const snap of input.taxReturn?.feeSnapshot ?? []) {
     if (seen.has(snap.label)) continue
+    if (snap.amount === software) continue
     lines.push({
       id: `snap-${snap.label}`,
       category: 'novara_platform',
@@ -103,6 +105,7 @@ export function buildPreSignFeeBreakdown(input: {
       amount: snap.amount,
       status: snap.status === 'paid' ? 'waived' : 'due',
     })
+    seen.add(snap.label)
   }
 
   if (input.bankProduct) {
