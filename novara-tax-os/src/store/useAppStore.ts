@@ -909,6 +909,7 @@ export const actions = {
         },
       ],
       hydrated: true,
+      prepStep: 2,
     }
     emit()
   },

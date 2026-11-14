@@ -1,0 +1,197 @@
+.refund-max {
+  margin-top: 0.75rem;
+}
+
+.refund-max-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.refund-max-head h2 {
+  margin: 0.15rem 0 0;
+  font-size: 1.25rem;
+}
+
+.refund-max-lead {
+  margin: 0.4rem 0 1rem;
+  max-width: 42rem;
+}
+
+.refund-max-dual {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.refund-max-card {
+  border-radius: 16px;
+  padding: 1rem 1.1rem;
+  background: linear-gradient(160deg, rgba(15, 23, 42, 0.04), rgba(15, 23, 42, 0.01));
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.refund-max-card.potential {
+  background: linear-gradient(160deg, rgba(14, 116, 144, 0.1), rgba(15, 23, 42, 0.02));
+  border-color: rgba(14, 116, 144, 0.22);
+}
+
+.refund-max-card .label {
+  margin: 0;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted, #64748b);
+}
+
+.refund-max-amount {
+  margin: 0.35rem 0 0.2rem;
+  font-size: clamp(1.85rem, 5vw, 2.65rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  animation: refund-pop 0.45s ease;
+}
+
+.refund-max-amount.accent {
+  color: #0e7490;
+}
+
+.refund-max-sub {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted, #64748b);
+}
+
+@keyframes refund-pop {
+  from {
+    opacity: 0.35;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.refund-max-progress {
+  margin: 1rem 0 0.65rem;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+}
+
+.refund-max-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #0f766e, #0e7490 55%, #38bdf8);
+  transition: width 0.55s ease;
+}
+
+.refund-max-delta {
+  margin: 0.35rem 0 0.85rem;
+  padding: 0.65rem 0.8rem;
+  border-radius: 12px;
+  background: rgba(14, 116, 144, 0.08);
+  font-size: 0.92rem;
+}
+
+.refund-max-breakdown h3,
+.refund-max-missed h3 {
+  margin: 0 0 0.45rem;
+  font-size: 1rem;
+}
+
+.refund-max-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.refund-max-steps li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem 0;
+  border-top: 1px solid rgba(15, 23, 42, 0.07);
+  font-size: 0.92rem;
+}
+
+.refund-max-steps .positive {
+  color: #0f766e;
+}
+
+.refund-max-steps .hypothetical {
+  color: #475569;
+  font-style: italic;
+}
+
+.refund-max-total strong {
+  font-size: 1.05rem;
+}
+
+.refund-max-trail {
+  margin-top: 0.75rem;
+  font-size: 0.88rem;
+}
+
+.refund-max-trail ul {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+}
+
+.refund-max-trail li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.35rem 0;
+  border-top: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.refund-max-missed {
+  margin-top: 1.15rem;
+}
+
+.refund-max-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 0.65rem;
+  margin-top: 0.65rem;
+}
+
+.refund-max-qcard {
+  border-radius: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  padding: 0.85rem;
+  background: #fff;
+}
+
+.refund-max-qcard-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.4rem;
+  align-items: flex-start;
+  margin-bottom: 0.35rem;
+}
+
+.refund-max-qcard p {
+  margin: 0 0 0.65rem;
+  font-size: 0.88rem;
+  color: #475569;
+}
+
+.refund-max-qcard-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+@media (max-width: 720px) {
+  .refund-max-dual {
+    grid-template-columns: 1fr;
+  }
+}

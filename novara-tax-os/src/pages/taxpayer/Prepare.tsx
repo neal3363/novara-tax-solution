@@ -6,6 +6,7 @@ import { formatMoney } from '../../data/fees'
 import { AppliedBenefitBanner } from '../../components/benefits/AppliedBenefitBanner'
 import { RefundTracker } from '../../components/benefits/RefundTracker'
 import { SavingsOpportunityPanel } from '../../components/benefits/SavingsOpportunityPanel'
+import { RefundMaximizer } from '../../components/benefits/RefundMaximizer'
 import { AnswerHistory, InterviewChoice } from '../../components/interview/InterviewChoice'
 import { QuestionOverview, QuestionProgressBar } from '../../components/interview/QuestionProgress'
 import {
@@ -615,7 +616,7 @@ export function Prepare() {
         </section>
       )}
 
-      {showInterview && prepStep >= 2 && prepStep < 3 && section !== 'review' && (
+      {showInterview && prepStep < 3 && section !== 'review' && (
         <section className="smart-interview rise">
           <div className="interview-layout">
             <div className="list-panel panel interview-chat">
@@ -721,6 +722,17 @@ export function Prepare() {
             </div>
 
             <div className="side-stack">
+              <RefundMaximizer
+                report={benefitReport}
+                profile={taxProfile}
+                preparePath="/app/taxpayer/prepare"
+                onOpenMapsTo={(mapsTo) => {
+                  actions.focusInterviewQuestion(mapsTo)
+                  requestAnimationFrame(() => {
+                    document.querySelector('.active-turn')?.scrollIntoView({ behavior: 'auto', block: 'center' })
+                  })
+                }}
+              />
               <RefundTracker report={benefitReport} />
               <AppliedBenefitBanner events={benefitReport?.lastApplications} returnPath="/app/taxpayer/prepare" />
               <SavingsOpportunityPanel

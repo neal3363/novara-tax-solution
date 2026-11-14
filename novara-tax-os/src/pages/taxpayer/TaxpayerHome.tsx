@@ -4,6 +4,7 @@ import { useAppStore, actions } from '../../store/useAppStore'
 import { formatMoney } from '../../data/fees'
 import { RefundTracker } from '../../components/benefits/RefundTracker'
 import { SavingsOpportunityPanel } from '../../components/benefits/SavingsOpportunityPanel'
+import { RefundMaximizer } from '../../components/benefits/RefundMaximizer'
 import { AppliedBenefitBanner } from '../../components/benefits/AppliedBenefitBanner'
 import { buildInterviewProgress } from '../../engine/questionProgress'
 import '../shared.css'
@@ -81,7 +82,8 @@ export function TaxpayerHome() {
       </div>
 
       <div style={{ marginTop: '1rem' }}>
-        <RefundTracker report={benefitReport} />
+        <RefundMaximizer report={benefitReport} profile={taxProfile} />
+      <RefundTracker report={benefitReport} />
       <AppliedBenefitBanner events={benefitReport?.lastApplications} returnPath="/app/taxpayer/prepare" />
       <SavingsOpportunityPanel report={benefitReport} compact />
       </div>
