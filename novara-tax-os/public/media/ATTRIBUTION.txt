@@ -1,11 +1,15 @@
 NOVARA Tax OS — ambient media attribution
 ========================================
 
-Video (silent NOVARA hero reel — real human motion in lobby / office HQ):
-- Mixkit Free License stock clips (Envato), re-encoded for NOVARA:
+Video (silent 12-second cinematic homepage hero — HQ arrival → networking → fintech workspace):
+- Mixkit Free License stock clips (Envato), re-encoded and crossfaded for NOVARA:
   https://mixkit.co/license/#videoFree
-  Includes office-lobby greetings, business building lobby, open-office floors,
-  coworkers talking, and professional meetings. Not affiliated with Filed.
+  Scene 1 (0–4s): Walking into a modern office building — Mixkit #4438
+  Scene 2 (4–8s): Professional greeting / handshake in office — Mixkit #30005
+  Scene 3 (8–12s): Team working in a modern office — Mixkit #4886
+  Delivery: 1080p H.264 MP4 (desktop) + 960×540 mobile encode, 24 fps, muted, looping.
+  Files: novara-cinematic-hero.mp4, novara-cinematic-hero-mobile.mp4, novara-cinematic-poster.jpg
+  (Also published as novara-office-hero*.mp4 / novara-office-poster.jpg for existing paths.)
 
 Audio:
 - “Soul Jazz” by Francisco Alvear — Mixkit Stock Music Free License
