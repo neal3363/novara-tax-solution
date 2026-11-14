@@ -39,8 +39,13 @@
     "test:returns-phase11": "node scripts/test-returns-phase11.mjs",
     "test:launch-phase12": "node scripts/test-launch-phase12.mjs",
     "test:master-acceptance": "node scripts/test-master-acceptance.mjs",
+    "test:tax-remediation": "node scripts/test-tax-remediation.mjs",
     "test:security-remediation": "node scripts/test-security-remediation.mjs",
-    "test:tax-remediation": "node scripts/test-tax-remediation.mjs"
+    "test:mef-readiness": "node scripts/test-mef-readiness.mjs",
+    "test:payments-readiness": "node scripts/test-payments-readiness.mjs",
+    "test:recovery-remediation": "node scripts/test-recovery-remediation.mjs",
+    "test:a11y-static": "node scripts/test-a11y-static.mjs",
+    "test:prod-readiness": "node scripts/test-prod-readiness.mjs"
   },
   "dependencies": {
     "@fontsource/figtree": "^5.3.0",

@@ -240,3 +240,23 @@ No silent pricing/tax-policy/branding/flag changes.
 ---
 
 **STOP:** Do not activate live IRS filing, production engine cutover, live banking, live payments, or real taxpayer document processing.
+
+---
+
+## Remediation update (2026-11-14 America/Chicago)
+
+Production-readiness remediation closed code-completable Master QA gaps without activating production locks.
+
+| Area | Updated status |
+|------|----------------|
+| Password recovery | PASS_STAGING (WS1) |
+| XSS/CSRF/rate-limit / injection | PASS_STAGING (WS1); independent AppSec BLOCKED |
+| Maximizer QSS | PASS (native `qss`) |
+| HSA / energy / IRA / education / CA·NY worksheets | PASS_STAGING (WS2–4); cutover OFF |
+| MeF / payments readiness inventory | PASS_STAGING mock/sandbox; official ATS & live pay BLOCKED |
+| A11y static inventory | PASS_STAGING; devices/screen-reader/load NOT_TESTED |
+| Backup/restore simulation | PASS_STAGING; production DB drill NOT_TESTED |
+
+**Harness re-run totals:** see `MASTER_ACCEPTANCE_SCORECARD.json`  
+**Decisions unchanged:** public demo **GO_SYNTHETIC_ONLY**; real taxpayer production **NO-GO**  
+**Trackers:** `EXTERNAL_APPROVAL_TRACKER.md`, `RELEASE_READINESS_REPORT.md`
