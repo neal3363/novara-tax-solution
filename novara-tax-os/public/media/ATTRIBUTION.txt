@@ -1,26 +1,26 @@
 NOVARA Tax OS — ambient media attribution
 ========================================
 
-Video (silent 12-second cinematic homepage hero — luxury building → clear faces → handshake → tax desk):
+Video (silent 12-second cinematic homepage hero — luxury building → clear faces → handshake → family handshake):
 - Mixkit Free License stock clips (Envato), re-encoded for NOVARA:
   https://mixkit.co/license/#videoFree
   Scene 1 (0–1.5s): Clouds moving above a glass skyscraper — Mixkit #27725
   Scene 2 (1.5–4s): Clear face — Black woman professional on phone in a bright office — Mixkit #100323
     https://mixkit.co/free-stock-video/businesswoman-talking-on-the-phone-100323/
-  Scene 3 (4–6.5s): Clear face — Black man in suit looking at the camera — Mixkit #48082
-    https://mixkit.co/free-stock-video/young-black-businessman-looking-at-the-camera-48082/
-  Scenes 4–5 (6.5–12s): Original NOVARA stills of Black men and Black women in tax/office advisory
-    contexts (handshake with readable faces; advisor/client document review), animated with subtle
-    camera push and lifted brightness so faces stay clear. Source stills under public/media/hero-source/.
-  Removed from this cut: Mixkit #33956 (backlit lobby silhouettes) and #8909 (hands-only handshake).
+  Scenes 3–5 (4–12s): Original NOVARA stills animated with subtle camera push and lifted brightness:
+    Scene 3 — East Asian professional woman, clear face-forward office portrait
+    Scene 4 — Black men and Black women handshake (readable faces)
+    Scene 5 — Caucasian and Black family clients shaking hands with an advisor
+    Source stills archived under public/media/hero-source/.
   Delivery: 12.0s loop, muted, 24 fps
     - novara-cinematic-hero.webm (VP9) + novara-cinematic-hero.mp4 (H.264 Constrained Baseline, yuv420p, 1080p)
     - novara-cinematic-hero-mobile.webm / .mp4 (960×540)
     - novara-cinematic-poster.jpg
   Legacy aliases: novara-office-hero*.mp4 / novara-office-poster.jpg (same baseline encodes).
 
-Demographic note (2026-11-14): People scenes intentionally include Black men and Black women so the
-hero reel is not limited to a single demographic. Framing keeps faces readable under a light hero veil.
+Demographic note (2026-11-14): Hero people scenes intentionally include Black, East Asian, and
+Caucasian individuals so the reel is not limited to a single demographic. Framing keeps faces
+readable under a light hero veil.
 
 Audio:
 - “Soul Jazz” by Francisco Alvear — Mixkit Stock Music Free License
