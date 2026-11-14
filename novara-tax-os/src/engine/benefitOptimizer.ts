@@ -69,6 +69,11 @@ export interface BenefitFinding {
   ruleCitation: string
   ruleVersion: string
   refundable?: boolean
+  /**
+   * Soft “more savings?” probe — does NOT block a docs-complete return.
+   * Taxpayer can answer later and may need proof uploads.
+   */
+  optionalDiscovery?: boolean
 }
 
 export interface OptimizationReport {
@@ -167,6 +172,7 @@ function factMap(p: TaxpayerProfile): Record<string, boolean> {
     is_educator: p.isEducator || p.answers.is_educator === 'yes',
     marketplace_coverage: p.answers.marketplace_coverage === 'yes' || p.answers.had_marketplace === 'yes',
     unmarried_or_considered: p.filingStatus === 'single' || p.filingStatus === 'hoh' || p.answers.unmarried_or_considered === 'yes',
+    filing_state_ready: Boolean(p.answers.filing_state) && p.answers.filing_state !== 'unresolved',
   }
 }
 
@@ -474,16 +480,17 @@ function evaluateRule(rule: BenefitRule, p: TaxpayerProfile, facts: Record<strin
   }
 
   if (!triggered && softProbe) {
-    // Prospective scenario only — not applied until facts/answers confirm eligibility.
+    // Prospective only — optional “more savings” path; never blocks a docs-complete return.
     const prospective = Math.max(0, rule.estimatedSavingsHint || 0)
     return baseFinding(rule, {
       status: 'needs_info',
       estimatedSavings: prospective,
       affectingRefund: 0,
-      explanation: `If you qualify, ${rule.shortName} could add about $${prospective.toLocaleString()} — answer a few questions so NOVARA can confirm. Not included in your current estimated refund.`,
+      explanation: `Optional: if you qualify, ${rule.shortName} could add about $${prospective.toLocaleString()}. Not required to finish your return — answer only if you want us to check.`,
       missingAnswers: rule.requiredAnswers.slice(0, 2),
       missingDocs: rule.requiredDocs.slice(0, 1),
       docStatus: 'requested',
+      optionalDiscovery: true,
     })
   }
 
@@ -666,20 +673,24 @@ export function runBenefitOptimization(p: TaxpayerProfile): OptimizationReport {
 
   const blockers: string[] = []
   if (refundIncomplete) blockers.unshift(refundIncompleteReason!)
+  // Only HARD needs_info block the return — optionalDiscovery credits are “more savings” later.
   findings
-    .filter((f) => f.status === 'needs_info')
+    .filter((f) => f.status === 'needs_info' && !f.optionalDiscovery)
     .forEach((f) => blockers.push(`${f.shortName}: answer ${f.missingAnswers.join(', ') || 'follow-ups'}`))
   findings
     .filter((f) => f.status === 'flagged_review')
     .forEach((f) => blockers.push(`${f.shortName}: human review required`))
+  // pending_verification is already on the return — recommend docs, do not block “done”
   findings
     .filter((f) => f.status === 'pending_verification')
     .forEach((f) =>
-      blockers.push(`${f.shortName}: applied provisionally — supporting document recommended before e-file`),
+      comparisonNotes.push(`${f.shortName}: on return — supporting document recommended before e-file`),
     )
 
-  const openNeeds = findings.some((f) => f.status === 'needs_info' || f.status === 'flagged_review')
+  const hardNeeds = findings.some((f) => f.status === 'needs_info' && !f.optionalDiscovery)
+  const flagged = findings.some((f) => f.status === 'flagged_review')
   const unresolved = p.unresolvedKeys.length > 0
+  const filingKnown = p.filingStatus !== 'unknown' || Boolean(p.answers.married_dec31)
 
   return {
     taxYear: p.taxYear,
@@ -694,7 +705,7 @@ export function runBenefitOptimization(p: TaxpayerProfile): OptimizationReport {
     newlyApplied: [],
     comparisonNotes,
     blockers,
-    auditComplete: !openNeeds && !unresolved && dependentInfoComplete,
+    auditComplete: !hardNeeds && !flagged && !unresolved && dependentInfoComplete && filingKnown,
     dependentInfoComplete,
     refundIncomplete,
     refundIncompleteReason,

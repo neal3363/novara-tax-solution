@@ -436,12 +436,27 @@ export function applyHouseholdToProfile(
   if (dependents.some((d) => d.age >= 0 && d.age < 17)) answers.has_child = 'yes'
   else if (dependents.length > 0 && dependents.every((d) => d.age >= 17)) answers.has_child = 'no'
   else if (!hasDeps) answers.has_child = 'no'
+  let filingStatus = profile.filingStatus
   if (spouse) {
     answers.married_dec31 = 'yes'
+    // Default MFJ from spouse on docs — taxpayer can Edit to MFS.
+    if (!answers.married_filing_plan) answers.married_filing_plan = 'Married Filing Jointly'
+    filingStatus = filingStatus === 'unknown' ? 'mfj' : filingStatus
+  } else if (intake.missingHouseholdAnswer !== null || intake.phase === 'interview' || dependents.length > 0 || intake.candidates.length > 0) {
+    // Household finished with no spouse → not married (skip the long filing quiz).
+    if (!answers.married_dec31) answers.married_dec31 = 'No'
+    if (hasDeps && answers.maintained_home !== 'no') {
+      answers.maintained_home = answers.maintained_home ?? 'yes'
+      answers.unmarried_or_considered = 'yes'
+      answers.has_qualifying_person = 'Yes'
+      filingStatus = filingStatus === 'unknown' || filingStatus === 'single' ? 'hoh' : filingStatus
+    } else if (!hasDeps) {
+      filingStatus = filingStatus === 'unknown' ? 'single' : filingStatus
+    }
   }
 
   // Re-import path: satisfyDocBackedAnswers lives in smartInterview — apply inline defaults here for CTC/EITC
-  if (dependents.some((d) => d.ctcEligible || d.eitcQualifyingChild || d.age >= 0 && d.age < 17)) {
+  if (dependents.some((d) => d.ctcEligible || d.eitcQualifyingChild || (d.age >= 0 && d.age < 17))) {
     answers.child_lived_with = answers.child_lived_with ?? 'yes'
     answers.child_support = answers.child_support ?? 'yes'
     answers.another_claimant = answers.another_claimant ?? 'no'
@@ -454,7 +469,7 @@ export function applyHouseholdToProfile(
     ...profile,
     dependents,
     answers,
-    // Filing status still recommended/confirmed via interview — do not auto-set MFJ from docs alone
+    filingStatus,
   }
 }
 

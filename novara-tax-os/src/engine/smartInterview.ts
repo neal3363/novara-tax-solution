@@ -499,10 +499,10 @@ export function nextBenefitDiscoveryTurn(profile: TaxpayerProfile): SmartTurn | 
       (f.status === 'applied' || f.status === 'pending_verification') &&
       f.affectingRefund > 0,
   )
-  // Only ask what still blocks a credit that already looks relevant
+  // Only HARD blockers — optionalDiscovery credits are “more savings” later, not required.
   const blockingKeys = new Set(
     report.findings
-      .filter((f) => f.status === 'needs_info' && f.missingAnswers.length > 0)
+      .filter((f) => f.status === 'needs_info' && !f.optionalDiscovery && f.missingAnswers.length > 0)
       .flatMap((f) => f.missingAnswers),
   )
 
@@ -535,14 +535,15 @@ export function nextBenefitDiscoveryTurn(profile: TaxpayerProfile): SmartTurn | 
     return true
   })
 
-  // Prefer a question that unlocks a needs_info credit
+  // Prefer a hard blocker; if docs already applied credits, stop the required queue
+  // (optional soft probes stay available via Maximize more / Edit).
   const blocker = filtered.find((q) => blockingKeys.has(q.mapsTo))
-  const q = blocker ?? (docsAppliedCredits ? null : filtered[0])
+  const q = blocker ?? (docsAppliedCredits || report.auditComplete ? null : filtered.find((q) => !DEFERRED_SOFT_PROBES.has(q.mapsTo)) ?? null)
   if (!q) return null
 
   const childCount = profile.dependents.filter((d) => d.age < 17).length
   let aiLead = docsAppliedCredits
-    ? 'Credits from your docs are on the return. Only a few checks left.'
+    ? 'Your docs finished the return. Only answer if you want extra credits.'
     : 'Upload docs first — credits apply faster.'
   if (q.mapsTo === 'had_w2') aiLead = 'How did you get paid?'
   else if (q.mapsTo === 'had_1099') aiLead = 'Any 1099 income?'
