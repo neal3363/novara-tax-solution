@@ -96,6 +96,10 @@ export interface DocumentVaultItem {
   uploadedAt: string;
   sensitivity: "standard" | "sensitive" | "privileged";
   ownerId: string;
+  /** Matters this document is explicitly authorized for. */
+  caseIds: string[];
+  /** Organizations explicitly authorized to view/download. */
+  authorizedOrganizationIds: string[];
   synthetic: true;
 }
 

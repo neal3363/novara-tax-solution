@@ -1,4 +1,5 @@
 import { PortalShell } from "@/components/layout/PortalShell";
+import { requirePortalUser } from "@/lib/auth/server";
 
 const nav = [
   { href: "/app/owner", label: "Claim Home" },
@@ -8,7 +9,8 @@ const nav = [
   { href: "/app/owner/notifications", label: "Notifications" },
 ];
 
-export default function OwnerLayout({ children }: { children: React.ReactNode }) {
+export default async function OwnerLayout({ children }: { children: React.ReactNode }) {
+  await requirePortalUser("owner");
   return (
     <PortalShell role="owner" nav={nav}>
       {children}

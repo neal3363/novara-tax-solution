@@ -5,19 +5,22 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Panel } from "@/components/ui/Panel";
-import { previewUsers } from "@/lib/synthetic/data";
+
+const DEMO_EMAILS = [
+  "executive@novara.preview",
+  "partner@novara.preview",
+  "attorney@novara.preview",
+  "owner@novara.preview",
+];
 
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const [email, setEmail] = useState(previewUsers.executive.email);
+  const [email, setEmail] = useState(DEMO_EMAILS[0]!);
   const [password, setPassword] = useState("");
   const [error, setError] = useState(() => {
     if (params.get("error") === "portal_isolation") {
-      return "Portal isolation blocked cross-role access. Sign in with the correct role.";
-    }
-    if (params.get("error") === "mfa_required") {
-      return "MFA verification required.";
+      return "Portal isolation blocked cross-role access.";
     }
     return "";
   });
@@ -33,9 +36,18 @@ function LoginForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
-      const data = (await res.json()) as { error?: string; redirectTo?: string };
+      const data = (await res.json()) as {
+        error?: string;
+        redirectTo?: string;
+        mfaRequired?: boolean;
+      };
       if (!res.ok) {
         setError(data.error ?? "Invalid credentials.");
+        return;
+      }
+      if (data.mfaRequired) {
+        router.push("/login/mfa");
+        router.refresh();
         return;
       }
       const next = params.get("next");
@@ -60,8 +72,8 @@ function LoginForm() {
         Asset Intelligence™ · Secure Login
       </div>
       <p className="mt-4 text-sm text-silver">
-        Sessions are HMAC-signed with a server secret. Portal passwords come from configured app
-        secrets — they are never shipped in source.
+        Individual user credentials and MFA are required. Shared demo passwords have been removed.
+        Portals stay closed unless authentication secrets are configured.
       </p>
       <form onSubmit={onSubmit} className="mt-6 space-y-4">
         <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-silver-muted">
@@ -88,20 +100,26 @@ function LoginForm() {
           {loading ? "Signing in…" : "Sign in"}
         </Button>
       </form>
+      <div className="mt-4">
+        <a href="/api/auth/oidc/start" className="text-sm text-champagne hover:underline">
+          Sign in with OIDC identity provider
+        </a>
+      </div>
       <div className="mt-6 space-y-2 text-xs text-silver-muted">
         <div className="font-semibold uppercase tracking-[0.12em] text-silver">Demo emails</div>
-        {Object.values(previewUsers).map((u) => (
+        {DEMO_EMAILS.map((value) => (
           <button
-            key={u.id}
+            key={value}
             type="button"
             className="block w-full rounded-md border border-[rgba(183,195,213,0.12)] px-3 py-2 text-left hover:border-champagne/40"
-            onClick={() => setEmail(u.email)}
+            onClick={() => setEmail(value)}
           >
-            {u.role}: {u.email}
+            {value}
           </button>
         ))}
         <p className="pt-2">
-          Enter the password from your Cursor app secrets (`PREVIEW_AUTH_PASSWORD`).
+          Passwords and TOTP secrets come from `AUTH_USERS_JSON` (or your OIDC IdP). They are never
+          shipped in source.
         </p>
       </div>
     </Panel>

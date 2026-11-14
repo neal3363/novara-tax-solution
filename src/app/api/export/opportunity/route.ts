@@ -1,14 +1,12 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { SESSION_COOKIE, decodeSession, sessionToUser } from "@/lib/auth/cookies";
+import { getCurrentSessionUser } from "@/lib/auth/server";
 import { opportunities } from "@/lib/synthetic/data";
 import { canExportOpportunity, watermarkExportPayload } from "@/lib/rbac/abac";
 import { appendAuditEvent } from "@/lib/audit/store";
+import { canAccessTerritory } from "@/lib/rbac/abac";
 
 export async function POST(request: Request) {
-  const jar = await cookies();
-  const session = await decodeSession(jar.get(SESSION_COOKIE)?.value);
-  const user = session ? sessionToUser(session) : null;
+  const user = await getCurrentSessionUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -19,16 +17,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  const territory = canAccessTerritory(user, opportunity.state);
   const decision = canExportOpportunity(user, opportunity);
+  const allowed = territory.allowed && decision.allowed;
+
   appendAuditEvent({
     actor: user.id,
     action: "export_opportunity",
     resource: opportunity.id,
-    outcome: decision.allowed ? "allowed" : "denied",
+    outcome: allowed ? "allowed" : "denied",
   });
 
-  if (!decision.allowed) {
-    return NextResponse.json({ error: decision.reason }, { status: 403 });
+  if (!allowed) {
+    return NextResponse.json(
+      { error: !territory.allowed ? territory.reason : decision.reason },
+      { status: 403 },
+    );
   }
 
   return NextResponse.json({

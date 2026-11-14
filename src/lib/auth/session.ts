@@ -1,24 +1,13 @@
-import type { PortalRole, UserSession } from "@/lib/types";
-import { previewUsers } from "@/lib/synthetic/data";
-import { getPreviewAuthPassword, timingSafeEqualString } from "@/lib/auth/crypto";
-
-export function getPreviewUser(role: PortalRole): UserSession {
-  return previewUsers[role];
-}
-
-export function authenticatePreview(
-  email: string,
-  password: string,
-): UserSession | null {
-  const expectedPassword = getPreviewAuthPassword();
-  if (!expectedPassword) return null;
-  if (!timingSafeEqualString(password, expectedPassword)) return null;
-
-  const match = Object.values(previewUsers).find(
-    (u) => u.email.toLowerCase() === email.toLowerCase(),
-  );
-  return match ?? null;
-}
+import type { PortalRole } from "@/lib/types";
+import {
+  findAuthUserByEmail,
+  getAuthMode,
+  loadAuthUsers,
+  roleRequiresMfa,
+  toUserSession,
+  verifyPassword,
+} from "@/lib/auth/users";
+import { getAuthSecret } from "@/lib/auth/crypto";
 
 export function portalPath(role: PortalRole): string {
   switch (role) {
@@ -33,6 +22,37 @@ export function portalPath(role: PortalRole): string {
   }
 }
 
-export function isPreviewAuthConfigured(): boolean {
-  return Boolean(getPreviewAuthPassword());
+export function isPasswordAuthConfigured(): boolean {
+  const mode = getAuthMode();
+  if (!getAuthSecret()) return false;
+  if (mode !== "password" && mode !== "both") return false;
+  return loadAuthUsers().length > 0;
+}
+
+export function isOidcConfigured(): boolean {
+  const mode = getAuthMode();
+  if (!getAuthSecret()) return false;
+  if (mode !== "oidc" && mode !== "both") return false;
+  return Boolean(
+    process.env.AUTH_OIDC_ISSUER?.trim() &&
+      process.env.AUTH_OIDC_CLIENT_ID?.trim() &&
+      process.env.AUTH_OIDC_CLIENT_SECRET?.trim(),
+  );
+}
+
+export function isAuthConfigured(): boolean {
+  return isPasswordAuthConfigured() || isOidcConfigured();
+}
+
+export function authenticatePassword(email: string, password: string) {
+  if (!isPasswordAuthConfigured()) return null;
+  const user = findAuthUserByEmail(email);
+  if (!user) return null;
+  if (!verifyPassword(password, user.passwordHash)) return null;
+  return {
+    session: toUserSession(user),
+    mfaRequired: roleRequiresMfa(user),
+    totpSecret: user.totpSecret,
+    record: user,
+  };
 }

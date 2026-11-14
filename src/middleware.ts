@@ -1,5 +1,16 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { SESSION_COOKIE, decodeSession, portalFromPath } from "@/lib/auth/cookies";
+import {
+  SESSION_COOKIE,
+  decodeSession,
+  portalFromPath,
+} from "@/lib/auth/cookies";
+
+const PRIVILEGED: Array<"executive" | "partner" | "attorney" | "owner"> = [
+  "executive",
+  "partner",
+  "attorney",
+  "owner",
+];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -25,10 +36,10 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(denied);
   }
 
-  if (!session.mfaVerified) {
-    const login = new URL("/login", request.url);
-    login.searchParams.set("error", "mfa_required");
-    return NextResponse.redirect(login);
+  if (PRIVILEGED.includes(session.role) && !session.mfaVerified) {
+    const mfa = new URL("/login/mfa", request.url);
+    mfa.searchParams.set("error", "mfa_required");
+    return NextResponse.redirect(mfa);
   }
 
   const response = NextResponse.next();

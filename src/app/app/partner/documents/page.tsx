@@ -1,11 +1,16 @@
+import Link from "next/link";
 import { Panel } from "@/components/ui/Panel";
-import { documents } from "@/lib/synthetic/data";
+import { requirePortalUser } from "@/lib/auth/server";
+import { cases, documents } from "@/lib/synthetic/data";
+import { listVisibleDocuments } from "@/lib/rbac/documents";
 import { formatDate } from "@/lib/utils";
 
 export const metadata = { title: "Partner Documents" };
 
-export default function PartnerDocumentsPage() {
-  const visible = documents.filter((d) => d.ownerId === "org_partner_tx_01" || d.category === "Claim Prep");
+export default async function PartnerDocumentsPage() {
+  const user = await requirePortalUser("partner");
+  const visible = listVisibleDocuments(user, documents, cases);
+
   return (
     <div className="space-y-6">
       <h1 className="font-display text-4xl text-white">Documents & milestones</h1>
@@ -19,7 +24,9 @@ export default function PartnerDocumentsPage() {
                   {doc.category} · {formatDate(doc.uploadedAt)} · {doc.sensitivity}
                 </div>
               </div>
-              <span className="synthetic-badge">Synthetic</span>
+              <Link href={`/api/documents/${doc.id}`} className="text-sm text-champagne">
+                Download
+              </Link>
             </div>
           </Panel>
         ))}

@@ -1,4 +1,5 @@
 import { PortalShell } from "@/components/layout/PortalShell";
+import { requirePortalUser } from "@/lib/auth/server";
 
 const nav = [
   { href: "/app/executive", label: "Command Overview" },
@@ -18,7 +19,8 @@ const nav = [
   { href: "/app/executive/audit", label: "Audit Log" },
 ];
 
-export default function ExecutiveLayout({ children }: { children: React.ReactNode }) {
+export default async function ExecutiveLayout({ children }: { children: React.ReactNode }) {
+  await requirePortalUser("executive");
   return (
     <PortalShell role="executive" nav={nav}>
       {children}
