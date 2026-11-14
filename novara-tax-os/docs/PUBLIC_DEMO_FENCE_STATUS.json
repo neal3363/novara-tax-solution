@@ -1,9 +1,11 @@
 {
   "fenceId": "public-demo-live-4bf9",
   "fencedAtAmericaChicago": "2026-11-14T02:03:00-06:00",
-  "gitTip": "b99b77f84857184065225d4a609ab02d75ba677b",
+  "codeTip": "b99b77f84857184065225d4a609ab02d75ba677b",
+  "fenceDocsCommit": "c6ce690",
   "baseBranch": "cursor/novara-tax-os-v1-local-4bf9",
-  "checkpointTag": "fence/public-demo-live-4bf9",
+  "fenceTag": "fence/public-demo-live-4bf9",
+  "checkpointTag": "checkpoint/public-demo-live-4bf9",
   "rollbackTag": "rollback/fence-public-demo-live-4bf9",
   "liveUrl": "https://novara-tax-os.apps.grok.bot",
   "recommendation": "GO_SYNTHETIC_PUBLIC_DEMO",
