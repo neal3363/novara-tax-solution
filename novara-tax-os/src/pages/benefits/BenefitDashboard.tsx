@@ -7,6 +7,7 @@ import { buildDocumentChecklist, documentsStillNeeded } from '../../engine/docum
 import { AppliedBenefitBanner } from '../../components/benefits/AppliedBenefitBanner'
 import { RefundTracker } from '../../components/benefits/RefundTracker'
 import { SavingsOpportunityPanel } from '../../components/benefits/SavingsOpportunityPanel'
+import { RefundMaximizer } from '../../components/benefits/RefundMaximizer'
 import { actions, useAppStore } from '../../store/useAppStore'
 import '../shared.css'
 import './Benefits.css'
@@ -82,6 +83,7 @@ export function BenefitDashboard() {
         your working return immediately, and open opportunities stay listed until they are applied or ruled out.
       </p>
 
+      <RefundMaximizer report={report} profile={taxProfile} interviewBase={interviewBase} preparePath={preparePath} />
       <RefundTracker report={report} />
       <AppliedBenefitBanner events={report?.lastApplications} returnPath={preparePath} />
       <div style={{ marginTop: '1rem' }}>

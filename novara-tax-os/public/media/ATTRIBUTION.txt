@@ -7,9 +7,11 @@ Video (silent 12-second cinematic homepage hero — HQ arrival → networking �
   Scene 1 (0–4s): Walking into a modern office building — Mixkit #4438
   Scene 2 (4–8s): Professional greeting / handshake in office — Mixkit #30005
   Scene 3 (8–12s): Team working in a modern office — Mixkit #4886
-  Delivery: 1080p H.264 MP4 (desktop) + 960×540 mobile encode, 24 fps, muted, looping.
-  Files: novara-cinematic-hero.mp4, novara-cinematic-hero-mobile.mp4, novara-cinematic-poster.jpg
-  (Also published as novara-office-hero*.mp4 / novara-office-poster.jpg for existing paths.)
+  Delivery: 12.0s loop, muted, 24 fps
+    - novara-cinematic-hero.webm (VP9) + novara-cinematic-hero.mp4 (H.264 Constrained Baseline, yuv420p, 1080p)
+    - novara-cinematic-hero-mobile.webm / .mp4 (960×540)
+    - novara-cinematic-poster.jpg
+  Legacy aliases: novara-office-hero*.mp4 / novara-office-poster.jpg (same baseline encodes).
 
 Audio:
 - “Soul Jazz” by Francisco Alvear — Mixkit Stock Music Free License

@@ -29,17 +29,17 @@
 .hero-video-overlay {
   position: absolute;
   inset: 0;
-  /* Dark navy gradient for text readability over cinematic footage */
+  /* Navy readability veil — light enough that motion remains visible */
   background:
     linear-gradient(
       105deg,
-      rgba(6, 14, 32, 0.82) 0%,
-      rgba(10, 22, 48, 0.62) 42%,
-      rgba(12, 28, 58, 0.38) 72%,
-      rgba(15, 35, 70, 0.28) 100%
+      rgba(6, 14, 32, 0.72) 0%,
+      rgba(10, 22, 48, 0.48) 40%,
+      rgba(12, 28, 58, 0.28) 70%,
+      rgba(15, 35, 70, 0.18) 100%
     ),
-    linear-gradient(0deg, rgba(4, 10, 24, 0.55) 0%, transparent 46%),
-    linear-gradient(180deg, rgba(8, 16, 36, 0.35) 0%, transparent 28%);
+    linear-gradient(0deg, rgba(4, 10, 24, 0.42) 0%, transparent 50%),
+    linear-gradient(180deg, rgba(8, 16, 36, 0.28) 0%, transparent 30%);
   pointer-events: none;
 }
 

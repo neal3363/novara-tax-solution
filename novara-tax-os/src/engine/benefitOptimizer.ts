@@ -472,10 +472,13 @@ function evaluateRule(rule: BenefitRule, p: TaxpayerProfile, facts: Record<strin
   }
 
   if (!triggered && softProbe) {
+    // Prospective scenario only — not applied until facts/answers confirm eligibility.
+    const prospective = Math.max(0, rule.estimatedSavingsHint || 0)
     return baseFinding(rule, {
       status: 'needs_info',
-      estimatedSavings: 0,
-      explanation: `More information needed to evaluate ${rule.shortName}.`,
+      estimatedSavings: prospective,
+      affectingRefund: 0,
+      explanation: `If you qualify, ${rule.shortName} could add about $${prospective.toLocaleString()} — answer a few questions so NOVARA can confirm. Not included in your current estimated refund.`,
       missingAnswers: rule.requiredAnswers.slice(0, 2),
       missingDocs: rule.requiredDocs.slice(0, 1),
       docStatus: 'requested',
@@ -606,12 +609,16 @@ export function runBenefitOptimization(p: TaxpayerProfile): OptimizationReport {
     const finding = evaluateRule(rule, p, facts)
     // Block unsupported dependent-based projections until discovery + interview complete
     if (DEPENDENT_CREDIT_RULES.has(rule.id) && !dependentInfoComplete) {
+      // Keep prospective potential (never applied) so the maximizer can show missed family credits.
+      const prospective = Math.max(finding.estimatedSavings, rule.estimatedSavingsHint || 0)
       return {
         ...finding,
         status: 'needs_info' as const,
-        estimatedSavings: 0,
+        estimatedSavings: prospective,
         affectingRefund: 0,
-        explanation: refundIncompleteReason!,
+        explanation:
+          refundIncompleteReason! +
+          ` Potential ${finding.shortName} scenario (~$${prospective.toLocaleString()}) stays separate until dependents are verified.`,
         missingAnswers: discovery.askedPotential
           ? discovery.countAnswered
             ? ['complete_dependent_interview']
