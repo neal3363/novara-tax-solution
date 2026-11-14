@@ -2,11 +2,21 @@
  * Centralized NOVARA pricing — single source of truth for all tiers.
  * TC = Tax Client · TP = Tax Preparer · Office = Tax Office
  * Do not hardcode prices elsewhere; import from this module.
+ *
+ * Approved structure (2026-11-14):
+ * - TC: personal $300 / business $399 (unchanged)
+ * - TP: pay-per-return only (no annual subscription) — $89 / $119 / $249
+ * - Office: annual plans $899 / $1,199 / $1,499 — covered returns have $0 NOVARA per-return fee
  */
 
 export type FeeStatus = 'approved' | 'provisional' | 'partner_pending'
 export type AccountTier = 'TC' | 'TP' | 'Office'
 export type BillingAudience = 'TC' | 'TP' | 'Office' | 'bank' | 'admin'
+
+/** Return categories for NOVARA software fee selection */
+export type ReturnKind = 'personal' | 'self_employed' | 'business_entity'
+
+export type OfficePlanId = 'office-personal' | 'office-self-employed' | 'office-business'
 
 export interface FeeItem {
   id: string
@@ -15,6 +25,14 @@ export interface FeeItem {
   note?: string
   status: FeeStatus
   audience: BillingAudience
+  /** Display hint: per return vs per year */
+  cadence?: 'per_return' | 'per_year' | 'one_time' | 'included'
+}
+
+export const RETURN_KIND_LABELS: Record<ReturnKind, string> = {
+  personal: 'Personal return',
+  self_employed: 'Self-employed / Form 1040 with Schedule C',
+  business_entity: 'Business entity (Form 1065, 1120-S, or 1120)',
 }
 
 /** —— Official three-tier pricing —— */
@@ -29,33 +47,64 @@ export const PRICING = {
   },
   TP: {
     label: 'Tax Preparer',
-    registration: 599,
-    personalReturn: 129,
-    businessReturn: 249,
+    /** No annual TP subscription — pay per completed return only */
+    registration: 0,
+    billingModel: 'pay_per_return' as const,
+    personalReturn: 89,
+    selfEmployedReturn: 119,
+    businessEntityReturn: 249,
     unlimitedClients: true,
+    /** Unlimited clients; fees are per completed return, not capped returns */
     unlimitedReturns: true,
+    canManagePreparers: false,
+    disclosure:
+      'TP prices are total NOVARA fees per completed return (not surcharges). TP sets their own client preparation charges. Bank-product, processing, and sponsor-office fees are disclosed separately.',
   },
   Office: {
     label: 'Tax Office',
-    /** Configurable billing frequency until finalized (demo default: annual) */
     subscriptionBillingFrequency: 'annual' as 'annual' | 'monthly',
-    subscriptionLow: 899,
-    subscriptionHigh: 1250,
-    personalReturn: 89,
-    businessReturn: 249,
+    /** Covered returns: no additional NOVARA per-return preparation fee */
+    perReturnSoftwareFee: 0,
     unlimitedClients: true,
     unlimitedReturns: true,
+    canManagePreparers: true,
+    disclosure:
+      'Office annual subscription covers eligible return types with no additional NOVARA per-return fee for covered returns, including work by preparers under that office. Bank-product fees remain separate.',
+    plans: {
+      personal: {
+        id: 'office-personal' as OfficePlanId,
+        name: 'Office Personal',
+        annual: 899,
+        allows: ['personal'] as const satisfies readonly ReturnKind[],
+        blurb: 'Personal returns only. Unlimited clients & returns, preparer management, client assignment, office oversight.',
+      },
+      selfEmployed: {
+        id: 'office-self-employed' as OfficePlanId,
+        name: 'Office Self-Employed',
+        annual: 1199,
+        allows: ['personal', 'self_employed'] as const satisfies readonly ReturnKind[],
+        blurb: 'Personal and Schedule C returns. Unlimited clients & returns, preparer management, client assignment, office oversight.',
+      },
+      business: {
+        id: 'office-business' as OfficePlanId,
+        name: 'Office Business',
+        annual: 1499,
+        allows: ['personal', 'self_employed', 'business_entity'] as const satisfies readonly ReturnKind[],
+        blurb: 'Personal, Schedule C, 1065, 1120-S, and 1120. Unlimited clients & returns, preparer management, client assignment, office oversight.',
+      },
+    },
   },
   banking: {
     liveConnectivity: false,
-    /**
-     * Architecture supports office-selected providers and/or a NOVARA platform partner
-     * (see bankProducts.ts). Never set liveConnectivity true until API + agreements verified.
-     */
     providerSelectionMode: 'either' as const,
     disclosure:
       'Banking-product and refund-transfer fees are separate from NOVARA software fees, disclosed before authorization, and not activated until provider agreements and testing are complete. Offices may configure an approved partner or use the platform default when connected — neither is live in this build.',
   },
+  /**
+   * Existing customer billing agreements are preserved.
+   * Do not auto-migrate or re-charge subscribers when catalog prices change.
+   */
+  preserveExistingBillingAgreements: true,
 } as const
 
 export const UNLIMITED_CLIENTS_COPY = 'Unlimited Clients & Unlimited Tax Returns'
@@ -68,34 +117,54 @@ export const TC_REGISTRATION_FEE = PRICING.TC.registration
 export const TC_PERSONAL_FEE = PRICING.TC.personalReturn
 export const TC_BUSINESS_FEE = PRICING.TC.businessReturn
 
+/** @deprecated TP has no annual subscription — always 0 */
 export const TP_REGISTRATION_FEE = PRICING.TP.registration
 export const TP_PERSONAL_FEE = PRICING.TP.personalReturn
-export const TP_BUSINESS_FEE = PRICING.TP.businessReturn
+export const TP_SELF_EMPLOYED_FEE = PRICING.TP.selfEmployedReturn
+/** Business entity return (1065 / 1120-S / 1120) — standalone total, not a surcharge */
+export const TP_BUSINESS_FEE = PRICING.TP.businessEntityReturn
 
-export const OFFICE_SUBSCRIPTION_FLOOR = PRICING.Office.subscriptionLow
-export const OFFICE_SUBSCRIPTION_HIGH = PRICING.Office.subscriptionHigh
-export const OFFICE_PERSONAL_FEE = PRICING.Office.personalReturn
-export const OFFICE_BUSINESS_FEE = PRICING.Office.businessReturn
+export const OFFICE_SUBSCRIPTION_PERSONAL = PRICING.Office.plans.personal.annual
+export const OFFICE_SUBSCRIPTION_SELF_EMPLOYED = PRICING.Office.plans.selfEmployed.annual
+export const OFFICE_SUBSCRIPTION_BUSINESS = PRICING.Office.plans.business.annual
+/** Lowest / highest Office annual plan (for range displays) */
+export const OFFICE_SUBSCRIPTION_FLOOR = OFFICE_SUBSCRIPTION_PERSONAL
+export const OFFICE_SUBSCRIPTION_HIGH = OFFICE_SUBSCRIPTION_BUSINESS
+/** Covered Office returns: $0 additional NOVARA per-return fee */
+export const OFFICE_PERSONAL_FEE = PRICING.Office.perReturnSoftwareFee
+export const OFFICE_BUSINESS_FEE = PRICING.Office.perReturnSoftwareFee
+export const OFFICE_SELF_EMPLOYED_FEE = PRICING.Office.perReturnSoftwareFee
 
-/** @deprecated Use TP_BUSINESS_FEE — kept only to catch old imports during migration */
+/** @deprecated Use TP_BUSINESS_FEE */
 export const TP_BUSINESS_TOTAL = TP_BUSINESS_FEE
 
 export const OFFICE_TIERS = [
   {
-    id: 'office-899',
-    name: 'Office Standard',
-    annual: OFFICE_SUBSCRIPTION_FLOOR,
-    businessReturns: true,
+    id: PRICING.Office.plans.personal.id,
+    name: PRICING.Office.plans.personal.name,
+    annual: OFFICE_SUBSCRIPTION_PERSONAL,
+    allows: PRICING.Office.plans.personal.allows,
+    businessReturns: false,
     status: 'approved' as const,
-    blurb: `${UNLIMITED_CLIENTS_COPY}. Personal return software fee ${formatMoneyInline(OFFICE_PERSONAL_FEE)}; business ${formatMoneyInline(OFFICE_BUSINESS_FEE)}. Billing frequency configurable.`,
+    blurb: `${PRICING.Office.plans.personal.blurb} ${formatMoneyInline(OFFICE_SUBSCRIPTION_PERSONAL)}/year.`,
   },
   {
-    id: 'office-1250',
-    name: 'Office Plus',
-    annual: OFFICE_SUBSCRIPTION_HIGH,
+    id: PRICING.Office.plans.selfEmployed.id,
+    name: PRICING.Office.plans.selfEmployed.name,
+    annual: OFFICE_SUBSCRIPTION_SELF_EMPLOYED,
+    allows: PRICING.Office.plans.selfEmployed.allows,
+    businessReturns: false,
+    status: 'approved' as const,
+    blurb: `${PRICING.Office.plans.selfEmployed.blurb} ${formatMoneyInline(OFFICE_SUBSCRIPTION_SELF_EMPLOYED)}/year.`,
+  },
+  {
+    id: PRICING.Office.plans.business.id,
+    name: PRICING.Office.plans.business.name,
+    annual: OFFICE_SUBSCRIPTION_BUSINESS,
+    allows: PRICING.Office.plans.business.allows,
     businessReturns: true,
     status: 'approved' as const,
-    blurb: `${UNLIMITED_CLIENTS_COPY}. Same per-return software fees. Enhanced office reporting and staff tools. Billing frequency configurable until finalized.`,
+    blurb: `${PRICING.Office.plans.business.blurb} ${formatMoneyInline(OFFICE_SUBSCRIPTION_BUSINESS)}/year.`,
   },
 ]
 
@@ -116,6 +185,7 @@ export const TC_FEES: FeeItem[] = [
     amount: TC_PERSONAL_FEE,
     status: 'approved',
     audience: 'TC',
+    cadence: 'per_return',
     note: 'Direct client preparation fee. Credits and deductions are calculated by NOVARA — clients do not apply them manually.',
   },
   {
@@ -124,66 +194,76 @@ export const TC_FEES: FeeItem[] = [
     amount: TC_BUSINESS_FEE,
     status: 'approved',
     audience: 'TC',
+    cadence: 'per_return',
   },
 ]
 
 export const TP_FEES: FeeItem[] = [
   {
-    id: 'tp-registration',
-    label: 'TP registration / upfront fee',
-    amount: TP_REGISTRATION_FEE,
-    status: 'approved',
-    audience: 'TP',
-    note: 'One-time registration. Unlimited clients & unlimited tax returns after approval.',
-  },
-  {
     id: 'tp-personal',
-    label: 'Personal tax return (TP software)',
+    label: 'Personal return (TP) — per return',
     amount: TP_PERSONAL_FEE,
     status: 'approved',
     audience: 'TP',
-    note: 'NOVARA software fee per personal return. Separate from any client preparation fee the TP charges.',
+    cadence: 'per_return',
+    note: 'Standalone total NOVARA fee per completed personal return. Not a surcharge. Separate from any client preparation fee the TP charges.',
   },
   {
-    id: 'tp-business',
-    label: 'Business tax return (TP software)',
+    id: 'tp-self-employed',
+    label: 'Self-employed / Schedule C (TP) — per return',
+    amount: TP_SELF_EMPLOYED_FEE,
+    status: 'approved',
+    audience: 'TP',
+    cadence: 'per_return',
+    note: 'Standalone total NOVARA fee for Form 1040 with Schedule C. Not stacked on the personal fee.',
+  },
+  {
+    id: 'tp-business-entity',
+    label: 'Business entity return (TP) — per return',
     amount: TP_BUSINESS_FEE,
     status: 'approved',
     audience: 'TP',
-    note: 'NOVARA software fee per business return. Never also charge the TC retail price on the same software line.',
+    cadence: 'per_return',
+    note: 'Standalone total NOVARA fee for Form 1065, 1120-S, or 1120. Never also charge the TC retail price on the same software line.',
   },
 ]
 
 export const OFFICE_FEES: FeeItem[] = [
   {
-    id: 'office-sub-899',
-    label: 'Office subscription — Standard',
-    amount: OFFICE_SUBSCRIPTION_FLOOR,
+    id: 'office-sub-personal',
+    label: 'Office subscription — Personal (per year)',
+    amount: OFFICE_SUBSCRIPTION_PERSONAL,
     status: 'approved',
     audience: 'Office',
-    note: `${UNLIMITED_CLIENTS_COPY}. Frequency configurable (demo: annual).`,
+    cadence: 'per_year',
+    note: `${UNLIMITED_CLIENTS_COPY}. Covers personal returns with $0 additional NOVARA per-return fee.`,
   },
   {
-    id: 'office-sub-1250',
-    label: 'Office subscription — Plus',
-    amount: OFFICE_SUBSCRIPTION_HIGH,
+    id: 'office-sub-self-employed',
+    label: 'Office subscription — Self-Employed (per year)',
+    amount: OFFICE_SUBSCRIPTION_SELF_EMPLOYED,
     status: 'approved',
     audience: 'Office',
-    note: `${UNLIMITED_CLIENTS_COPY}. Frequency configurable (demo: annual).`,
+    cadence: 'per_year',
+    note: `${UNLIMITED_CLIENTS_COPY}. Covers personal and Schedule C returns with $0 additional NOVARA per-return fee.`,
   },
   {
-    id: 'office-personal',
-    label: 'Personal tax return (Office software)',
-    amount: OFFICE_PERSONAL_FEE,
+    id: 'office-sub-business',
+    label: 'Office subscription — Business (per year)',
+    amount: OFFICE_SUBSCRIPTION_BUSINESS,
     status: 'approved',
     audience: 'Office',
+    cadence: 'per_year',
+    note: `${UNLIMITED_CLIENTS_COPY}. Covers personal, Schedule C, 1065, 1120-S, and 1120 with $0 additional NOVARA per-return fee.`,
   },
   {
-    id: 'office-business',
-    label: 'Business tax return (Office software)',
-    amount: OFFICE_BUSINESS_FEE,
+    id: 'office-covered-return',
+    label: 'Covered return under Office subscription',
+    amount: 0,
     status: 'approved',
     audience: 'Office',
+    cadence: 'included',
+    note: 'No additional NOVARA per-return preparation fee for returns covered by the active Office plan (including office-employed preparers).',
   },
 ]
 
@@ -200,8 +280,8 @@ export const TIER_REGISTRATION_CARDS = [
     registrationLabel: 'Registration',
     registrationAmount: TC_REGISTRATION_FEE,
     lines: [
-      { label: 'Personal return', amount: TC_PERSONAL_FEE },
-      { label: 'Business return', amount: TC_BUSINESS_FEE },
+      { label: 'Personal return', amount: TC_PERSONAL_FEE, cadence: 'per_return' as const },
+      { label: 'Business return', amount: TC_BUSINESS_FEE, cadence: 'per_return' as const },
     ],
     path: '/register/tc',
     role: 'taxpayer' as const,
@@ -210,11 +290,12 @@ export const TIER_REGISTRATION_CARDS = [
     tier: 'TP' as AccountTier,
     title: 'I’m a Tax Preparer',
     subtitle: 'TP — Tax Preparer',
-    registrationLabel: 'Upfront fee',
-    registrationAmount: TP_REGISTRATION_FEE,
+    registrationLabel: 'No annual subscription',
+    registrationAmount: 0,
     lines: [
-      { label: 'Personal return', amount: TP_PERSONAL_FEE },
-      { label: 'Business return', amount: TP_BUSINESS_FEE },
+      { label: 'Personal — per return', amount: TP_PERSONAL_FEE, cadence: 'per_return' as const },
+      { label: 'Self-employed / Sch. C — per return', amount: TP_SELF_EMPLOYED_FEE, cadence: 'per_return' as const },
+      { label: 'Business entity — per return', amount: TP_BUSINESS_FEE, cadence: 'per_return' as const },
     ],
     badge: UNLIMITED_CLIENTS_COPY,
     path: '/register/tp',
@@ -224,12 +305,14 @@ export const TIER_REGISTRATION_CARDS = [
     tier: 'Office' as AccountTier,
     title: 'I Own a Tax Office',
     subtitle: 'Office — Tax Office',
-    registrationLabel: 'Subscription',
+    registrationLabel: 'Annual subscription',
     registrationAmount: null as number | null,
     registrationRange: [OFFICE_SUBSCRIPTION_FLOOR, OFFICE_SUBSCRIPTION_HIGH] as [number, number],
     lines: [
-      { label: 'Personal return', amount: OFFICE_PERSONAL_FEE },
-      { label: 'Business return', amount: OFFICE_BUSINESS_FEE },
+      { label: 'Personal plan — per year', amount: OFFICE_SUBSCRIPTION_PERSONAL, cadence: 'per_year' as const },
+      { label: 'Self-Employed plan — per year', amount: OFFICE_SUBSCRIPTION_SELF_EMPLOYED, cadence: 'per_year' as const },
+      { label: 'Business plan — per year', amount: OFFICE_SUBSCRIPTION_BUSINESS, cadence: 'per_year' as const },
+      { label: 'Covered return software fee', amount: 0, cadence: 'included' as const },
     ],
     badge: UNLIMITED_CLIENTS_COPY,
     path: '/register/office',
@@ -245,16 +328,104 @@ export function formatMoney(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n)
 }
 
-export function returnSoftwareFee(tier: AccountTier, isBusiness: boolean): FeeItem {
-  if (tier === 'TC') {
-    return isBusiness ? TC_FEES.find((f) => f.id === 'tc-business')! : TC_FEES.find((f) => f.id === 'tc-personal')!
+export function officePlanById(planId: OfficePlanId | string | undefined) {
+  if (!planId) return PRICING.Office.plans.personal
+  const found = OFFICE_TIERS.find((t) => t.id === planId)
+  if (found) {
+    return (
+      Object.values(PRICING.Office.plans).find((p) => p.id === found.id) ?? PRICING.Office.plans.personal
+    )
   }
+  // Legacy amount mapping for preserved agreements / old registrations
+  if (planId === '899' || planId === 'office-899') return PRICING.Office.plans.personal
+  if (planId === '1199') return PRICING.Office.plans.selfEmployed
+  if (planId === '1250' || planId === 'office-1250' || planId === '1499') return PRICING.Office.plans.business
+  return PRICING.Office.plans.personal
+}
+
+export function officePlanAllowsReturn(
+  planId: OfficePlanId | string | undefined,
+  kind: ReturnKind,
+): boolean {
+  const plan = officePlanById(planId)
+  return (plan.allows as readonly ReturnKind[]).includes(kind)
+}
+
+/** Map legacy boolean business flag → return kind (self-employed must be explicit). */
+export function returnKindFromFlags(input: {
+  isBusiness?: boolean
+  hasScheduleC?: boolean
+  kind?: ReturnKind
+}): ReturnKind {
+  if (input.kind) return input.kind
+  if (input.isBusiness) return 'business_entity'
+  if (input.hasScheduleC) return 'self_employed'
+  return 'personal'
+}
+
+/**
+ * Authoritative NOVARA software fee for a completed return.
+ * Office-employed preparers inherit Office subscription coverage (never standalone TP fees).
+ */
+export function novaraSoftwareFeeForReturn(input: {
+  tier: AccountTier
+  kind: ReturnKind
+  /** Active Office plan — required for Office eligibility checks */
+  officePlanId?: OfficePlanId | string
+  /** When true, charge is under Office subscription even if actor is a preparer login */
+  officeEmployedPreparer?: boolean
+}): { amount: number; fee: FeeItem; eligible: boolean; reason?: string } {
+  const { tier, kind } = input
+
+  if (input.officeEmployedPreparer || tier === 'Office') {
+    const planId = input.officePlanId
+    if (!officePlanAllowsReturn(planId, kind)) {
+      return {
+        amount: 0,
+        fee: OFFICE_FEES.find((f) => f.id === 'office-covered-return')!,
+        eligible: false,
+        reason: `Office plan does not cover ${RETURN_KIND_LABELS[kind]}. Upgrade required before filing this return type.`,
+      }
+    }
+    return {
+      amount: 0,
+      fee: OFFICE_FEES.find((f) => f.id === 'office-covered-return')!,
+      eligible: true,
+    }
+  }
+
   if (tier === 'TP') {
-    return isBusiness ? TP_FEES.find((f) => f.id === 'tp-business')! : TP_FEES.find((f) => f.id === 'tp-personal')!
+    if (kind === 'personal') {
+      return { amount: TP_PERSONAL_FEE, fee: TP_FEES.find((f) => f.id === 'tp-personal')!, eligible: true }
+    }
+    if (kind === 'self_employed') {
+      return {
+        amount: TP_SELF_EMPLOYED_FEE,
+        fee: TP_FEES.find((f) => f.id === 'tp-self-employed')!,
+        eligible: true,
+      }
+    }
+    return {
+      amount: TP_BUSINESS_FEE,
+      fee: TP_FEES.find((f) => f.id === 'tp-business-entity')!,
+      eligible: true,
+    }
   }
-  return isBusiness
-    ? OFFICE_FEES.find((f) => f.id === 'office-business')!
-    : OFFICE_FEES.find((f) => f.id === 'office-personal')!
+
+  // TC
+  if (kind === 'business_entity' || kind === 'self_employed') {
+    // TC business retail remains the business return fee; Sch C personal filers use personal unless explicitly business
+    if (kind === 'business_entity') {
+      return { amount: TC_BUSINESS_FEE, fee: TC_FEES.find((f) => f.id === 'tc-business')!, eligible: true }
+    }
+  }
+  return { amount: TC_PERSONAL_FEE, fee: TC_FEES.find((f) => f.id === 'tc-personal')!, eligible: true }
+}
+
+/** @deprecated Prefer novaraSoftwareFeeForReturn — maps isBusiness → personal | business_entity */
+export function returnSoftwareFee(tier: AccountTier, isBusiness: boolean): FeeItem {
+  const kind: ReturnKind = isBusiness ? 'business_entity' : 'personal'
+  return novaraSoftwareFeeForReturn({ tier, kind }).fee
 }
 
 export function roleToTier(role: string): AccountTier | null {
@@ -276,23 +447,63 @@ export function dedupeFeeLines(
 export function estimateNovaraAnnualCharges(input: {
   subscriptionAnnual: number
   individualReturns: number
+  selfEmployedReturns?: number
   businessReturns: number
   /** Which software fee schedule to use for per-return lines */
   schedule?: 'TP' | 'Office'
+  officePlanId?: OfficePlanId | string
 }) {
   const schedule = input.schedule ?? 'Office'
-  const personal = schedule === 'TP' ? TP_PERSONAL_FEE : OFFICE_PERSONAL_FEE
-  const business = schedule === 'TP' ? TP_BUSINESS_FEE : OFFICE_BUSINESS_FEE
-  const individualFees = input.individualReturns * personal
-  const businessFees = input.businessReturns * business
-  const perReturnTotal = individualFees + businessFees
-  const total = input.subscriptionAnnual + perReturnTotal
-  return { individualFees, businessFees, perReturnTotal, total, personalRate: personal, businessRate: business }
+  const selfEmp = input.selfEmployedReturns ?? 0
+
+  if (schedule === 'Office') {
+    // Covered returns: $0 per-return under active subscription
+    const personalRate = 0
+    const selfEmployedRate = 0
+    const businessRate = 0
+    const individualFees = 0
+    const selfEmployedFees = 0
+    const businessFees = 0
+    const perReturnTotal = 0
+    const total = input.subscriptionAnnual
+    return {
+      individualFees,
+      selfEmployedFees,
+      businessFees,
+      perReturnTotal,
+      total,
+      personalRate,
+      selfEmployedRate,
+      businessRate,
+      model: 'office_subscription_includes_returns' as const,
+    }
+  }
+
+  const personalRate = TP_PERSONAL_FEE
+  const selfEmployedRate = TP_SELF_EMPLOYED_FEE
+  const businessRate = TP_BUSINESS_FEE
+  const individualFees = input.individualReturns * personalRate
+  const selfEmployedFees = selfEmp * selfEmployedRate
+  const businessFees = input.businessReturns * businessRate
+  const perReturnTotal = individualFees + selfEmployedFees + businessFees
+  // No annual TP subscription
+  const total = perReturnTotal
+  return {
+    individualFees,
+    selfEmployedFees,
+    businessFees,
+    perReturnTotal,
+    total,
+    personalRate,
+    selfEmployedRate,
+    businessRate,
+    model: 'tp_pay_per_return' as const,
+  }
 }
 
 /** Quota helpers — TP/Office never enforce client or return caps */
 export function clientQuotaForTier(tier: AccountTier): number | null {
-  if (tier === 'TP' || tier === 'Office') return null // unlimited
+  if (tier === 'TP' || tier === 'Office') return null
   return null
 }
 
@@ -304,6 +515,28 @@ export function assertUnlimitedProfessionalAccess(tier: AccountTier) {
     return PRICING.Office.unlimitedClients && PRICING.Office.unlimitedReturns
   }
   return true
+}
+
+export function assertApprovedTpOfficePricing(): { ok: boolean; detail: string } {
+  const ok =
+    TP_REGISTRATION_FEE === 0 &&
+    TP_PERSONAL_FEE === 89 &&
+    TP_SELF_EMPLOYED_FEE === 119 &&
+    TP_BUSINESS_FEE === 249 &&
+    OFFICE_SUBSCRIPTION_PERSONAL === 899 &&
+    OFFICE_SUBSCRIPTION_SELF_EMPLOYED === 1199 &&
+    OFFICE_SUBSCRIPTION_BUSINESS === 1499 &&
+    OFFICE_PERSONAL_FEE === 0 &&
+    OFFICE_BUSINESS_FEE === 0 &&
+    PRICING.TP.canManagePreparers === false &&
+    PRICING.Office.canManagePreparers === true &&
+    PRICING.preserveExistingBillingAgreements === true
+  return {
+    ok,
+    detail: ok
+      ? 'TP pay-per-return 89/119/249; Office annual 899/1199/1499; covered Office returns $0'
+      : 'TP/Office pricing mismatch',
+  }
 }
 
 export type YearReturnKind = 'personal' | 'business' | 'both'
@@ -344,12 +577,15 @@ export interface MultiYearOrderQuote {
 export function quoteMultiYearOrder(
   tier: AccountTier,
   selections: YearOrderSelection[],
-  opts?: { currentTaxYear?: number; seasonYear?: number; includeEnrollment?: boolean },
+  opts?: {
+    currentTaxYear?: number
+    seasonYear?: number
+    includeEnrollment?: boolean
+    officePlanId?: OfficePlanId | string
+  },
 ): MultiYearOrderQuote {
   const currentTaxYear = opts?.currentTaxYear ?? new Date().getUTCFullYear() - 1
   const seasonYear = opts?.seasonYear ?? currentTaxYear + 1
-  const personal = tier === 'TC' ? TC_PERSONAL_FEE : tier === 'TP' ? TP_PERSONAL_FEE : OFFICE_PERSONAL_FEE
-  const business = tier === 'TC' ? TC_BUSINESS_FEE : tier === 'TP' ? TP_BUSINESS_FEE : OFFICE_BUSINESS_FEE
 
   const lines: MultiYearFeeLine[] = []
   let basePreparationTotal = 0
@@ -357,25 +593,26 @@ export function quoteMultiYearOrder(
 
   const sorted = [...selections].sort((a, b) => b.taxYear - a.taxYear)
   for (const sel of sorted) {
-    if (sel.kind === 'personal' || sel.kind === 'both') {
+    const kinds: ReturnKind[] = []
+    if (sel.kind === 'personal' || sel.kind === 'both') kinds.push('personal')
+    if (sel.kind === 'business' || sel.kind === 'both') kinds.push('business_entity')
+
+    for (const rk of kinds) {
+      const priced = novaraSoftwareFeeForReturn({
+        tier,
+        kind: rk,
+        officePlanId: opts?.officePlanId,
+      })
       lines.push({
-        id: `base-personal-${sel.taxYear}`,
-        label: `${sel.taxYear} personal return (${tier})${sel.filingMode === 'amended' ? ' — amended' : ''}`,
-        amount: personal,
+        id: `base-${rk}-${sel.taxYear}`,
+        label: `${sel.taxYear} ${RETURN_KIND_LABELS[rk]} (${tier})${sel.filingMode === 'amended' ? ' — amended' : ''}${
+          priced.amount === 0 && tier === 'Office' ? ' — included in subscription' : ''
+        }`,
+        amount: priced.amount,
         taxYear: sel.taxYear,
         kind: 'base',
       })
-      basePreparationTotal += personal
-    }
-    if (sel.kind === 'business' || sel.kind === 'both') {
-      lines.push({
-        id: `base-business-${sel.taxYear}`,
-        label: `${sel.taxYear} business return (${tier})${sel.filingMode === 'amended' ? ' — amended' : ''}`,
-        amount: business,
-        taxYear: sel.taxYear,
-        kind: 'base',
-      })
-      basePreparationTotal += business
+      basePreparationTotal += priced.amount
     }
     if (sel.taxYear < currentTaxYear) priorYears.add(sel.taxYear)
   }
@@ -397,19 +634,15 @@ export function quoteMultiYearOrder(
   let enrollmentOrSubscription = 0
   if (opts?.includeEnrollment) {
     if (tier === 'TP') {
-      enrollmentOrSubscription = TP_REGISTRATION_FEE
-      lines.push({
-        id: 'tp-enrollment',
-        label: 'TP registration / upfront fee (separate)',
-        amount: TP_REGISTRATION_FEE,
-        kind: 'enrollment',
-      })
+      // No annual TP subscription
+      enrollmentOrSubscription = 0
     } else if (tier === 'Office') {
-      enrollmentOrSubscription = OFFICE_SUBSCRIPTION_FLOOR
+      const plan = officePlanById(opts.officePlanId)
+      enrollmentOrSubscription = plan.annual
       lines.push({
-        id: 'office-subscription',
-        label: 'Office subscription (separate — plan selected at registration)',
-        amount: OFFICE_SUBSCRIPTION_FLOOR,
+        id: `office-subscription-${plan.id}`,
+        label: `${plan.name} subscription (per year — separate from per-return)`,
+        amount: plan.annual,
         kind: 'subscription',
       })
     }

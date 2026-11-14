@@ -3,14 +3,16 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { BrandMark } from '../components/BrandMark'
 import {
   BANKING_FEES_NOTE,
-  OFFICE_SUBSCRIPTION_FLOOR,
-  OFFICE_SUBSCRIPTION_HIGH,
+  OFFICE_SUBSCRIPTION_BUSINESS,
+  OFFICE_SUBSCRIPTION_PERSONAL,
+  OFFICE_SUBSCRIPTION_SELF_EMPLOYED,
+  OFFICE_TIERS,
   PRICING,
   TIER_REGISTRATION_CARDS,
-  TP_REGISTRATION_FEE,
   UNLIMITED_CLIENTS_COPY,
   formatMoney,
   type AccountTier,
+  type OfficePlanId,
 } from '../data/fees'
 import { isValidEfinFormat, isValidEinFormat, isValidPtinFormat } from '../engine/credentials'
 import { actions } from '../store/useAppStore'
@@ -94,7 +96,7 @@ export function RegisterFlow() {
 
   const card = TIER_REGISTRATION_CARDS.find((c) => c.tier === tier)
   const [step, setStep] = useState<Step>('form')
-  const [officePlan, setOfficePlan] = useState<899 | 1250>(899)
+  const [officePlanId, setOfficePlanId] = useState<OfficePlanId>('office-personal')
   const [formError, setFormError] = useState<string | null>(null)
   const [credNote, setCredNote] = useState<string | null>(null)
   const [form, setForm] = useState({
@@ -110,19 +112,27 @@ export function RegisterFlow() {
     efileProviderName: '',
   })
 
+  const selectedOfficeTier = OFFICE_TIERS.find((t) => t.id === officePlanId) ?? OFFICE_TIERS[0]
+
   const due = useMemo(() => {
     if (!tier) return []
     if (tier === 'TC') return [{ id: 'tc-reg', label: 'TC registration', amount: 0 }]
     if (tier === 'TP')
-      return [{ id: 'tp-reg', label: 'TP registration / upfront fee', amount: TP_REGISTRATION_FEE }]
+      return [
+        {
+          id: 'tp-no-sub',
+          label: 'TP — no annual subscription (pay per completed return)',
+          amount: 0,
+        },
+      ]
     return [
       {
-        id: officePlan === 899 ? 'office-sub-899' : 'office-sub-1250',
-        label: officePlan === 899 ? 'Office Standard subscription' : 'Office Plus subscription',
-        amount: officePlan,
+        id: selectedOfficeTier.id,
+        label: `${selectedOfficeTier.name} — per year`,
+        amount: selectedOfficeTier.annual,
       },
     ]
-  }, [tier, officePlan])
+  }, [tier, selectedOfficeTier])
 
   if (!tier || !card) {
     return (
@@ -183,7 +193,8 @@ export function RegisterFlow() {
       ein: form.ein,
       efileProviderName: form.efileProviderName,
       lines: due,
-      planAmount: tier === 'Office' ? officePlan : due[0]?.amount ?? 0,
+      planAmount: tier === 'Office' ? selectedOfficeTier.annual : due[0]?.amount ?? 0,
+      officePlanId: tier === 'Office' ? officePlanId : undefined,
     })
     if (!result.ok) {
       setFormError(result.error)
@@ -349,30 +360,45 @@ export function RegisterFlow() {
                   />
                 </div>
                 <fieldset className="plan-pick">
-                  <legend>Subscription selection</legend>
+                  <legend>Annual subscription selection (per year)</legend>
                   <label className="plan-option">
                     <input
                       type="radio"
                       name="plan"
-                      checked={officePlan === 899}
-                      onChange={() => setOfficePlan(899)}
+                      checked={officePlanId === 'office-personal'}
+                      onChange={() => setOfficePlanId('office-personal')}
                     />
                     <span>
-                      Standard — {formatMoney(OFFICE_SUBSCRIPTION_FLOOR)} ({PRICING.Office.subscriptionBillingFrequency}
-                      )
+                      Personal — {formatMoney(OFFICE_SUBSCRIPTION_PERSONAL)}/year (personal returns)
                     </span>
                   </label>
                   <label className="plan-option">
                     <input
                       type="radio"
                       name="plan"
-                      checked={officePlan === 1250}
-                      onChange={() => setOfficePlan(1250)}
+                      checked={officePlanId === 'office-self-employed'}
+                      onChange={() => setOfficePlanId('office-self-employed')}
                     />
                     <span>
-                      Plus — {formatMoney(OFFICE_SUBSCRIPTION_HIGH)} ({PRICING.Office.subscriptionBillingFrequency})
+                      Self-Employed — {formatMoney(OFFICE_SUBSCRIPTION_SELF_EMPLOYED)}/year (personal + Schedule C)
                     </span>
                   </label>
+                  <label className="plan-option">
+                    <input
+                      type="radio"
+                      name="plan"
+                      checked={officePlanId === 'office-business'}
+                      onChange={() => setOfficePlanId('office-business')}
+                    />
+                    <span>
+                      Business — {formatMoney(OFFICE_SUBSCRIPTION_BUSINESS)}/year (personal, Schedule C, 1065, 1120-S,
+                      1120)
+                    </span>
+                  </label>
+                  <p className="muted" style={{ marginTop: '0.5rem' }}>
+                    Covered returns have no additional NOVARA per-return fee. Billing frequency:{' '}
+                    {PRICING.Office.subscriptionBillingFrequency}. Existing agreements are not auto-migrated.
+                  </p>
                 </fieldset>
                 <p className="muted">
                   Office = preparers + clients. EFIN/EIN are fingerprinted (not recoverable encryption) and stay pending

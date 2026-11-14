@@ -2,11 +2,10 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   BANKING_FEES_NOTE,
-  OFFICE_BUSINESS_FEE,
   OFFICE_FEES,
-  OFFICE_PERSONAL_FEE,
-  OFFICE_SUBSCRIPTION_FLOOR,
-  OFFICE_SUBSCRIPTION_HIGH,
+  OFFICE_SUBSCRIPTION_BUSINESS,
+  OFFICE_SUBSCRIPTION_PERSONAL,
+  OFFICE_SUBSCRIPTION_SELF_EMPLOYED,
   OFFICE_TIERS,
   PRIOR_YEAR_SURCHARGE,
   PRICING,
@@ -17,7 +16,7 @@ import {
   TP_BUSINESS_FEE,
   TP_FEES,
   TP_PERSONAL_FEE,
-  TP_REGISTRATION_FEE,
+  TP_SELF_EMPLOYED_FEE,
   UNLIMITED_CLIENTS_COPY,
   estimateNovaraAnnualCharges,
   formatMoney,
@@ -28,15 +27,15 @@ import './Fees.css'
 const FAQ = [
   {
     q: 'Is the office subscription monthly or annual?',
-    a: `Billing frequency is configurable until finalized. This demo displays ${PRICING.Office.subscriptionBillingFrequency} amounts of ${formatMoney(OFFICE_SUBSCRIPTION_FLOOR)} and ${formatMoney(OFFICE_SUBSCRIPTION_HIGH)}.`,
+    a: `Office plans are billed ${PRICING.Office.subscriptionBillingFrequency}: Personal ${formatMoney(OFFICE_SUBSCRIPTION_PERSONAL)}, Self-Employed ${formatMoney(OFFICE_SUBSCRIPTION_SELF_EMPLOYED)}, Business ${formatMoney(OFFICE_SUBSCRIPTION_BUSINESS)}.`,
   },
   {
     q: 'Do TP or Office accounts limit clients or returns?',
-    a: `No. ${UNLIMITED_CLIENTS_COPY}. Only approved per-return software fees apply for standard usage.`,
+    a: `No. ${UNLIMITED_CLIENTS_COPY}. Independent TPs pay per completed return. Office subscriptions include covered return types with no additional NOVARA per-return fee.`,
   },
   {
     q: 'Can an office have multiple preparers?',
-    a: 'Yes. Office owners invite preparers with individual logins and PTINs where applicable. Independent TP accounts cannot add preparers — TP = clients only. Unauthorized EFIN use is blocked.',
+    a: 'Yes. Office owners invite preparers with individual logins and PTINs where applicable. Independent TP accounts cannot add preparers — TP = clients only. Unauthorized EFIN use is blocked. Office-employed preparers are not charged standalone TP fees.',
   },
   {
     q: 'What credentials are required to register?',
@@ -52,26 +51,28 @@ const FAQ = [
   },
   {
     q: 'Does a TP also pay the TC retail price?',
-    a: 'No. TC retail fees and TP/Office software fees are separate billing relationships. Do not stack them on the same charge line.',
+    a: 'No. TC retail fees and TP per-return software fees are separate billing relationships. Do not stack them on the same charge line.',
   },
 ]
 
 export function Fees() {
   const [individualReturns, setIndividualReturns] = useState(300)
+  const [selfEmployedReturns, setSelfEmployedReturns] = useState(0)
   const [businessReturns, setBusinessReturns] = useState(0)
   const [schedule, setSchedule] = useState<'Office' | 'TP'>('Office')
-  const [subAmount, setSubAmount] = useState<number>(OFFICE_SUBSCRIPTION_FLOOR)
+  const [subAmount, setSubAmount] = useState<number>(OFFICE_SUBSCRIPTION_PERSONAL)
   const [openFaq, setOpenFaq] = useState<number | null>(0)
 
   const estimate = useMemo(
     () =>
       estimateNovaraAnnualCharges({
-        subscriptionAnnual: schedule === 'Office' ? subAmount : TP_REGISTRATION_FEE,
+        subscriptionAnnual: schedule === 'Office' ? subAmount : 0,
         individualReturns: Math.max(0, individualReturns),
+        selfEmployedReturns: Math.max(0, selfEmployedReturns),
         businessReturns: Math.max(0, businessReturns),
         schedule,
       }),
-    [individualReturns, businessReturns, schedule, subAmount],
+    [individualReturns, selfEmployedReturns, businessReturns, schedule, subAmount],
   )
 
   return (
@@ -87,8 +88,8 @@ export function Fees() {
       </header>
 
       <p className="pricing-intro muted rise">
-        All screens read from one pricing catalog. Banking-product fees are separate. Existing AI tax preparation is
-        unchanged across tiers.
+        All screens read from one pricing catalog. Banking-product fees are separate. Existing customer billing
+        agreements are preserved — catalog updates do not auto-migrate or re-charge subscribers.
       </p>
 
       <section className="panel how-steps rise">
@@ -97,28 +98,35 @@ export function Fees() {
           <div className="fee-table-row head" role="row">
             <span>Fee</span>
             <span>TC</span>
-            <span>TP</span>
-            <span>Office</span>
+            <span>TP (per return)</span>
+            <span>Office (per year)</span>
           </div>
           <div className="fee-table-row" role="row">
             <span>Registration / subscription</span>
             <span>{formatMoney(0)}</span>
-            <span>{formatMoney(TP_REGISTRATION_FEE)}</span>
+            <span>None — pay per return</span>
             <span>
-              {formatMoney(OFFICE_SUBSCRIPTION_FLOOR)}–{formatMoney(OFFICE_SUBSCRIPTION_HIGH)}
+              {formatMoney(OFFICE_SUBSCRIPTION_PERSONAL)} / {formatMoney(OFFICE_SUBSCRIPTION_SELF_EMPLOYED)} /{' '}
+              {formatMoney(OFFICE_SUBSCRIPTION_BUSINESS)}
             </span>
           </div>
           <div className="fee-table-row" role="row">
             <span>Personal tax return</span>
             <span>{formatMoney(TC_PERSONAL_FEE)}</span>
             <span>{formatMoney(TP_PERSONAL_FEE)}</span>
-            <span>{formatMoney(OFFICE_PERSONAL_FEE)}</span>
+            <span>Included ($0)</span>
           </div>
           <div className="fee-table-row" role="row">
-            <span>Business tax return</span>
+            <span>Self-employed / Schedule C</span>
+            <span>—</span>
+            <span>{formatMoney(TP_SELF_EMPLOYED_FEE)}</span>
+            <span>Included on SE+ plans ($0)</span>
+          </div>
+          <div className="fee-table-row" role="row">
+            <span>Business entity (1065 / 1120-S / 1120)</span>
             <span>{formatMoney(TC_BUSINESS_FEE)}</span>
             <span>{formatMoney(TP_BUSINESS_FEE)}</span>
-            <span>{formatMoney(OFFICE_BUSINESS_FEE)}</span>
+            <span>Included on Business plan ($0)</span>
           </div>
         </div>
       </section>
@@ -142,9 +150,10 @@ export function Fees() {
 
       <section className="list-panel panel" style={{ marginTop: '1rem' }}>
         <div className="section-head">
-          <h2>2. TP — Tax Preparer</h2>
+          <h2>2. TP — Tax Preparer (pay per return)</h2>
           <span className="badge badge-ok">{UNLIMITED_CLIENTS_COPY}</span>
         </div>
+        <p className="muted">{PRICING.TP.disclosure}</p>
         {TP_FEES.map((f) => (
           <div className="row-item" key={f.id}>
             <div>
@@ -158,9 +167,10 @@ export function Fees() {
 
       <section className="list-panel panel" style={{ marginTop: '1rem' }}>
         <div className="section-head">
-          <h2>3. Office — Tax Office</h2>
+          <h2>3. Office — Tax Office (per year)</h2>
           <span className="badge badge-ok">{UNLIMITED_CLIENTS_COPY}</span>
         </div>
+        <p className="muted">{PRICING.Office.disclosure}</p>
         <ul className="check-list">
           {STARTER_INCLUDES.map((item) => (
             <li key={item}>{item}</li>
@@ -173,14 +183,15 @@ export function Fees() {
                 <strong>{t.name}</strong>
                 <span className="row-meta">{t.blurb}</span>
               </div>
-              <strong>{formatMoney(t.annual!)}/yr</strong>
+              <strong>{formatMoney(t.annual!)}/year</strong>
             </div>
           ))}
         </div>
-        {OFFICE_FEES.filter((f) => f.id.startsWith('office-p') || f.id.startsWith('office-b')).map((f) => (
+        {OFFICE_FEES.filter((f) => f.id === 'office-covered-return').map((f) => (
           <div className="row-item" key={f.id}>
             <div>
               <strong>{f.label}</strong>
+              <span className="row-meta">{f.note}</span>
             </div>
             <strong>{formatMoney(f.amount)}</strong>
           </div>
@@ -208,16 +219,23 @@ export function Fees() {
           <div className="field">
             <label htmlFor="sched">Fee schedule</label>
             <select id="sched" value={schedule} onChange={(e) => setSchedule(e.target.value as 'Office' | 'TP')}>
-              <option value="Office">Office software fees</option>
-              <option value="TP">TP software fees</option>
+              <option value="Office">Office annual subscription</option>
+              <option value="TP">TP pay-per-return</option>
             </select>
           </div>
           {schedule === 'Office' && (
             <div className="field">
-              <label htmlFor="sub">Subscription</label>
+              <label htmlFor="sub">Subscription (per year)</label>
               <select id="sub" value={subAmount} onChange={(e) => setSubAmount(Number(e.target.value))}>
-                <option value={OFFICE_SUBSCRIPTION_FLOOR}>{formatMoney(OFFICE_SUBSCRIPTION_FLOOR)} Standard</option>
-                <option value={OFFICE_SUBSCRIPTION_HIGH}>{formatMoney(OFFICE_SUBSCRIPTION_HIGH)} Plus</option>
+                <option value={OFFICE_SUBSCRIPTION_PERSONAL}>
+                  {formatMoney(OFFICE_SUBSCRIPTION_PERSONAL)} Personal / year
+                </option>
+                <option value={OFFICE_SUBSCRIPTION_SELF_EMPLOYED}>
+                  {formatMoney(OFFICE_SUBSCRIPTION_SELF_EMPLOYED)} Self-Employed / year
+                </option>
+                <option value={OFFICE_SUBSCRIPTION_BUSINESS}>
+                  {formatMoney(OFFICE_SUBSCRIPTION_BUSINESS)} Business / year
+                </option>
               </select>
             </div>
           )}
@@ -232,7 +250,17 @@ export function Fees() {
             />
           </div>
           <div className="field">
-            <label htmlFor="biz">Business returns</label>
+            <label htmlFor="se">Self-employed / Sch. C returns</label>
+            <input
+              id="se"
+              type="number"
+              min={0}
+              value={selfEmployedReturns}
+              onChange={(e) => setSelfEmployedReturns(Number(e.target.value) || 0)}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="biz">Business entity returns</label>
             <input
               id="biz"
               type="number"
@@ -245,26 +273,36 @@ export function Fees() {
         <div className="example-math" style={{ marginTop: '0.75rem' }}>
           <div className="row-item">
             <div>
-              <strong>{schedule === 'Office' ? 'Subscription' : 'TP registration (year-one model)'}</strong>
+              <strong>{schedule === 'Office' ? 'Subscription (per year)' : 'TP annual subscription'}</strong>
             </div>
-            <strong>
-              {formatMoney(schedule === 'Office' ? subAmount : TP_REGISTRATION_FEE)}
-            </strong>
+            <strong>{formatMoney(schedule === 'Office' ? subAmount : 0)}</strong>
           </div>
           <div className="row-item">
             <div>
               <strong>Personal return fees</strong>
               <span className="row-meta">
                 {individualReturns} × {formatMoney(estimate.personalRate)}
+                {schedule === 'TP' ? ' (per return)' : ' (included)'}
               </span>
             </div>
             <strong>{formatMoney(estimate.individualFees)}</strong>
           </div>
           <div className="row-item">
             <div>
-              <strong>Business return fees</strong>
+              <strong>Self-employed return fees</strong>
+              <span className="row-meta">
+                {selfEmployedReturns} × {formatMoney(estimate.selfEmployedRate)}
+                {schedule === 'TP' ? ' (per return)' : ' (included)'}
+              </span>
+            </div>
+            <strong>{formatMoney(estimate.selfEmployedFees)}</strong>
+          </div>
+          <div className="row-item">
+            <div>
+              <strong>Business entity return fees</strong>
               <span className="row-meta">
                 {businessReturns} × {formatMoney(estimate.businessRate)}
+                {schedule === 'TP' ? ' (per return)' : ' (included)'}
               </span>
             </div>
             <strong>{formatMoney(estimate.businessFees)}</strong>
@@ -280,25 +318,18 @@ export function Fees() {
       </section>
 
       <section className="list-panel panel" style={{ marginTop: '1rem' }}>
-        <h2>5. Pricing FAQ</h2>
-        <div className="faq-list">
-          {FAQ.map((item, i) => {
-            const open = openFaq === i
-            return (
-              <div className="faq-item" key={item.q}>
-                <button type="button" className="faq-q" onClick={() => setOpenFaq(open ? null : i)} aria-expanded={open}>
-                  <span>Q: {item.q}</span>
-                  <span aria-hidden>{open ? '−' : '+'}</span>
-                </button>
-                {open && (
-                  <p className="faq-a">
-                    <strong>A:</strong> {item.a}
-                  </p>
-                )}
-              </div>
-            )
-          })}
-        </div>
+        <h2>FAQ</h2>
+        {FAQ.map((item, i) => (
+          <button
+            key={item.q}
+            type="button"
+            className="faq-row"
+            onClick={() => setOpenFaq(openFaq === i ? null : i)}
+          >
+            <strong>{item.q}</strong>
+            {openFaq === i && <span className="muted">{item.a}</span>}
+          </button>
+        ))}
       </section>
     </div>
   )

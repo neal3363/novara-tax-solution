@@ -4,15 +4,14 @@ import { BrandMark } from '../components/BrandMark'
 import { actions } from '../store/useAppStore'
 import type { Role } from '../data/types'
 import {
-  OFFICE_BUSINESS_FEE,
-  OFFICE_PERSONAL_FEE,
-  OFFICE_SUBSCRIPTION_FLOOR,
-  OFFICE_SUBSCRIPTION_HIGH,
+  OFFICE_SUBSCRIPTION_BUSINESS,
+  OFFICE_SUBSCRIPTION_PERSONAL,
+  OFFICE_SUBSCRIPTION_SELF_EMPLOYED,
   TC_BUSINESS_FEE,
   TC_PERSONAL_FEE,
   TP_BUSINESS_FEE,
   TP_PERSONAL_FEE,
-  TP_REGISTRATION_FEE,
+  TP_SELF_EMPLOYED_FEE,
   UNLIMITED_CLIENTS_COPY,
   formatMoney,
 } from '../data/fees'
@@ -51,7 +50,7 @@ const DEV_ACCOUNTS: DemoAccount[] = [
     userId: 'u-prep-solo',
     role: 'preparer',
     title: 'TP — Solo (Taylor Kim) · local',
-    blurb: `Upfront ${formatMoney(TP_REGISTRATION_FEE)} · Personal ${formatMoney(TP_PERSONAL_FEE)} · Business ${formatMoney(TP_BUSINESS_FEE)}.`,
+    blurb: `Pay per return · Personal ${formatMoney(TP_PERSONAL_FEE)} · SE ${formatMoney(TP_SELF_EMPLOYED_FEE)} · Business entity ${formatMoney(TP_BUSINESS_FEE)}.`,
     finds: 'Independent TP workspace',
     path: '/app/preparer',
     intents: ['professional', 'preparer', 'pro', 'tp', 'solo'],
@@ -60,7 +59,7 @@ const DEV_ACCOUNTS: DemoAccount[] = [
     userId: 'u-owner',
     role: 'efin_owner',
     title: 'Office — Summit · local',
-    blurb: `EFIN · Subscription ${formatMoney(OFFICE_SUBSCRIPTION_FLOOR)}–${formatMoney(OFFICE_SUBSCRIPTION_HIGH)} · Personal ${formatMoney(OFFICE_PERSONAL_FEE)} · Business ${formatMoney(OFFICE_BUSINESS_FEE)}.`,
+    blurb: `EFIN · Per year ${formatMoney(OFFICE_SUBSCRIPTION_PERSONAL)} / ${formatMoney(OFFICE_SUBSCRIPTION_SELF_EMPLOYED)} / ${formatMoney(OFFICE_SUBSCRIPTION_BUSINESS)} · Covered returns included.`,
     finds: 'Staff, pipeline, pricing',
     path: '/app/office',
     intents: ['office', 'professional', 'pricing', 'efin', 'summit'],

@@ -4,14 +4,11 @@
  */
 
 import {
-  OFFICE_BUSINESS_FEE,
-  OFFICE_PERSONAL_FEE,
   PRIOR_YEAR_SURCHARGE,
-  TC_BUSINESS_FEE,
-  TC_PERSONAL_FEE,
-  TP_BUSINESS_FEE,
-  TP_PERSONAL_FEE,
   formatMoney,
+  novaraSoftwareFeeForReturn,
+  returnKindFromFlags,
+  type OfficePlanId,
 } from '../data/fees'
 import type { AccountType, TaxReturn } from '../data/types'
 import type { BankProductOffer } from './bankProducts'
@@ -48,37 +45,36 @@ export function buildPreSignFeeBreakdown(input: {
   taxYear: number
   seasonYear?: number
   bankProduct?: BankProductOffer | null
+  officePlanId?: OfficePlanId | string
 }): FeeBreakdown {
   const lines: FeeLineItem[] = []
   const season = input.seasonYear ?? 2026
   const isPrior = input.taxYear < season - 1
   const isBusiness = Boolean(input.taxReturn?.isBusiness)
   const at = input.accountType ?? 'tc'
+  const kind = returnKindFromFlags({ isBusiness })
 
-  let software: number = TC_PERSONAL_FEE
-  let label = 'NOVARA platform fee — personal return (Tax Client)'
-  if (at === 'independent_tp') {
-    software = isBusiness ? Number(TP_BUSINESS_FEE) : Number(TP_PERSONAL_FEE)
-    label = isBusiness
-      ? 'NOVARA platform fee — business return (Independent TP)'
-      : 'NOVARA platform fee — personal return (Independent TP)'
-  } else if (at === 'office_owner' || at === 'office_preparer') {
-    software = isBusiness ? Number(OFFICE_BUSINESS_FEE) : Number(OFFICE_PERSONAL_FEE)
-    label = isBusiness
-      ? 'NOVARA platform fee — business return (Office)'
-      : 'NOVARA platform fee — personal return (Office)'
-  } else if (isBusiness) {
-    software = Number(TC_BUSINESS_FEE)
-    label = 'NOVARA platform fee — business return (Tax Client)'
-  }
+  const tier =
+    at === 'independent_tp' ? 'TP' : at === 'office_owner' || at === 'office_preparer' ? 'Office' : 'TC'
+  const priced = novaraSoftwareFeeForReturn({
+    tier,
+    kind,
+    officePlanId: input.officePlanId,
+    officeEmployedPreparer: at === 'office_preparer',
+  })
+  const software = priced.amount
+  const label =
+    priced.amount === 0 && tier === 'Office'
+      ? `NOVARA platform fee — ${priced.fee.label}`
+      : `NOVARA platform fee — ${priced.fee.label}`
 
   lines.push({
     id: 'novara-software',
     category: 'novara_platform',
     label,
     amount: software,
-    status: 'due',
-    note: 'Approved NOVARA software pricing — unchanged.',
+    status: priced.eligible ? (software === 0 ? 'waived' : 'due') : 'not_applicable',
+    note: priced.reason ?? priced.fee.note ?? 'Approved NOVARA software pricing from fees.ts.',
   })
 
   if (isPrior) {

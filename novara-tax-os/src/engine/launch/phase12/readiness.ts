@@ -195,7 +195,7 @@ export function buildLaunchReadinessReport(): LaunchReadinessReport {
     e2e,
     deployment,
     evidence: [
-      `pricing TC ${TC_PERSONAL_FEE}/${TC_BUSINESS_FEE}; Office ${PRICING.Office.subscriptionLow}-${PRICING.Office.subscriptionHigh}; TP reg ${PRICING.TP.registration}`,
+      `pricing TC ${TC_PERSONAL_FEE}/${TC_BUSINESS_FEE}; Office ${PRICING.Office.plans.personal.annual}/${PRICING.Office.plans.selfEmployed.annual}/${PRICING.Office.plans.business.annual}/yr; TP per-return ${PRICING.TP.personalReturn}/${PRICING.TP.selfEmployedReturn}/${PRICING.TP.businessEntityReturn}`,
       `phase6.productionAuthPath=${p6.productionAuthPath}`,
       `phase7.productionEnforcement=${p7.productionEnforcement}`,
       `phase9.activateCutover=${p9.activateCutover}`,

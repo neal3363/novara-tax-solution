@@ -33,7 +33,13 @@ export function resetSubscriptionsForTests(): void {
 export function createSandboxSubscription(input: {
   tenantId: string
   principalId: string
-  kind: 'tp_subscription' | 'office_subscription_standard' | 'office_subscription_plus'
+  kind:
+    | 'tp_subscription'
+    | 'office_subscription_standard'
+    | 'office_subscription_plus'
+    | 'office_subscription_personal'
+    | 'office_subscription_self_employed'
+    | 'office_subscription_business'
   periodDays?: number
 }): { subscription: SandboxSubscription; checkout: SandboxCheckoutSession } {
   assertNoLivePayments()

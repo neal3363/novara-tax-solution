@@ -24,8 +24,8 @@ import {
   PRIOR_YEAR_SURCHARGE,
   TC_PERSONAL_FEE,
   dedupeFeeLines,
+  novaraSoftwareFeeForReturn,
   quoteMultiYearOrder,
-  returnSoftwareFee,
   roleToTier,
   type AccountTier,
   type YearOrderSelection,
@@ -506,6 +506,7 @@ let state: Store = {
   auditEvents: [],
   uploadIssues: [],
   accountTier: undefined,
+  officePlanId: undefined,
   registrationPayments: [],
   officeStaff: [],
   householdIntake: emptyHouseholdIntake(),
@@ -640,6 +641,7 @@ function persist() {
         benefitReviewSigned: state.benefitReviewSigned,
         filingAuthorized: state.filingAuthorized,
         accountTier: state.accountTier,
+        officePlanId: state.officePlanId,
         viewerId: state.currentUser?.id ?? null,
       }
       sessionStorage.setItem(SESSION_KEY, JSON.stringify(light))
@@ -719,6 +721,7 @@ function hydrate() {
             benefitReviewSigned: light.benefitReviewSigned ?? false,
             filingAuthorized: light.filingAuthorized ?? false,
             accountTier: light.accountTier,
+            officePlanId: light.officePlanId,
             taxProfile: defaultProfile(),
             benefitReport: toSnapshot(defaultProfile()),
             currentUser: null,
@@ -1896,7 +1899,16 @@ export const actions = {
         : actor.accountType === 'independent_tp'
           ? 'TP'
           : roleToTier(actor.role) ?? 'TP'
-    const fee = returnSoftwareFee(tier, true)
+    const priced = novaraSoftwareFeeForReturn({
+      tier,
+      kind: 'business_entity',
+      officePlanId: state.officePlanId,
+      officeEmployedPreparer: actor.accountType === 'office_preparer',
+    })
+    if (!priced.eligible) {
+      return { ok: false as const, error: priced.reason ?? 'Office plan does not cover business entity returns.' }
+    }
+    const fee = { ...priced.fee, amount: priced.amount }
     const clientId = uid('c')
     const ret: TaxReturn = {
       id: uid('r'),
@@ -2122,6 +2134,7 @@ export const actions = {
     efileProviderName?: string
     lines: { id: string; label: string; amount: number }[]
     planAmount: number
+    officePlanId?: string
   }) {
     if (!import.meta.env.DEV) {
       return {
@@ -2210,14 +2223,16 @@ export const actions = {
       ...state,
       currentUser: user,
       accountTier: input.tier,
+      officePlanId: input.tier === 'Office' ? input.officePlanId ?? 'office-personal' : state.officePlanId,
       registrationPayments: deduped,
       officeStaff,
       auditEvents: appendAudit(
         'registration_complete',
-        `${input.tier} registration recorded. Credentials stored as fingerprint + last-four only (not recoverable encryption); status pending verification (not auto-verified).`,
+        `${input.tier} registration recorded. Credentials stored as fingerprint + last-four only (not recoverable encryption); status pending verification (not auto-verified). Existing billing agreements are not auto-migrated when catalog prices change.`,
         {
           tier: input.tier,
           amount: input.planAmount,
+          officePlanId: input.officePlanId ?? '',
           ptinStatus: credentials.ptin?.status ?? 'n/a',
           efinStatus: credentials.efin?.status ?? 'n/a',
         },
@@ -2259,9 +2274,31 @@ export const actions = {
     emit()
   },
   chargeReturnSoftwareFee(returnId: string, isBusiness: boolean) {
-    const tier: AccountTier =
-      state.accountTier ?? roleToTier(state.currentUser?.role ?? 'taxpayer') ?? 'TC'
-    const fee = returnSoftwareFee(tier, isBusiness)
+    const accountType = state.currentUser?.accountType
+    const officeEmployed = accountType === 'office_preparer' || accountType === 'office_owner'
+    const tier: AccountTier = officeEmployed
+      ? 'Office'
+      : state.accountTier ?? roleToTier(state.currentUser?.role ?? 'taxpayer') ?? 'TC'
+    const kind = isBusiness ? 'business_entity' : 'personal'
+    const priced = novaraSoftwareFeeForReturn({
+      tier,
+      kind,
+      officePlanId: state.officePlanId,
+      officeEmployedPreparer: accountType === 'office_preparer',
+    })
+    if (!priced.eligible) {
+      state = {
+        ...state,
+        auditEvents: appendAudit(
+          'software_fee_blocked',
+          priced.reason ?? 'Return type not covered by Office plan.',
+          { returnId, kind, officePlanId: state.officePlanId ?? '' },
+        ),
+      }
+      emit()
+      return { ok: false as const, error: priced.reason ?? 'Return type not covered by Office plan.' }
+    }
+    const fee = priced.fee
     state = {
       ...state,
       returns: state.returns.map((r) =>
@@ -2270,19 +2307,23 @@ export const actions = {
               ...r,
               feeSnapshot: dedupeFeeLines(r.feeSnapshot, {
                 label: fee.label,
-                amount: fee.amount,
+                amount: priced.amount,
                 status: fee.status,
               }),
               updatedAt: new Date().toISOString(),
             }
           : r,
       ),
-      auditEvents: appendAudit('software_fee', `Applied ${fee.label} without duplicate charge.`, {
-        returnId,
-        amount: fee.amount,
-      }),
+      auditEvents: appendAudit(
+        'software_fee',
+        priced.amount === 0 && tier === 'Office'
+          ? `Office subscription covers return — $0 additional NOVARA per-return fee (${fee.label}).`
+          : `Applied ${fee.label} (${priced.amount}) without duplicate charge.`,
+        { returnId, amount: priced.amount, kind, tier },
+      ),
     }
     emit()
+    return { ok: true as const, amount: priced.amount }
   },
   updateEntryLine(id: string, patch: Partial<EntryPlanLine>) {
     state = {
@@ -2742,8 +2783,14 @@ export const actions = {
 
       for (const k of kinds) {
         const isBusiness = k === 'business'
-        const fee = returnSoftwareFee(tier, isBusiness)
-        const yearFees = [{ label: fee.label, amount: fee.amount, status: fee.status }]
+        const priced = novaraSoftwareFeeForReturn({
+          tier,
+          kind: isBusiness ? 'business_entity' : 'personal',
+          officePlanId: state.officePlanId,
+          officeEmployedPreparer: actor.accountType === 'office_preparer',
+        })
+        const fee = priced.fee
+        const yearFees = [{ label: fee.label, amount: priced.amount, status: fee.status }]
         const surchargeLine = quote.lines.find(
           (l) => l.kind === 'prior_year_surcharge' && l.taxYear === sel.taxYear,
         )
