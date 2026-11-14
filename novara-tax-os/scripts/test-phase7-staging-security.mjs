@@ -2,6 +2,7 @@
  * Phase 7 staging security integration tests — synthetic data only.
  * STOP before production enforcement / MFA mandate.
  */
+process.env.NOVARA_STAGING_SECURITY_API = "1"
 import { spawnSync } from 'node:child_process'
 import { mkdirSync, writeFileSync, rmSync, mkdtempSync } from 'node:fs'
 import { join } from 'node:path'
@@ -69,14 +70,17 @@ import {
   getLastQuarantineId,
   stagingKmsRoundTripVerify,
   connectStagingKms,
+  setDurableRoot,
+  getDurableRoot,
   PHASE7_SECURITY_VERSION,
 } from '../src/engine/security/phase7/index.ts'
-import * as SessionApi from '../api/security/session.ts'
-import * as MfaApi from '../api/security/mfa.ts'
-import * as AuthzApi from '../api/security/authorize.ts'
-import * as VaultApi from '../api/security/vault.ts'
-import * as AuditApi from '../api/security/audit.ts'
-import * as StatusApi from '../api/security/status.ts'
+process.env.NOVARA_STAGING_SECURITY_API = '1'
+import * as SessionApi from '../../staging-security-api/security/session.ts'
+import * as MfaApi from '../../staging-security-api/security/mfa.ts'
+import * as AuthzApi from '../../staging-security-api/security/authorize.ts'
+import * as VaultApi from '../../staging-security-api/security/vault.ts'
+import * as AuditApi from '../../staging-security-api/security/audit.ts'
+import * as StatusApi from '../../staging-security-api/security/status.ts'
 
 let failed = 0
 function assert(c: boolean, m: string) {
@@ -289,16 +293,39 @@ assert(!durableVerifyAuditChain().ok, 'durable tamper detected')
 
 console.log('=== HTTP security API handlers ===')
 resetAll()
+process.env.NOVARA_STAGING_SECURITY_DIR = DURABLE
 await StatusApi.POST(new Request('http://local/api/security/status', {
   method: 'POST',
   headers: { 'content-type': 'application/json' },
-  body: JSON.stringify({ op: 'bootstrap', durableRoot: DURABLE }),
+  body: JSON.stringify({ op: 'bootstrap', durableRoot: '/etc/passwd' }),
 }))
+assert(getDurableRoot() === DURABLE || getDurableRoot().endsWith('.novara-staging-security') || getDurableRoot().includes('novara'), 'HTTP bootstrap ignores client durableRoot')
+let pathDenied = false
+try {
+  setDurableRoot('/etc/novara-evil')
+} catch {
+  pathDenied = true
+}
+assert(pathDenied, 'setDurableRoot rejects path outside allowlist')
+setDurableRoot(DURABLE)
+bootstrapStagingSecurity({ durableRoot: DURABLE })
 const statusRes = await StatusApi.GET()
 const statusBody = await statusRes.json()
 assert(statusRes.status === 200, 'status GET')
 assert(statusBody.productionEnforcement === false, 'status production OFF')
 assert(statusBody.mfaMandatoryForExistingUsers === false, 'status MFA mandate OFF')
+
+const deniedEnv = process.env.NOVARA_STAGING_SECURITY_API
+process.env.NOVARA_STAGING_SECURITY_API = '0'
+const gated = await SessionApi.POST(new Request('http://local/api/security/session', {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({
+    principalId: 'x', email: 'x@t', role: 'admin', accountType: 'admin', tenantId: 't',
+  }),
+}))
+assert(gated.status === 404, 'session mint blocked when staging API disabled')
+process.env.NOVARA_STAGING_SECURITY_API = deniedEnv || '1'
 
 const createRes = await SessionApi.POST(new Request('http://local/api/security/session', {
   method: 'POST',
@@ -419,7 +446,7 @@ process.exit(failed > 0 ? 1 : 0)
 const r = spawnSync('npx', ['--yes', 'tsx', join(tmp, 'run.ts')], {
   cwd: root,
   encoding: 'utf8',
-  env: { ...process.env, NOVARA_STAGING_SECURITY_DIR: durableTmp },
+  env: { ...process.env, NOVARA_STAGING_SECURITY_API: '1', NOVARA_STAGING_SECURITY_DIR: durableTmp },
 })
 if (r.stdout) process.stdout.write(r.stdout)
 if (r.stderr) process.stderr.write(r.stderr)

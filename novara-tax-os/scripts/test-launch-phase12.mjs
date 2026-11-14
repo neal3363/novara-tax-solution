@@ -2,6 +2,7 @@
  * Phase 12 launch-readiness & staging E2E tests — synthetic only.
  * STOP before production activation.
  */
+process.env.NOVARA_STAGING_SECURITY_API = "1"
 import { spawnSync } from 'node:child_process'
 import { mkdirSync, writeFileSync, rmSync, mkdtempSync } from 'node:fs'
 import { join } from 'node:path'
@@ -44,7 +45,8 @@ import {
   resetSessionStoreForTests,
 } from '../src/engine/security/phase6/index.ts'
 import { bootstrapStagingSecurity, resetStagingForTests } from '../src/engine/security/phase7/index.ts'
-import * as LaunchApi from '../api/security/launch-phase12.ts'
+process.env.NOVARA_STAGING_SECURITY_API = '1'
+import * as LaunchApi from '../../staging-security-api/security/launch-phase12.ts'
 
 let failed = 0
 function assert(c: boolean, m: string) {
@@ -186,7 +188,7 @@ process.exit(failed > 0 ? 1 : 0)
 const r = spawnSync('npx', ['--yes', 'tsx', join(tmp, 'run.ts')], {
   cwd: root,
   encoding: 'utf8',
-  env: { ...process.env },
+  env: { ...process.env, NOVARA_STAGING_SECURITY_API: '1' },
 })
 if (r.stdout) process.stdout.write(r.stdout)
 if (r.stderr) process.stderr.write(r.stderr)

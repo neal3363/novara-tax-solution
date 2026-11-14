@@ -3,9 +3,11 @@
  * Always reports productionEnforcement=false.
  */
 
-import { json, loadPhase6, loadPhase7 } from './_shared.js'
+import { json, loadPhase6, loadPhase7, refuseUnlessStagingEnabled} from './_shared.js'
 
 export async function GET() {
+  const __denied = refuseUnlessStagingEnabled()
+  if (__denied) return __denied
   try {
     const p6 = await loadPhase6()
     const p7 = await loadPhase7()
@@ -37,15 +39,18 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const __denied = refuseUnlessStagingEnabled()
+  if (__denied) return __denied
   try {
     const p7 = await loadPhase7()
     const body = (await request.json()) as Record<string, unknown>
     const op = String(body.op ?? '')
 
     if (op === 'bootstrap') {
-      const durableRoot = body.durableRoot ? String(body.durableRoot) : undefined
-      const result = p7.bootstrapStagingSecurity({ durableRoot })
-      return json(200, { ...result, stop: true })
+      // Never accept client-controlled filesystem paths (path traversal).
+      // Callers must set NOVARA_STAGING_SECURITY_DIR or use the default staging root.
+      const result = p7.bootstrapStagingSecurity({})
+      return json(200, { ...result, stop: true, clientDurableRootIgnored: true })
     }
 
     if (op === 'malware_outage') {

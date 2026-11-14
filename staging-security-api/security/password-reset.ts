@@ -3,13 +3,15 @@
  * Production enforcement remains OFF.
  */
 
-import { json } from './_shared.js'
+import { json, refuseUnlessStagingEnabled} from './_shared.js'
 
 async function loadRemediation() {
-  return import('../../src/engine/remediation/index.js')
+  return import('../../novara-tax-os/src/engine/remediation/index.js')
 }
 
 export async function GET() {
+  const __denied = refuseUnlessStagingEnabled()
+  if (__denied) return __denied
   try {
     const rem = await loadRemediation()
     return json(200, {
@@ -24,6 +26,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const __denied = refuseUnlessStagingEnabled()
+  if (__denied) return __denied
   try {
     const rem = await loadRemediation()
     rem.assertRemediationStagingOnly()

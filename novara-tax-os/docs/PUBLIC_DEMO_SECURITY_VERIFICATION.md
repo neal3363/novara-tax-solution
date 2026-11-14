@@ -14,3 +14,6 @@
 | Sensitive log redaction | PASS_STAGING | Staging redact helpers; no live PAN logging |
 
 Harness: `npm run test:public-demo-deploy`
+| Staging security HTTP routes | PASS | Removed from `novara-tax-os/api`; local-only under `staging-security-api` |
+| Durable root path traversal | PASS | Allowlisted roots; HTTP bootstrap ignores client paths |
+

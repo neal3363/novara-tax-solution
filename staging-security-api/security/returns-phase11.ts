@@ -3,13 +3,15 @@
  * Isolated state / business / amended calcs. No live e-file. No interview wiring.
  */
 
-import { json, loadPhase7, sessionIdFrom } from './_shared.js'
+import { json, loadPhase7, sessionIdFrom, refuseUnlessStagingEnabled} from './_shared.js'
 
 async function loadP11() {
-  return import('../../src/engine/returns/phase11/index.js')
+  return import('../../novara-tax-os/src/engine/returns/phase11/index.js')
 }
 
 export async function GET() {
+  const __denied = refuseUnlessStagingEnabled()
+  if (__denied) return __denied
   try {
     const p11 = await loadP11()
     return json(200, {
@@ -28,6 +30,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const __denied = refuseUnlessStagingEnabled()
+  if (__denied) return __denied
   try {
     const p7 = await loadPhase7()
     const p11 = await loadP11()

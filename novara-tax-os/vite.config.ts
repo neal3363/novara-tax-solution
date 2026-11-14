@@ -47,30 +47,36 @@ function sessionApiPlugin(): Plugin {
 }
 
 /**
- * Staging-only Phase 6/7 security APIs under /api/security/*.
- * Does not alter taxpayer UI login or production enforcement.
+ * Public demo-safety + optional local-only staging security APIs.
+ * Staging handlers live outside novara-tax-os/api (not publishable as host routes).
+ * Mount /api/security/* only when NOVARA_STAGING_SECURITY_API=1.
  */
 function securityApiPlugin(): Plugin {
-  const routes: Record<string, string> = {
-    '/api/security/session': '/api/security/session.ts',
-    '/api/security/mfa': '/api/security/mfa.ts',
-    '/api/security/authorize': '/api/security/authorize.ts',
-    '/api/security/vault': '/api/security/vault.ts',
-    '/api/security/audit': '/api/security/audit.ts',
-    '/api/security/status': '/api/security/status.ts',
-    '/api/security/mef': '/api/security/mef.ts',
-    '/api/security/irs-staging': '/api/security/irs-staging.ts',
-    '/api/security/payments': '/api/security/payments.ts',
-    '/api/security/returns-phase11': '/api/security/returns-phase11.ts',
-    '/api/security/launch-phase12': '/api/security/launch-phase12.ts',
-    '/api/security/password-reset': '/api/security/password-reset.ts',
+  const stagingDir = path.resolve(rootDir, '../staging-security-api/security')
+  const publicRoutes: Record<string, string> = {
     '/api/demo-safety': '/api/demo-safety.ts',
+  }
+  const stagingRoutes: Record<string, string> = {
+    '/api/security/session': path.join(stagingDir, 'session.ts'),
+    '/api/security/mfa': path.join(stagingDir, 'mfa.ts'),
+    '/api/security/authorize': path.join(stagingDir, 'authorize.ts'),
+    '/api/security/vault': path.join(stagingDir, 'vault.ts'),
+    '/api/security/audit': path.join(stagingDir, 'audit.ts'),
+    '/api/security/status': path.join(stagingDir, 'status.ts'),
+    '/api/security/mef': path.join(stagingDir, 'mef.ts'),
+    '/api/security/irs-staging': path.join(stagingDir, 'irs-staging.ts'),
+    '/api/security/payments': path.join(stagingDir, 'payments.ts'),
+    '/api/security/returns-phase11': path.join(stagingDir, 'returns-phase11.ts'),
+    '/api/security/launch-phase12': path.join(stagingDir, 'launch-phase12.ts'),
+    '/api/security/password-reset': path.join(stagingDir, 'password-reset.ts'),
   }
   return {
     name: 'novara-security-api-staging',
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
         const urlPath = req.url?.split('?')[0] ?? ''
+        const stagingOn = process.env.NOVARA_STAGING_SECURITY_API === '1'
+        const routes = stagingOn ? { ...publicRoutes, ...stagingRoutes } : publicRoutes
         const modPath = routes[urlPath]
         if (!modPath) return next()
         const method = (req.method ?? 'GET').toUpperCase()

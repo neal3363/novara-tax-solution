@@ -3,9 +3,11 @@
  * Does NOT mandate MFA for existing production users.
  */
 
-import { json, loadPhase6, loadPhase7, sessionIdFrom } from './_shared.js'
+import { json, loadPhase6, loadPhase7, sessionIdFrom, refuseUnlessStagingEnabled} from './_shared.js'
 
 export async function POST(request: Request) {
+  const __denied = refuseUnlessStagingEnabled()
+  if (__denied) return __denied
   try {
     const p6 = await loadPhase6()
     const p7 = await loadPhase7()
@@ -93,6 +95,8 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
+  const __denied = refuseUnlessStagingEnabled()
+  if (__denied) return __denied
   try {
     const p7 = await loadPhase7()
     const url = new URL(request.url)

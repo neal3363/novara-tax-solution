@@ -36,6 +36,23 @@ assert(!existsSync(join(root, 'src/components/VoiceInputDev.tsx')), 'vendor STT 
 assert(existsSync(join(root, '../dev-fixtures/seed.dev.ts')), 'fixtures remain available outside app tree for local tests')
 assert(existsSync(join(root, '../dev-fixtures/VoiceInputDev.tsx')), 'DEV voice helper remains outside app tree')
 
+console.log('=== Staging security APIs must not ship under publishable api/ ===')
+assert(!existsSync(join(root, 'api/security')), 'api/security removed from published app tree')
+assert(existsSync(join(root, '../staging-security-api/security/session.ts')), 'staging session handler kept outside app')
+assert(existsSync(join(root, '../staging-security-api/security/status.ts')), 'staging status handler kept outside app')
+assert(existsSync(join(root, 'api/session.ts')), 'verified Cursor session API remains')
+assert(existsSync(join(root, 'api/demo-safety.ts')), 'public demo-safety API remains')
+const statusSrc = readFileSync(join(root, '../staging-security-api/security/status.ts'), 'utf8')
+assert(statusSrc.includes('clientDurableRootIgnored') || statusSrc.includes('Never accept client-controlled'), 'status bootstrap ignores client durableRoot')
+assert(
+  readFileSync(join(root, '../staging-security-api/security/_shared.ts'), 'utf8').includes('refuseUnlessStagingEnabled'),
+  'staging handlers hard-gated behind opt-in env',
+)
+assert(
+  readFileSync(join(root, 'src/engine/security/phase7/durableStore.ts'), 'utf8').includes('durable_root_not_allowed'),
+  'durableRoot path allowlist enforced',
+)
+
 console.log('=== Production bundle must not expose multi-tenant / demo PII seed ===')
 const assetsDir = join(root, 'dist/assets')
 const jsFiles = readdirSync(assetsDir).filter((f) => f.endsWith('.js'))

@@ -3,13 +3,15 @@
  * Staging assessment only. Never activates production.
  */
 
-import { json, loadPhase7, sessionIdFrom } from './_shared.js'
+import { json, loadPhase7, sessionIdFrom, refuseUnlessStagingEnabled} from './_shared.js'
 
 async function loadP12() {
-  return import('../../src/engine/launch/phase12/index.js')
+  return import('../../novara-tax-os/src/engine/launch/phase12/index.js')
 }
 
 export async function GET() {
+  const __denied = refuseUnlessStagingEnabled()
+  if (__denied) return __denied
   try {
     const p12 = await loadP12()
     const report = p12.buildLaunchReadinessReport()
@@ -28,6 +30,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const __denied = refuseUnlessStagingEnabled()
+  if (__denied) return __denied
   try {
     const p7 = await loadPhase7()
     const p12 = await loadP12()
