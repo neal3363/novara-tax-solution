@@ -62,6 +62,7 @@ function securityApiPlugin(): Plugin {
     '/api/security/irs-staging': '/api/security/irs-staging.ts',
     '/api/security/payments': '/api/security/payments.ts',
     '/api/security/returns-phase11': '/api/security/returns-phase11.ts',
+    '/api/security/launch-phase12': '/api/security/launch-phase12.ts',
   }
   return {
     name: 'novara-security-api-staging',
