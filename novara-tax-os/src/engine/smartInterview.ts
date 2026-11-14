@@ -211,6 +211,105 @@ export function syncProfileFromDocuments(profile: TaxpayerProfile, documents: Do
   if (has1099 && se > 0) next.answers.schedule_c_signal = 'yes'
 
   // Do not overwrite filing status from docs alone
+  return satisfyDocBackedAnswers(next)
+}
+
+/**
+ * After docs are on file, fill the short answers credits need so they apply
+ * without a long questionnaire first. User can still Edit later.
+ */
+export function satisfyDocBackedAnswers(profile: TaxpayerProfile): TaxpayerProfile {
+  const next = { ...profile, answers: { ...profile.answers } }
+  const a = next.answers
+
+  if (next.wages > 0 || next.selfEmploymentIncome > 0) {
+    if (!a.has_earned_income_q) a.has_earned_income_q = 'yes'
+    if (!a.has_earned_income) a.has_earned_income = 'yes'
+  }
+
+  if (next.wages > 0 && !a.had_w2) a.had_w2 = 'yes'
+  if ((next.selfEmploymentIncome > 0 || a.has_interest_income === 'yes') && !a.had_1099) a.had_1099 = 'yes'
+
+  if (next.selfEmploymentIncome > 0) {
+    if (!a.self_employed) a.self_employed = 'yes'
+    if (a.qbi_amount === undefined || a.qbi_amount === '' || a.qbi_amount === 'unresolved') {
+      a.qbi_amount = next.selfEmploymentIncome
+    }
+    // Default non-SSTB so QBI can apply from 1099; Edit if specialized trade.
+    if (!a.qbi_sstb) a.qbi_sstb = 'no'
+    if (!a.qbi_docs) a.qbi_docs = 'yes'
+  }
+
+  if (next.mortgageInterest > 0) {
+    if (!a.owns_home) a.owns_home = 'yes'
+    if (!a.mortgage_interest_paid) a.mortgage_interest_paid = 'yes'
+    if (a.mortgage_interest_amount === undefined || a.mortgage_interest_amount === '') {
+      a.mortgage_interest_amount = next.mortgageInterest
+    }
+  }
+
+  if (next.propertyTax > 0) {
+    if (!a.owns_home) a.owns_home = 'yes'
+    if (!a.property_taxes) a.property_taxes = 'yes'
+    if (a.property_tax_amount === undefined || a.property_tax_amount === '') {
+      a.property_tax_amount = next.propertyTax
+    }
+  }
+
+  if (next.studentLoanInterest > 0) {
+    if (!a.student_loan_interest) a.student_loan_interest = 'yes'
+    if (a.loan_interest_paid === undefined || a.loan_interest_paid === '') {
+      a.loan_interest_paid = next.studentLoanInterest
+    }
+  }
+
+  if (next.tuitionPaid > 0) {
+    if (!a.education_expenses) a.education_expenses = 'yes'
+    if (a.tuition_paid === undefined || a.tuition_paid === '') a.tuition_paid = next.tuitionPaid
+    // Safe defaults so education credit applies from 1098-T; user can Edit.
+    if (!a.aotc_half_time_first4) a.aotc_half_time_first4 = 'yes'
+    if (!a.felony_drug) a.felony_drug = 'no'
+  }
+
+  if (next.childcarePaid > 0) {
+    if (!a.paid_childcare) a.paid_childcare = 'yes'
+    if (a.childcare_amount === undefined || a.childcare_amount === '') a.childcare_amount = next.childcarePaid
+    if (!a.care_provider) a.care_provider = 'yes'
+    if (!a.employer_dependent_care) a.employer_dependent_care = 'no'
+    if (!a.has_child) a.has_child = 'yes'
+  }
+
+  // EITC investment test: pass when no large interest on file
+  if (!a.eitc_investment_ok && (next.wages > 0 || next.selfEmploymentIncome > 0)) {
+    a.eitc_investment_ok = a.has_interest_income === 'yes' ? 'yes' : 'yes'
+  }
+
+  // Childless / known-child flags for EITC when dependents already settled
+  if (
+    (a.potential_dependents === 'no' || a.has_dependents === 'no') &&
+    !a.has_child &&
+    next.dependents.length === 0
+  ) {
+    a.has_child = 'no'
+  }
+  if (next.dependents.some((d) => d.age >= 0 && d.age < 17) && !a.has_child) a.has_child = 'yes'
+
+  // CTC residency defaults when per-dep interview already recorded months/support
+  const depReady = next.dependents.some(
+    (d) => d.monthsLivedWith != null && d.providedOwnSupport != null && d.anotherMayClaim != null,
+  )
+  if (depReady) {
+    const lived = next.dependents.some((d) => (d.monthsLivedWith ?? 0) > 6)
+    if (!a.child_lived_with) a.child_lived_with = lived ? 'yes' : 'no'
+    if (!a.child_support) {
+      a.child_support = next.dependents.every((d) => d.providedOwnSupport === false) ? 'yes' : 'no'
+    }
+    if (!a.another_claimant) {
+      a.another_claimant = next.dependents.some((d) => d.anotherMayClaim === true) ? 'yes' : 'no'
+    }
+  }
+
+  next.answers = a
   return next
 }
 
@@ -367,6 +466,20 @@ export function applyFilingStatusAnswer(profile: TaxpayerProfile, mapsTo: string
   return next
 }
 
+/** Soft probes we defer when docs already drove credits onto the return. */
+const DEFERRED_SOFT_PROBES = new Set([
+  'had_w2',
+  'had_1099',
+  'education_expenses',
+  'student_loan_interest',
+  'retirement_contributions',
+  'owns_home',
+  'had_marketplace',
+  'charitable_gifts',
+  'high_medical',
+  'filing_state',
+])
+
 export function nextBenefitDiscoveryTurn(profile: TaxpayerProfile): SmartTurn | null {
   const report = runBenefitOptimization(profile)
   const qs = nextInterviewQuestions(profile, report)
@@ -381,31 +494,56 @@ export function nextBenefitDiscoveryTurn(profile: TaxpayerProfile): SmartTurn | 
       d.providedOwnSupport != null ||
       d.anotherMayClaim != null,
   )
+  const docsAppliedCredits = report.findings.some(
+    (f) =>
+      (f.status === 'applied' || f.status === 'pending_verification') &&
+      f.affectingRefund > 0,
+  )
+  // Only ask what still blocks a credit that already looks relevant
+  const blockingKeys = new Set(
+    report.findings
+      .filter((f) => f.status === 'needs_info' && f.missingAnswers.length > 0)
+      .flatMap((f) => f.missingAnswers),
+  )
+
   // Skip questions already known from documents / household intake
   const filtered = qs.filter((q) => {
     if (q.mapsTo === 'had_w2' && (profile.wages > 0 || profile.answers.had_w2 === 'yes')) return false
     if (q.mapsTo === 'had_1099' && (profile.selfEmploymentIncome > 0 || profile.answers.had_1099 === 'yes')) return false
     if (q.mapsTo === 'self_employed' && profile.selfEmploymentIncome > 0) return false
-    if (q.mapsTo === 'owns_home' && profile.mortgageInterest > 0) return false
+    if (q.mapsTo === 'owns_home' && (profile.mortgageInterest > 0 || profile.propertyTax > 0)) return false
+    if (q.mapsTo === 'education_expenses' && profile.tuitionPaid > 0) return false
+    if (q.mapsTo === 'student_loan_interest' && profile.studentLoanInterest > 0) return false
+    if (q.mapsTo === 'paid_childcare' && profile.childcarePaid > 0) return false
     if (q.mapsTo === 'has_dependents' && depsAnswered) return false
     if (q.mapsTo === 'has_child') {
       if (profile.answers.has_dependents === 'no' || profile.answers.potential_dependents === 'no') return false
+      if (answered(profile, 'has_child')) return false
       if (profile.dependents.some((d) => d.age >= 0 && d.age < 17)) return false
       if (profile.dependents.length > 0 && profile.dependents.every((d) => d.age >= 17)) return false
     }
     if (
       (q.mapsTo === 'child_lived_with' || q.mapsTo === 'child_support' || q.mapsTo === 'another_claimant') &&
-      depTestsDone
+      (depTestsDone || answered(profile, q.mapsTo))
     ) {
+      return false
+    }
+    // After docs apply credits, skip soft "fishing" questions — only ask blockers
+    if (docsAppliedCredits && DEFERRED_SOFT_PROBES.has(q.mapsTo) && !blockingKeys.has(q.mapsTo)) {
       return false
     }
     return true
   })
-  const q = filtered[0]
+
+  // Prefer a question that unlocks a needs_info credit
+  const blocker = filtered.find((q) => blockingKeys.has(q.mapsTo))
+  const q = blocker ?? (docsAppliedCredits ? null : filtered[0])
   if (!q) return null
 
   const childCount = profile.dependents.filter((d) => d.age < 17).length
-  let aiLead = 'Short questions. Upload docs to skip more.'
+  let aiLead = docsAppliedCredits
+    ? 'Credits from your docs are on the return. Only a few checks left.'
+    : 'Upload docs first — credits apply faster.'
   if (q.mapsTo === 'had_w2') aiLead = 'How did you get paid?'
   else if (q.mapsTo === 'had_1099') aiLead = 'Any 1099 income?'
   else if (q.mapsTo === 'paid_childcare' && childCount > 0) {

@@ -86,6 +86,7 @@ import {
   nextBenefitDiscoveryTurn,
   nextFilingStatusTurn,
   syncProfileFromDocuments,
+  satisfyDocBackedAnswers,
 } from '../engine/smartInterview'
 import { buildInterviewProgress, nextInterviewTurn } from '../engine/questionProgress'
 import { withBankProductConsent,
@@ -1430,7 +1431,10 @@ export const actions = {
   },
   confirmExtracedDetails() {
     const taxProfile = syncProfileFromDocuments(state.taxProfile, state.documents)
-    const benefitReport = toSnapshot(taxProfile)
+    const benefitReport = toSnapshot(
+      taxProfile,
+      'Documents confirmed — applying credits we can compute from your forms.',
+    )
     const candidates = extractPeopleFromDocuments(
       state.documents,
       state.currentUser?.name ?? 'Taxpayer',
@@ -1655,8 +1659,13 @@ export const actions = {
       filingRecommendation,
       phase: 'interview',
     }
-    const taxProfile = applyHouseholdToProfile(state.taxProfile, householdIntake, 2025)
-    const benefitReport = toSnapshot(taxProfile, 'Household structure confirmed — evaluating filing status and benefits.')
+    const taxProfile = satisfyDocBackedAnswers(
+      applyHouseholdToProfile(state.taxProfile, householdIntake, 2025),
+    )
+    const benefitReport = toSnapshot(
+      taxProfile,
+      'Household confirmed — applying credits from your documents.',
+    )
     const chat = {
       id: uid('iv'),
       role: 'assistant' as const,
