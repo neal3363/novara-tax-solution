@@ -418,8 +418,14 @@ export function applyHouseholdToProfile(
   })
 
   const answers = { ...profile.answers }
-  answers.potential_dependents = dependents.length > 0 || intake.missingHouseholdAnswer === 'yes' ? 'yes' : 'no'
+  const hasDeps = dependents.length > 0 || intake.missingHouseholdAnswer === 'yes'
+  answers.potential_dependents = hasDeps ? 'yes' : 'no'
+  answers.has_dependents = hasDeps ? 'yes' : 'no'
   answers.dependent_count = dependents.length
+  // Sync once so benefit discovery does not re-ask "any dependents?"
+  if (dependents.some((d) => d.age >= 0 && d.age < 17)) answers.has_child = 'yes'
+  else if (dependents.length > 0 && dependents.every((d) => d.age >= 17)) answers.has_child = 'no'
+  else if (!hasDeps) answers.has_child = 'no'
   if (spouse) {
     answers.married_dec31 = 'yes'
   }

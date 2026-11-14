@@ -203,6 +203,7 @@ export function extractFactsForType(
     case 'W-2':
       return [
         fact(uid('f'), 'Employee name', personName, confidence),
+        fact(uid('f'), 'Employee SSN (last 4)', '9021', confidence - 0.02),
         fact(uid('f'), 'Employer name', 'Acme Logistics LLC', confidence),
         fact(uid('f'), 'Wages (Box 1)', '$64,200.00', confidence),
         fact(uid('f'), 'Federal withheld', '$7,110.00', confidence - 0.02),

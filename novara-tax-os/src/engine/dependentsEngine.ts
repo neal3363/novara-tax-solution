@@ -333,7 +333,7 @@ export function nextDependentQuestion(
   if (!discovery.askedPotential) {
     return {
       id: 'potential_dependents',
-      prompt: 'Do you have any children or other people who may qualify as your dependents?',
+      prompt: 'Any kids or dependents?',
       kind: 'yesno',
       mapsTo: 'potential_dependents',
       dependentIndex: -1,
@@ -345,7 +345,7 @@ export function nextDependentQuestion(
   if (!discovery.countAnswered) {
     return {
       id: 'dependent_count',
-      prompt: 'How many children or other potential dependents do you have?',
+      prompt: 'How many dependents?',
       kind: 'choice',
       choices: ['0', '1', '2', '3', '4', '5+'],
       mapsTo: 'dependent_count',
@@ -363,7 +363,7 @@ export function nextDependentQuestion(
     if (!dep.fullLegalName) {
       return {
         id: `dep_${i}_name`,
-        prompt: `What is the full legal name of dependent ${i + 1}?`,
+        prompt: `Dependent ${i + 1} — full name?`,
         kind: 'text',
         mapsTo: `dep_${i}_name`,
         dependentIndex: i,
@@ -372,7 +372,7 @@ export function nextDependentQuestion(
     if (!dep.dateOfBirth) {
       return {
         id: `dep_${i}_dob`,
-        prompt: `What is ${label}'s date of birth? (YYYY-MM-DD)`,
+        prompt: `${label}'s birthday?`,
         kind: 'date',
         mapsTo: `dep_${i}_dob`,
         dependentIndex: i,
@@ -383,7 +383,7 @@ export function nextDependentQuestion(
     if (!tinPath && dep.tinStatus === 'missing') {
       return {
         id: `dep_${i}_tin`,
-        prompt: `Do you have ${label}'s Social Security number or ITIN? (Enter last 4 only on the next screen, or confirm you will upload ID.)`,
+        prompt: `${label}'s Social — last 4 or upload ID?`,
         kind: 'choice',
         choices: ['I will enter last 4 now', 'I will upload ID documentation', 'Not available yet'],
         mapsTo: `dep_${i}_tin_path`,
@@ -393,7 +393,7 @@ export function nextDependentQuestion(
     if (tinPath === 'I will enter last 4 now' && !dep.tinLast4) {
       return {
         id: `dep_${i}_tin_last4`,
-        prompt: `Enter only the last 4 digits of ${label}'s SSN/ITIN (full number is never shown on screen).`,
+        prompt: `${label} — last 4 of SSN only`,
         kind: 'text',
         mapsTo: `dep_${i}_tin_last4`,
         dependentIndex: i,
@@ -402,7 +402,7 @@ export function nextDependentQuestion(
     if (!dep.relationship) {
       return {
         id: `dep_${i}_rel`,
-        prompt: `What is ${label}'s relationship to you?`,
+        prompt: `${label} is your…?`,
         kind: 'choice',
         choices: [
           'Son',
@@ -424,7 +424,7 @@ export function nextDependentQuestion(
     if (dep.monthsLivedWith === null) {
       return {
         id: `dep_${i}_months`,
-        prompt: `How many months did ${label} live with you during the tax year?`,
+        prompt: `Months ${label} lived with you?`,
         kind: 'choice',
         choices: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'],
         mapsTo: `dep_${i}_months`,
@@ -434,7 +434,7 @@ export function nextDependentQuestion(
     if (dep.sharedCustody === null && CHILD_RELATIONS.includes(dep.relationship as DependentRelationship)) {
       return {
         id: `dep_${i}_custody`,
-        prompt: `Do you share custody of ${label} with another parent or guardian?`,
+        prompt: `Share custody of ${label}?`,
         kind: 'yesno',
         mapsTo: `dep_${i}_shared_custody`,
         dependentIndex: i,
@@ -443,7 +443,7 @@ export function nextDependentQuestion(
     if (dep.sharedCustody === true && dep.isCustodialParent === null) {
       return {
         id: `dep_${i}_custodial`,
-        prompt: `Are you the custodial parent (the child lived with you more nights)?`,
+        prompt: `Did ${label} live with you more nights?`,
         kind: 'yesno',
         mapsTo: `dep_${i}_custodial`,
         dependentIndex: i,

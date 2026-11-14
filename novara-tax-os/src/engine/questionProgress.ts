@@ -44,11 +44,11 @@ export interface InterviewProgress {
 }
 
 const FILING_PROMPTS: { mapsTo: string; prompt: string }[] = [
-  { mapsTo: 'married_dec31', prompt: 'Were you married on December 31 of the tax year?' },
-  { mapsTo: 'married_filing_plan', prompt: 'How are you planning to file?' },
-  { mapsTo: 'potential_dependents', prompt: 'Do you have any children or other people who may qualify as your dependents?' },
-  { mapsTo: 'dependent_count', prompt: 'How many children or other potential dependents do you have?' },
-  { mapsTo: 'maintained_home', prompt: 'Did you pay more than half the cost of maintaining your home?' },
+  { mapsTo: 'married_dec31', prompt: 'Married on Dec 31?' },
+  { mapsTo: 'married_filing_plan', prompt: 'How will you file?' },
+  { mapsTo: 'potential_dependents', prompt: 'Any kids or dependents?' },
+  { mapsTo: 'dependent_count', prompt: 'How many dependents?' },
+  { mapsTo: 'maintained_home', prompt: 'Did you pay most of the home costs?' },
 ]
 
 function statusMeta(status: QuestionStatus): { status: QuestionStatus; statusLabel: string } {
