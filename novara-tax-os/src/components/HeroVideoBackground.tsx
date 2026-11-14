@@ -1,12 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import './HeroVideoBackground.css'
 
-const DESKTOP_SRC = '/media/novara-office-hero.mp4'
-const MOBILE_SRC = '/media/novara-office-hero-mobile.mp4'
-const POSTER = '/media/novara-office-poster.jpg'
+/** 12s Mixkit-licensed cinematic reel (HQ → networking → fintech workspace). */
+const DESKTOP_SRC = '/media/novara-cinematic-hero.mp4'
+const MOBILE_SRC = '/media/novara-cinematic-hero-mobile.mp4'
+const POSTER = '/media/novara-cinematic-poster.jpg'
+/** Legacy paths remain as identical encodes for caches / older builds. */
+const DESKTOP_FALLBACK = '/media/novara-office-hero.mp4'
+const MOBILE_FALLBACK = '/media/novara-office-hero-mobile.mp4'
+const POSTER_FALLBACK = '/media/novara-office-poster.jpg'
 
 /**
- * Full-bleed silent cinematic office video — real human motion.
+ * Full-bleed silent cinematic headquarters video — 12s loop.
  * Reduced-motion / failed playback fall back to the static poster.
  */
 export function HeroVideoBackground() {
@@ -51,9 +56,17 @@ export function HeroVideoBackground() {
   }, [reducedMotion, failed, useMobile])
 
   const showVideo = !reducedMotion && !failed
+  const poster = POSTER
+  const primary = useMobile ? MOBILE_SRC : DESKTOP_SRC
+  const secondary = useMobile ? MOBILE_FALLBACK : DESKTOP_FALLBACK
 
   return (
-    <div className="hero-video-bg" aria-hidden>
+    <div
+      className="hero-video-bg"
+      aria-hidden
+      data-hero-video="novara-cinematic-12s"
+      data-hero-fallback={failed || reducedMotion ? 'static-poster' : 'video'}
+    >
       {showVideo ? (
         <video
           key={useMobile ? 'm' : 'd'}
@@ -64,14 +77,24 @@ export function HeroVideoBackground() {
           loop
           playsInline
           preload="metadata"
-          poster={POSTER}
+          poster={poster}
+          controls={false}
           disablePictureInPicture
           disableRemotePlayback
+          onError={() => setFailed(true)}
         >
-          <source src={useMobile ? MOBILE_SRC : DESKTOP_SRC} type="video/mp4" />
+          <source src={primary} type="video/mp4" />
+          <source src={secondary} type="video/mp4" />
         </video>
       ) : (
-        <img className="hero-video-poster" src={POSTER} alt="" />
+        <img
+          className="hero-video-poster"
+          src={poster}
+          alt=""
+          onError={(e) => {
+            ;(e.currentTarget as HTMLImageElement).src = POSTER_FALLBACK
+          }}
+        />
       )}
       <div className="hero-video-overlay" />
     </div>

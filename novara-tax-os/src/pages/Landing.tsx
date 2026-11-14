@@ -26,43 +26,43 @@ import './Landing.css'
 
 const FEATURES: { title: string; body: string; status: 'live' | 'partial' | 'soon' }[] = [
   {
-    title: 'Zero Manual Tax-Form Entry',
-    body: 'AI extracts information from uploaded documents so you confirm — not re-type — accurate values.',
+    title: 'AI Document Upload & Extraction',
+    body: 'Upload W-2s, 1099s, and IDs — AI extracts the facts so clients confirm values instead of typing tax forms.',
     status: 'live',
   },
   {
-    title: 'AI Tax Assistant',
-    body: 'Answers questions and guides you through filing with a conversational smart interview.',
+    title: 'No Manual Tax Data Entry',
+    body: 'Clients speak, type, or upload into one questionnaire. NOVARA fills the working return from answers and documents.',
     status: 'live',
   },
   {
-    title: 'Maximum Refund Discovery',
-    body: 'Investigates potentially available credits and deductions before the return is considered complete.',
+    title: 'Intelligent Tailored Questions',
+    body: 'Only asks what still matters for this taxpayer — personal, family, income, business, deductions, and credits.',
     status: 'live',
   },
   {
-    title: 'Filing Status Assistance',
-    body: 'Helps evaluate Single, MFJ, MFS, Head of Household, and Qualifying Surviving Spouse eligibility.',
+    title: 'Credits & Deduction Exploration',
+    body: 'Comprehensively explores eligible deductions and tax credits, then applies allowable amounts to the live refund projection.',
     status: 'live',
   },
   {
-    title: 'Dependent & Childcare Benefits',
-    body: 'Evaluates family-related credits and asks follow-ups only when they may apply.',
+    title: 'Personal & Business Returns',
+    body: 'Supports personal and business tax return preparation, including self-employment follow-ups like mileage and QBI screening.',
     status: 'live',
   },
   {
-    title: 'Education Benefits',
-    body: 'Checks qualifying tuition, student loan interest, and education credit alternatives.',
+    title: 'Preparers & Tax Offices',
+    body: 'Unified workflows for tax clients, independent preparers, and offices — inbox, clients, pipeline, and transparent pricing.',
     status: 'live',
   },
   {
-    title: 'Business Tax Deductions',
-    body: 'Explores eligible self-employment and business expenses, including QBI screening.',
+    title: 'Secure Document Management',
+    body: 'Session-scoped Tax Vault keeps uploaded documents and extracted facts organized for review.',
     status: 'live',
   },
   {
-    title: 'Homeownership Benefits',
-    body: 'Evaluates mortgage interest, property tax, and related itemized vs standard comparisons.',
+    title: 'Human Review Before E-File',
+    body: 'Human review and verification remain required before electronic filing — NOVARA assists; it does not skip legal checks.',
     status: 'live',
   },
   {
@@ -71,8 +71,8 @@ const FEATURES: { title: string; body: string; status: 'live' | 'partial' | 'soo
     status: 'partial',
   },
   {
-    title: 'Secure Document Storage',
-    body: 'Session-scoped Tax Vault stores uploaded documents and extracted facts in this demo environment.',
+    title: 'Filing Status Assistance',
+    body: 'Helps evaluate Single, MFJ, MFS, Head of Household, and Qualifying Surviving Spouse eligibility.',
     status: 'live',
   },
   {
@@ -170,25 +170,34 @@ export function Landing() {
             <div className="hero-nav-actions">
               <MusicControls compact className="landing-music" />
               <a className="nav-text" href="#how">
-                How it works
+                See How It Works
               </a>
               <Link className="btn btn-secondary landing-ghost" to="/login?intent=professional">
                 Tax pros
               </Link>
               <button className="btn btn-primary hero-solid" type="button" onClick={() => goToPrepare()}>
-                Start Filing
+                Get Started
               </button>
             </div>
           </nav>
 
           <div className="hero-copy">
             <p className="hero-brand brand rise">NOVARA TAX OS</p>
-            <h1 className="rise rise-delay-1">Speak It. Upload It. File It.</h1>
-            <p className="hero-tagline rise rise-delay-2">Your AI-powered tax preparation experience.</p>
+            <h1 className="rise rise-delay-1">The Future of Tax Preparation Is Here.</h1>
+            <p className="hero-tagline rise rise-delay-2">Upload. Answer. Done.</p>
             <p className="lead rise rise-delay-2">
-              Tell NOVARA what you’re filing — speak or type in the same place — or upload documents. One questionnaire
-              with tabs for everything still needed.
+              Experience intelligent, AI-powered tax preparation designed to eliminate manual data entry, explore
+              eligible tax deductions and credits, and help maximize lawful tax refunds.
             </p>
+
+            <div className="hero-actions rise rise-delay-2">
+              <button className="btn btn-primary hero-solid" type="button" onClick={() => goToPrepare()}>
+                Get Started
+              </button>
+              <a className="btn btn-secondary landing-ghost" href="#how">
+                See How It Works
+              </a>
+            </div>
 
             <div
               className={`hero-compose rise rise-delay-3 ${drag ? 'drag' : ''}`}
@@ -200,7 +209,7 @@ export function Landing() {
               onDrop={onDrop}
             >
               <label className="hero-compose-label" htmlFor="heroIntent">
-                Tell NOVARA what you need
+                Or speak, type, or upload to begin
               </label>
               <input
                 id="heroIntent"
@@ -241,7 +250,7 @@ export function Landing() {
                   type="button"
                   onClick={() => submitIntent(draft)}
                 >
-                  {draft.trim() ? 'Continue' : 'Start Filing'}
+                  {draft.trim() ? 'Continue' : 'Get Started'}
                 </button>
                 <input
                   ref={fileRef}
@@ -253,7 +262,8 @@ export function Landing() {
                 />
               </div>
               <p className="hero-compose-note">
-                No Speak / Type / Upload tabs — one entrance. Voice is optional. Music starts after you interact.
+                One entrance — speak, type, or upload into the same questionnaire. Refunds are maximized only when
+                answers and documents support them; human review is required before e-file.
               </p>
             </div>
           </div>
@@ -265,7 +275,8 @@ export function Landing() {
           <p className="landing-kicker">How NOVARA works</p>
           <h2>One questionnaire. Three ways to answer.</h2>
           <p className="section-lead">
-            Speak, type, or upload into the same return. Tabs show what’s complete and what’s still unanswered.
+            Speak, type, or upload into the same return. Tabs show what’s complete and what’s still unanswered — then
+            NOVARA explores eligible credits before you review and file.
           </p>
           <div className="steps-grid">
             {[
@@ -285,8 +296,12 @@ export function Landing() {
 
       <section className="section soft">
         <div className="container">
-          <p className="landing-kicker">Capabilities</p>
-          <h2>Built for accurate preparation</h2>
+          <p className="landing-kicker">Why NOVARA</p>
+          <h2>Professional tax technology, exceptionally simple</h2>
+          <p className="section-lead">
+            Built for taxpayers, preparers, and offices — AI-assisted preparation with secure documents and human
+            verification before electronic filing.
+          </p>
           <div className="feature-grid">
             {FEATURES.map((f) => (
               <article key={f.title} className="feature-card">

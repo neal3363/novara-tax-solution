@@ -105,10 +105,16 @@
 
 .hero-copy h1 {
   margin: 0 0 0.75rem;
-  font-size: clamp(1.55rem, 4.2vw, 2.35rem);
-  line-height: 1.15;
+  font-size: clamp(1.55rem, 4.2vw, 2.45rem);
+  line-height: 1.12;
   font-weight: 700;
-  max-width: 18ch;
+  max-width: 16ch;
+}
+
+.hero-actions .btn {
+  min-height: 2.85rem;
+  padding-inline: 1.25rem;
+  font-weight: 700;
 }
 
 .hero-tagline {

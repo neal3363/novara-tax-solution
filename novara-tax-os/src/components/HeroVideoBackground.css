@@ -3,7 +3,10 @@
   inset: 0;
   z-index: 0;
   overflow: hidden;
-  background: #062e2b;
+  /* Premium static fallback when video is unavailable */
+  background:
+    radial-gradient(1200px 600px at 70% 30%, rgba(37, 99, 235, 0.22), transparent 55%),
+    linear-gradient(145deg, #0a1628 0%, #0f2744 42%, #163a5c 100%);
 }
 
 .hero-video-el,
@@ -16,13 +19,27 @@
   object-position: center;
 }
 
+@media (max-width: 768px) {
+  .hero-video-el,
+  .hero-video-poster {
+    object-position: 58% center;
+  }
+}
+
 .hero-video-overlay {
   position: absolute;
   inset: 0;
-  /* Readable text without hiding lobby walkers / desk activity */
+  /* Dark navy gradient for text readability over cinematic footage */
   background:
-    linear-gradient(105deg, rgba(4, 28, 26, 0.72) 0%, rgba(6, 46, 43, 0.48) 45%, rgba(8, 53, 49, 0.28) 100%),
-    linear-gradient(0deg, rgba(4, 20, 18, 0.42) 0%, transparent 48%);
+    linear-gradient(
+      105deg,
+      rgba(6, 14, 32, 0.82) 0%,
+      rgba(10, 22, 48, 0.62) 42%,
+      rgba(12, 28, 58, 0.38) 72%,
+      rgba(15, 35, 70, 0.28) 100%
+    ),
+    linear-gradient(0deg, rgba(4, 10, 24, 0.55) 0%, transparent 46%),
+    linear-gradient(180deg, rgba(8, 16, 36, 0.35) 0%, transparent 28%);
   pointer-events: none;
 }
 
