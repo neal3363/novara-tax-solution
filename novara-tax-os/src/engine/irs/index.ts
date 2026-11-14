@@ -75,7 +75,22 @@ export { computeForm8863 } from './forms/form8863'
 export { computeScheduleB } from './forms/scheduleB'
 export { computeScheduleD } from './forms/scheduleD'
 export { computeScheduleE } from './forms/scheduleE'
+export { computeForm8582, computeSpecialAllowanceCeiling } from './forms/form8582'
+export { computeForm8949 } from './forms/form8949'
 export { computeForm6251 } from './forms/form6251Amt'
 export { computeForm8960 } from './forms/form8960Niit'
 export { computeForm1040X } from './forms/form1040x'
 export { PHASE4_GOLDEN_FIXTURES } from './golden/phase4Fixtures'
+export { PHASE5_GOLDEN_FIXTURES } from './golden/phase5Fixtures'
+export {
+  runInternalShadowSuite,
+  isAuthorizedShadowTester,
+  listAuthorizedShadowTesters,
+  shadowCompareIrsInputs,
+} from './shadowTesting'
+export {
+  CUTOVER_CRITERIA,
+  cutoverReady,
+  cutoverBlockingCriteria,
+  formatCutoverCriteriaReport,
+} from './cutoverCriteria'

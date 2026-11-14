@@ -89,17 +89,39 @@ export interface IrsReturnInput {
   ordinaryDividends?: number
   qualifiedDividends?: number
   foreignAccounts?: boolean
-  /** Schedule D */
+  /** Schedule D / Form 8949 */
   shortTermCapitalGainLoss?: number
   longTermCapitalGainLoss?: number
   shortTermCapitalLossCarryover?: number
   longTermCapitalLossCarryover?: number
-  /** Schedule E */
+  unrecaptured1250Gain?: number
+  collectibles28Gain?: number
+  form8949Transactions?: {
+    description?: string
+    dateAcquired?: string
+    dateSold?: string
+    proceeds: number
+    costBasis: number
+    adjustments?: number
+    longTerm?: boolean
+    rateGroup?: 'ordinary' | 'preferential' | 'collectibles28' | 'unrecaptured1250'
+  }[]
+  /** Schedule E / Form 8582 */
   rentalIncome?: number
   rentalExpenses?: number
   rentalActivelyParticipating?: boolean
+  rentalRealEstateProfessional?: boolean
+  rentalPriorSuspendedLoss?: number
+  rentalEntirelyDisposed?: boolean
   royaltyIncome?: number
   k1OrdinaryIncome?: number
+  k1Passive?: boolean
+  k1PriorSuspendedLoss?: number
+  mfsLivedApartAllYear?: boolean
+  /** Form 6251 additional preferences */
+  privateActivityBondInterest?: number
+  isoBargainElement?: number
+  amtDepreciationAdjustment?: number
   /** Form 8863 */
   educationStudents?: {
     creditType: 'aotc' | 'llc'
@@ -142,6 +164,10 @@ export interface IrsReturnResult {
   scheduleBInterestDividends: number
   scheduleDNet: number
   scheduleENet: number
+  suspendedPassiveLoss: number
+  unrecaptured1250Applied: number
+  collectibles28Applied: number
+  unsupportedCases: string[]
   taxAfterCredits: number
   totalPayments: number
   refundOrBalanceDue: number

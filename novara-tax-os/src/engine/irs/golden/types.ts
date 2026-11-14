@@ -25,6 +25,9 @@ export interface GoldenExpected {
   scheduleBInterestDividends?: number
   scheduleDNet?: number
   scheduleENet?: number
+  suspendedPassiveLoss?: number
+  unrecaptured1250Applied?: number
+  collectibles28Applied?: number
   refundOrBalanceDue: number
 }
 

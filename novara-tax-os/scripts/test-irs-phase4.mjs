@@ -75,7 +75,10 @@ assert(f8863.totalRefundable === 1000, 'AOTC refundable 1000 got ' + f8863.total
 assert(f8863.productionReady === false, '8863 not production')
 
 assert(computeScheduleB({ taxableInterest: 2000, ordinaryDividends: 1000 }).agiInclusion === 3000, 'Sch B')
-assert(computeScheduleE({ properties: [{ rentsReceived: 24000, expenses: 10000, activelyParticipating: true }] }).agiInclusion === 14000, 'Sch E')
+assert(computeScheduleE({
+  taxYear: 2025, filingStatus: 'single', magiBeforePassiveLosses: 50000,
+  properties: [{ rentsReceived: 24000, expenses: 10000, activelyParticipating: true }],
+}).agiInclusion === 14000, 'Sch E')
 assert(computeForm8960({ filingStatus: 'single', magi: 250000, netInvestmentIncome: 50000 }).niit === 1900, 'NIIT')
 assert(computeForm6251({
   taxYear: 2025, filingStatus: 'single', taxableIncome: 235000, regularTax: 32000,

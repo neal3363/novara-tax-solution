@@ -12,6 +12,7 @@ import { computeForm8960 } from './forms/form8960Niit'
 import { computeForm8962 } from './forms/form8962'
 import { computeForm8995A } from './forms/form8995A'
 import { computeScheduleB } from './forms/scheduleB'
+import { computeForm8949 } from './forms/form8949'
 import { computeScheduleD } from './forms/scheduleD'
 import { computeScheduleE } from './forms/scheduleE'
 import { sourcesForYear } from './sources'
@@ -138,6 +139,10 @@ function emptyResult(
     scheduleBInterestDividends: 0,
     scheduleDNet: 0,
     scheduleENet: 0,
+    suspendedPassiveLoss: 0,
+    unrecaptured1250Applied: 0,
+    collectibles28Applied: 0,
+    unsupportedCases: [],
     taxAfterCredits: 0,
     totalPayments: 0,
     refundOrBalanceDue: 0,
@@ -151,8 +156,8 @@ export function computeIrsFederalReturn(input: IrsReturnInput): IrsReturnResult 
   const tables = getYearTables(input.taxYear)
   const limitations: string[] = [
     'Isolated IRS module — not connected to live UI / benefitOptimizer.',
-    'NOT production-ready — dual-run / golden validation only.',
-    'Schedule E passive loss (Form 8582) is isolated-partial.',
+    'NOT production-ready — dual-run / shadow / golden validation only.',
+    'Form 8582 integrated with Schedule E; PTP / complex conversions may be unsupported.',
     'ACTC uses Schedule 8812 earned-income formula (simplified ordering).',
   ]
   if (!tables) {
@@ -160,6 +165,7 @@ export function computeIrsFederalReturn(input: IrsReturnInput): IrsReturnResult 
   }
 
   const notes: string[] = []
+  const unsupportedCases: string[] = []
   const deps = input.dependents ?? []
   const se = computeSeTax(input.selfEmploymentNetProfit, tables)
   const educator = Math.min(input.educatorExpenses ?? 0, tables.educatorExpenseMax)
@@ -174,66 +180,103 @@ export function computeIrsFederalReturn(input: IrsReturnInput): IrsReturnResult 
     foreignAccounts: input.foreignAccounts,
   })
 
-  // Schedule E
+  // Form 8949 → Schedule D aggregates
+  const f8949 =
+    input.form8949Transactions && input.form8949Transactions.length > 0
+      ? computeForm8949({ transactions: input.form8949Transactions })
+      : null
+  if (f8949) {
+    notes.push(...f8949.notes)
+    unsupportedCases.push(...f8949.unsupportedCases)
+  }
+
+  const hasSchD =
+    !!f8949 ||
+    (input.shortTermCapitalGainLoss ?? 0) !== 0 ||
+    (input.longTermCapitalGainLoss ?? 0) !== 0 ||
+    (input.shortTermCapitalLossCarryover ?? 0) !== 0 ||
+    (input.longTermCapitalLossCarryover ?? 0) !== 0 ||
+    (input.unrecaptured1250Gain ?? 0) > 0 ||
+    (input.collectibles28Gain ?? 0) > 0
+
+  let capitalForAgi = 0
+  if (hasSchD) {
+    const stBase = f8949 ? f8949.shortTermTotal : Math.round(input.shortTermCapitalGainLoss ?? 0)
+    const ltBase = f8949 ? f8949.longTermTotal : Math.round(input.longTermCapitalGainLoss ?? 0)
+    const st =
+      stBase - Math.max(0, Math.round(input.shortTermCapitalLossCarryover ?? 0))
+    const lt =
+      ltBase - Math.max(0, Math.round(input.longTermCapitalLossCarryover ?? 0))
+    const net = st + lt
+    const lossLimit = input.filingStatus === 'mfs' ? 1500 : 3000
+    capitalForAgi = net >= 0 ? net : -Math.min(lossLimit, -net)
+  }
+
+  // MAGI before passive losses (for Form 8582 special-allowance phaseout)
+  const magiBeforePassive = Math.max(
+    0,
+    Math.round(
+      input.wages +
+        input.selfEmploymentNetProfit -
+        se.deductibleHalf -
+        educator -
+        studentLoan +
+        schB.agiInclusion +
+        capitalForAgi,
+    ),
+  )
+
+  // Schedule E + Form 8582
   const hasSchE =
     (input.rentalIncome ?? 0) > 0 ||
     (input.rentalExpenses ?? 0) > 0 ||
     (input.royaltyIncome ?? 0) > 0 ||
-    (input.k1OrdinaryIncome ?? 0) !== 0
+    (input.k1OrdinaryIncome ?? 0) !== 0 ||
+    (input.rentalPriorSuspendedLoss ?? 0) > 0 ||
+    (input.k1PriorSuspendedLoss ?? 0) > 0 ||
+    !!input.rentalEntirelyDisposed
   const schE = hasSchE
     ? computeScheduleE({
+        taxYear: input.taxYear,
+        filingStatus: input.filingStatus,
+        magiBeforePassiveLosses: magiBeforePassive,
+        mfsLivedApartAllYear: input.mfsLivedApartAllYear,
         properties:
           (input.rentalIncome ?? 0) > 0 ||
           (input.rentalExpenses ?? 0) > 0 ||
-          (input.royaltyIncome ?? 0) > 0
+          (input.royaltyIncome ?? 0) > 0 ||
+          (input.rentalPriorSuspendedLoss ?? 0) > 0 ||
+          !!input.rentalEntirelyDisposed
             ? [
                 {
                   rentsReceived: input.rentalIncome ?? 0,
                   royaltiesReceived: input.royaltyIncome ?? 0,
                   expenses: input.rentalExpenses ?? 0,
                   activelyParticipating: input.rentalActivelyParticipating ?? true,
+                  realEstateProfessional: input.rentalRealEstateProfessional,
+                  priorSuspendedPassiveLoss: input.rentalPriorSuspendedLoss,
+                  entirelyDisposed: input.rentalEntirelyDisposed,
                 },
               ]
             : [],
         k1s:
-          input.k1OrdinaryIncome !== undefined
-            ? [{ ordinaryIncome: input.k1OrdinaryIncome, passive: false }]
+          input.k1OrdinaryIncome !== undefined || (input.k1PriorSuspendedLoss ?? 0) > 0
+            ? [
+                {
+                  ordinaryIncome: input.k1OrdinaryIncome ?? 0,
+                  passive: input.k1Passive ?? true,
+                  priorSuspendedPassiveLoss: input.k1PriorSuspendedLoss,
+                },
+              ]
             : [],
       })
     : null
-  if (schE) notes.push(...schE.notes)
-
-  // Schedule D net for AGI (gains/losses before preferential tax)
-  const hasSchD =
-    (input.shortTermCapitalGainLoss ?? 0) !== 0 ||
-    (input.longTermCapitalGainLoss ?? 0) !== 0 ||
-    (input.shortTermCapitalLossCarryover ?? 0) !== 0 ||
-    (input.longTermCapitalLossCarryover ?? 0) !== 0
-
-  // Preliminary AGI pieces before capital loss limitation needs TI — use Sch D net then limit loss
-  let capitalForAgi = 0
-  if (hasSchD) {
-    const st =
-      Math.round(input.shortTermCapitalGainLoss ?? 0) -
-      Math.max(0, Math.round(input.shortTermCapitalLossCarryover ?? 0))
-    const lt =
-      Math.round(input.longTermCapitalGainLoss ?? 0) -
-      Math.max(0, Math.round(input.longTermCapitalLossCarryover ?? 0))
-    const net = st + lt
-    const lossLimit = input.filingStatus === 'mfs' ? 1500 : 3000
-    capitalForAgi = net >= 0 ? net : -Math.min(lossLimit, -net)
+  if (schE) {
+    notes.push(...schE.notes)
+    unsupportedCases.push(...schE.unsupportedCases)
   }
 
-  let agi =
-    input.wages +
-    input.selfEmploymentNetProfit -
-    se.deductibleHalf -
-    educator -
-    studentLoan +
-    schB.agiInclusion +
-    capitalForAgi +
-    (schE?.agiInclusion ?? 0)
-  agi = Math.max(0, Math.round(agi))
+  let agi = Math.max(0, Math.round(magiBeforePassive + (schE?.agiInclusion ?? 0)))
 
   const standard = tables.standardDeduction[input.filingStatus]
   const itemized = computeItemized(input, tables, agi)
@@ -288,18 +331,26 @@ export function computeIrsFederalReturn(input: IrsReturnInput): IrsReturnResult 
   // Preferential capital gains tax when Schedule D / QD present
   let incomeTaxBeforeCredits = taxFromBrackets(taxableIncome, tables.brackets[input.filingStatus])
   let scheduleDNet = capitalForAgi
+  let unrecaptured1250Applied = 0
+  let collectibles28Applied = 0
   if (hasSchD || (input.qualifiedDividends ?? 0) > 0) {
     const schD = computeScheduleD({
       filingStatus: input.filingStatus,
-      shortTermGainLoss: input.shortTermCapitalGainLoss ?? 0,
-      longTermGainLoss: input.longTermCapitalGainLoss ?? 0,
+      shortTermGainLoss: f8949 ? f8949.shortTermTotal : (input.shortTermCapitalGainLoss ?? 0),
+      longTermGainLoss: f8949 ? f8949.longTermTotal : (input.longTermCapitalGainLoss ?? 0),
       shortTermCarryover: input.shortTermCapitalLossCarryover,
       longTermCarryover: input.longTermCapitalLossCarryover,
       qualifiedDividends: input.qualifiedDividends ?? schB.qualifiedDividends,
+      unrecaptured1250Gain: input.unrecaptured1250Gain,
+      collectibles28Gain: input.collectibles28Gain,
+      form8949: f8949 ?? undefined,
       taxableIncome,
       tables,
     })
     scheduleDNet = schD.netCapitalGainLoss
+    unrecaptured1250Applied = schD.unrecaptured1250Applied
+    collectibles28Applied = schD.collectibles28Applied
+    unsupportedCases.push(...schD.unsupportedCases)
     if (schD.netCapitalGain + (input.qualifiedDividends ?? schB.qualifiedDividends) > 0) {
       incomeTaxBeforeCredits = schD.taxWithPreferentialRates
       notes.push(...schD.notes)
@@ -315,17 +366,20 @@ export function computeIrsFederalReturn(input: IrsReturnInput): IrsReturnResult 
     standardDeductionTaken: usedItemized ? 0 : standard,
     usedItemized,
     saltDeducted,
+    privateActivityBondInterest: input.privateActivityBondInterest,
+    isoBargainElement: input.isoBargainElement,
+    depreciationAdjustment: input.amtDepreciationAdjustment,
   })
   const amt = amtRes.amt
-  if (amt > 0) notes.push(...amtRes.notes)
+  unsupportedCases.push(...amtRes.unsupportedCases)
+  if (amt > 0 || amtRes.adjustmentsTotal > 0) notes.push(...amtRes.notes)
 
   // Form 8960 NIIT
   const nii =
     schB.taxableInterest +
     schB.ordinaryDividends +
     Math.max(0, capitalForAgi) +
-    Math.max(0, schE?.rentalNet ?? 0) +
-    Math.max(0, schE?.royaltyNet ?? 0) +
+    Math.max(0, schE?.agiInclusion ?? 0) +
     (input.investmentIncome ?? 0)
   const niitRes = computeForm8960({
     filingStatus: input.filingStatus,
@@ -454,6 +508,10 @@ export function computeIrsFederalReturn(input: IrsReturnInput): IrsReturnResult 
     scheduleBInterestDividends: schB.agiInclusion,
     scheduleDNet,
     scheduleENet: schE?.agiInclusion ?? 0,
+    suspendedPassiveLoss: schE?.suspendedPassiveLoss ?? 0,
+    unrecaptured1250Applied,
+    collectibles28Applied,
+    unsupportedCases: [...new Set(unsupportedCases)],
     taxAfterCredits: Math.round(netTax),
     totalPayments: input.withholding,
     refundOrBalanceDue,
@@ -466,6 +524,8 @@ export function computeIrsFederalReturn(input: IrsReturnInput): IrsReturnResult 
       scheduleB: FORM_READINESS.scheduleB,
       scheduleD: FORM_READINESS.scheduleD,
       scheduleE: FORM_READINESS.scheduleE,
+      form8582: FORM_READINESS.form8582,
+      form8949: FORM_READINESS.form8949,
       form6251Amt: FORM_READINESS.form6251Amt,
       form8960Niit: FORM_READINESS.form8960Niit,
       form1040x: FORM_READINESS.form1040x,

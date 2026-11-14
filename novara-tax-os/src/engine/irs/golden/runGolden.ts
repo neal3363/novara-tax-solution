@@ -44,6 +44,9 @@ export function runGoldenFixture(fixture: GoldenFixture): GoldenCheckResult[] {
     checkField(fixture, 'scheduleBInterestDividends', e.scheduleBInterestDividends, r.scheduleBInterestDividends),
     checkField(fixture, 'scheduleDNet', e.scheduleDNet, r.scheduleDNet),
     checkField(fixture, 'scheduleENet', e.scheduleENet, r.scheduleENet),
+    checkField(fixture, 'suspendedPassiveLoss', e.suspendedPassiveLoss, r.suspendedPassiveLoss),
+    checkField(fixture, 'unrecaptured1250Applied', e.unrecaptured1250Applied, r.unrecaptured1250Applied),
+    checkField(fixture, 'collectibles28Applied', e.collectibles28Applied, r.collectibles28Applied),
     checkField(fixture, 'refundOrBalanceDue', e.refundOrBalanceDue, r.refundOrBalanceDue),
   ]
   return checks.filter((c): c is GoldenCheckResult => c != null)

@@ -80,9 +80,9 @@ export function stubScheduleE(): StubResult {
     isolatedImplemented: true,
     supported: true,
     productionReady: false,
-    readiness: 'isolated-partial',
-    message: 'Isolated Schedule E rental/K-1; Form 8582 passive limitation not complete.',
-    nextStep: 'Implement Form 8582 before claiming Schedule E complete.',
+    readiness: 'isolated-validated',
+    message: 'Isolated Schedule E with Form 8582; PTP/REP edge cases may be unsupported. Not production-ready.',
+    nextStep: 'Keep dual-run/shadow only until cutover approval.',
   }
 }
 
