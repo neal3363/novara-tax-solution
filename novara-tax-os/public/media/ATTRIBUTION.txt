@@ -1,18 +1,23 @@
 NOVARA Tax OS — ambient media attribution
 ========================================
 
-Video (silent 12-second cinematic homepage hero — luxury buildings → business deal → advisor/client → preparer team):
-- Mixkit Free License stock clips (Envato), re-encoded and crossfaded for NOVARA:
+Video (silent 12-second cinematic homepage hero — luxury buildings → Black woman professional → Black man & woman handshake → Black advisor/client review):
+- Mixkit Free License stock clips (Envato), re-encoded for NOVARA:
   https://mixkit.co/license/#videoFree
   Scene 1 (0–3s): Clouds moving above a glass skyscraper — Mixkit #27725
-  Scene 2 (3–6s): Silhouette of business handshake in skyscraper — Mixkit #15795
-  Scene 3 (6–9s): Top view of business handshake and client meeting — Mixkit #5537
-  Scene 4 (9–12s): Brainstorming over the meeting table — Mixkit #46680
+  Scene 2 (3–6s): Focused woman in a professional setting (Afro-American businesswoman) — Mixkit #100322
+    https://mixkit.co/free-stock-video/focused-woman-in-a-professional-setting-100322/
+  Scenes 3–4 (6–12s): Original cinematic stills produced for NOVARA depicting Black men and Black women
+    in tax/office advisory contexts (handshake; advisor/client document review), animated with subtle
+    camera push for the loop. Source stills archived under public/media/hero-source/.
   Delivery: 12.0s loop, muted, 24 fps
     - novara-cinematic-hero.webm (VP9) + novara-cinematic-hero.mp4 (H.264 Constrained Baseline, yuv420p, 1080p)
     - novara-cinematic-hero-mobile.webm / .mp4 (960×540)
     - novara-cinematic-poster.jpg
   Legacy aliases: novara-office-hero*.mp4 / novara-office-poster.jpg (same baseline encodes).
+
+Demographic note (2026-11-14): People scenes intentionally include Black men and Black women so the
+hero reel is not limited to a single demographic.
 
 Audio:
 - “Soul Jazz” by Francisco Alvear — Mixkit Stock Music Free License
