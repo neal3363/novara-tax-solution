@@ -8,6 +8,7 @@ import { VoiceInput } from '../components/VoiceInput'
 import { useAmbientAudio } from '../ambient/AmbientAudioContext'
 import { detectFilingIntent } from '../engine/conversationIntent'
 import { PUBLIC_DEMO_BANNER, isPublicDemoMode } from '../engine/demo/publicDemo'
+import { stashLandingUploads } from '../engine/pendingLandingUploads'
 import { actions } from '../store/useAppStore'
 import {
   OFFICE_SUBSCRIPTION_BUSINESS,
@@ -104,12 +105,23 @@ export function Landing() {
   const [typed, setTyped] = useState('')
   const [pendingVoice, setPendingVoice] = useState<string | null>(null)
   const [drag, setDrag] = useState(false)
+  const [uploadNote, setUploadNote] = useState<string | null>(null)
 
   function unlockAudio() {
     ambient.enterAndPlay()
   }
 
-  function goToPrepare(opts?: { intent?: string; upload?: boolean }) {
+  function ensureWorkspace() {
+    // Public host: open the questionnaire directly — do not send people through
+    // Cursor apps-gate (that path shows a dead “page doesn’t exist” screen).
+    if (!import.meta.env.DEV) {
+      actions.loginAsPublicGuest()
+      return true
+    }
+    return false
+  }
+
+  function goToPrepare(opts?: { intent?: string; uploadedCount?: number }) {
     unlockAudio()
     if (opts?.intent) {
       try {
@@ -118,16 +130,40 @@ export function Landing() {
         /* ignore */
       }
     }
-    const q = opts?.upload ? '?upload=1' : ''
+    const q =
+      opts?.uploadedCount && opts.uploadedCount > 0
+        ? `?uploaded=${opts.uploadedCount}`
+        : ''
     const dest = `/app/taxpayer/prepare${q}`
-    // Public host: open the questionnaire directly — do not send people through
-    // Cursor apps-gate (that path shows a dead “page doesn’t exist” screen).
-    if (!import.meta.env.DEV) {
-      actions.loginAsPublicGuest()
+    if (ensureWorkspace()) {
       navigate(dest)
       return
     }
     navigate(`/login?next=${encodeURIComponent(dest)}`)
+  }
+
+  function beginWithFiles(files: FileList | File[] | null | undefined) {
+    unlockAudio()
+    const list = files ? Array.from(files) : []
+    if (list.length === 0) {
+      setUploadNote('Choose one or more documents (W-2s, 1099s, IDs, receipts) to upload together.')
+      return
+    }
+    // Public demo: open guest workspace and classify into the vault immediately.
+    if (ensureWorkspace()) {
+      actions.uploadFiles(list)
+      setUploadNote(
+        `${list.length} document${list.length === 1 ? '' : 's'} sorted into your return. Add more anytime for credits you discover later.`,
+      )
+      goToPrepare({ uploadedCount: list.length })
+      return
+    }
+    // DEV login gate: stash in-tab until Prepare mounts after login.
+    stashLandingUploads(list)
+    setUploadNote(
+      `${list.length} document${list.length === 1 ? '' : 's'} ready — they will sort into your return after you continue.`,
+    )
+    goToPrepare({ uploadedCount: list.length })
   }
 
   function submitIntent(raw: string) {
@@ -147,9 +183,7 @@ export function Landing() {
   function onDrop(e: DragEvent) {
     e.preventDefault()
     setDrag(false)
-    unlockAudio()
-    // Files can't cross login easily — stash flag and open prepare upload
-    goToPrepare({ upload: true })
+    beginWithFiles(e.dataTransfer.files)
   }
 
   const draft = pendingVoice ?? typed
@@ -227,6 +261,7 @@ export function Landing() {
               />
               <div className="hero-compose-actions">
                 <VoiceInput
+                  compact
                   labelStart="Speak"
                   labelStop="Stop"
                   onTranscript={(text) => {
@@ -243,7 +278,7 @@ export function Landing() {
                     fileRef.current?.click()
                   }}
                 >
-                  Upload Documents
+                  Upload all documents
                 </button>
                 <button
                   className="btn btn-primary hero-solid"
@@ -258,12 +293,21 @@ export function Landing() {
                   multiple
                   hidden
                   accept=".pdf,.png,.jpg,.jpeg,.webp,.heic,.json"
-                  onChange={() => goToPrepare({ upload: true })}
+                  onChange={(e) => {
+                    beginWithFiles(e.target.files)
+                    e.target.value = ''
+                  }}
                 />
               </div>
+              {uploadNote && (
+                <p className="hero-compose-note" role="status">
+                  {uploadNote}
+                </p>
+              )}
               <p className="hero-compose-note">
-                One entrance — speak, type, or upload into the same questionnaire. Refunds are maximized only when
-                answers and documents support them; human review is required before e-file.
+                Speak your situation, type it, or drop every document at once — W-2s, 1099s, IDs, and receipts. NOVARA
+                sorts each file into the right place. If you learn about a credit later, upload supporting docs anytime
+                from Documents or the Vault. Human review is required before e-file.
               </p>
             </div>
           </div>
@@ -288,9 +332,18 @@ export function Landing() {
           </p>
           <div className="steps-grid">
             {[
-              ['STEP 1 — TELL OR UPLOAD', 'Say what you’re filing, or drop W-2s and IDs. Either path opens the same workspace.'],
-              ['STEP 2 — QUESTIONNAIRE TABS', 'Personal, filing status, dependents, income, business, deductions, credits, review.'],
-              ['STEP 3 — FILL GAPS ONLY', 'NOVARA asks what’s still missing. Green = answered, orange = still needed.'],
+              [
+                'STEP 1 — SPEAK OR UPLOAD ALL',
+                'Use the mic, type, or upload every document you have at once. Files are sorted into your return automatically.',
+              ],
+              [
+                'STEP 2 — QUESTIONNAIRE TABS',
+                'Personal, filing status, dependents, income, business, deductions, credits, review — one workspace.',
+              ],
+              [
+                'STEP 3 — FILL GAPS & ADD LATER',
+                'NOVARA asks what’s still missing. Discover a credit mid-way? Upload the receipt later — it still routes correctly.',
+              ],
               ['STEP 4 — REVIEW & FILE', 'Confirm the estimate, sign, and complete preparation without blank tax forms.'],
             ].map(([t, b]) => (
               <div key={t}>

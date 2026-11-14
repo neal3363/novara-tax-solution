@@ -53,7 +53,8 @@ export function DocumentsNeeded() {
       </header>
 
       <p className="muted" style={{ maxWidth: '42rem' }}>
-        NOVARA only lists documents relevant to your return. Items already uploaded and matched are marked received. Optional
+        NOVARA only lists documents relevant to your return. Upload everything you have now, or add supporting files later when
+        you discover a credit. Items already uploaded and matched are marked received. Optional
         receipts can wait — they don’t block an initial calculation.
       </p>
 
