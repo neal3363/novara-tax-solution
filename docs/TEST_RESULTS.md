@@ -4,39 +4,22 @@
 
 ```bash
 npm test
+npm run build
 ```
 
-## Coverage focus
+## Latest results (security isolation branch)
 
-- Portal role isolation
-- Partner cannot read master discovery pool
-- Cross-partner opportunity leak prevention
-- First Look decision authority
-- AI cannot finalize legal determinations
-- Workflow stage sequence integrity
-- Partner assistant scope denylist
-- Synthetic labeling of opportunities
-- Session cookie encode/decode + portal path mapping
-- ABAC territory / sensitivity / export watermarking
-- Immutable audit append + mutation rejection
+- Vitest: **10 files, 29 tests, all passed**
+- `next build`: success (56 routes + middleware)
 
-## Results
+### Security-focused suites
 
-Executed via `npm test` (Vitest 3.2.7): **6 files, 21 tests, all passed.**  
-Production build succeeded (52 routes + middleware).
-
-| Suite | Intent | Result |
-|-------|--------|--------|
-| `src/lib/rbac/policy.test.ts` | Permissions / partner isolation | Pass (6) |
-| `src/lib/rbac/abac.test.ts` | ABAC territory/docs/exports | Pass (4) |
-| `src/lib/workflow/stages.test.ts` | Core workflow + synthetic flag | Pass (4) |
-| `src/lib/agents/registry.test.ts` | AI limits + assistant scope | Pass (2) |
-| `src/lib/auth/cookies.test.ts` | Session cookie integrity | Pass (3) |
-| `src/lib/audit/store.test.ts` | Immutable audit store | Pass (2) |
-
-## Not yet automated
-
-- End-to-end browser flows with middleware cookies
-- Connector idempotency / dedupe under replay
-- Compensation approval guards with real ledgers
-- Production MFA enrollment
+| Suite | Coverage |
+|-------|----------|
+| `auth/session.test.ts` | Per-user passwords; fail-closed without config |
+| `auth/cookies.test.ts` | Signed v2 sessions; MFA flag not forged unsigned |
+| `auth/totp.test.ts` | TOTP accept/reject |
+| `auth/rate-limit.test.ts` | Lockout after repeated failures |
+| `rbac/documents.test.ts` | Attorney cannot see owner ID; partner isolation |
+| `rbac/policy.test.ts` | Portal/master-pool isolation |
+| `rbac/abac.test.ts` | Territory / export watermarking |

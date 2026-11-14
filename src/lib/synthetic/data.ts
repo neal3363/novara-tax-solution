@@ -212,6 +212,8 @@ export const documents: DocumentVaultItem[] = [
     uploadedAt: "2026-11-12T18:20:00Z",
     sensitivity: "sensitive",
     ownerId: "usr_owner_221",
+    caseIds: ["case_owner_221"],
+    authorizedOrganizationIds: ["org_claimant_221"],
     synthetic: true,
   },
   {
@@ -221,6 +223,8 @@ export const documents: DocumentVaultItem[] = [
     uploadedAt: "2026-11-11T15:01:00Z",
     sensitivity: "privileged",
     ownerId: "org_counsel_tx",
+    caseIds: ["case_tx_1102"],
+    authorizedOrganizationIds: ["org_counsel_tx", "org_novara"],
     synthetic: true,
   },
   {
@@ -230,6 +234,8 @@ export const documents: DocumentVaultItem[] = [
     uploadedAt: "2026-11-13T09:44:00Z",
     sensitivity: "standard",
     ownerId: "org_partner_tx_01",
+    caseIds: ["case_tx_1102"],
+    authorizedOrganizationIds: ["org_partner_tx_01", "org_novara", "org_counsel_tx"],
     synthetic: true,
   },
 ];

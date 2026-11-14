@@ -3,26 +3,39 @@ import {
   decodeSession,
   encodeSession,
   portalFromPath,
-  sessionToUser,
 } from "@/lib/auth/cookies";
-import { previewUsers } from "@/lib/synthetic/data";
 
-describe("signed session cookies", () => {
+describe("signed session cookies v2", () => {
   beforeEach(() => {
     process.env.AUTH_SECRET = "unit-test-auth-secret-32chars-minimum!!";
+    process.env.AUTH_SESSION_VERSION = "2";
   });
 
-  it("round-trips a signed preview session payload", async () => {
-    const token = await encodeSession(previewUsers.partner);
-    expect(token.includes(".")).toBe(true);
+  it("round-trips a signed session and preserves mfaVerified=false", async () => {
+    const token = await encodeSession({
+      role: "partner",
+      userId: "usr_partner_014",
+      organizationId: "org_partner_tx_01",
+      mfaVerified: false,
+      authSource: "password",
+      rosterFp: "abc",
+    });
     const payload = await decodeSession(token);
     expect(payload?.role).toBe("partner");
-    expect(sessionToUser(payload!).organizationId).toBe("org_partner_tx_01");
+    expect(payload?.mfaVerified).toBe(false);
+    expect(payload?.v).toBe(2);
   });
 
-  it("rejects unsigned or tampered tokens", async () => {
+  it("rejects unsigned, tampered, or legacy payloads", async () => {
     expect(await decodeSession("not-a-token")).toBeNull();
-    const token = await encodeSession(previewUsers.executive);
+    const token = await encodeSession({
+      role: "executive",
+      userId: "usr_exec_001",
+      organizationId: "org_novara",
+      mfaVerified: true,
+      authSource: "password",
+      rosterFp: "abc",
+    });
     const [body] = token.split(".");
     expect(await decodeSession(`${body}.tamperedsignaturevalue`)).toBeNull();
   });

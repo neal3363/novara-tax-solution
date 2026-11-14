@@ -1,4 +1,5 @@
 import { PortalShell } from "@/components/layout/PortalShell";
+import { requirePortalUser } from "@/lib/auth/server";
 
 const nav = [
   { href: "/app/attorney", label: "Legal Queue" },
@@ -10,7 +11,8 @@ const nav = [
   { href: "/app/attorney/conflicts", label: "Conflict Checks" },
 ];
 
-export default function AttorneyLayout({ children }: { children: React.ReactNode }) {
+export default async function AttorneyLayout({ children }: { children: React.ReactNode }) {
+  await requirePortalUser("attorney");
   return (
     <PortalShell role="attorney" nav={nav}>
       {children}

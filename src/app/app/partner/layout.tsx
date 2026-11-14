@@ -1,4 +1,5 @@
 import { PortalShell } from "@/components/layout/PortalShell";
+import { requirePortalUser } from "@/lib/auth/server";
 
 const nav = [
   { href: "/app/partner", label: "Assigned Portfolio" },
@@ -10,7 +11,8 @@ const nav = [
   { href: "/app/partner/subscription", label: "Subscription" },
 ];
 
-export default function PartnerLayout({ children }: { children: React.ReactNode }) {
+export default async function PartnerLayout({ children }: { children: React.ReactNode }) {
+  await requirePortalUser("partner");
   return (
     <PortalShell role="partner" nav={nav}>
       {children}
