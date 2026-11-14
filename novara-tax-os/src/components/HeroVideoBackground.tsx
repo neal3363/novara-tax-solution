@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import './HeroVideoBackground.css'
 
-/** 12s Mixkit-licensed cinematic reel (luxury buildings → deals → advisor/client → preparer team). */
+/** 12s cinematic reel (skyline → Black woman professional → Black professionals handshake → advisor/client). */
 const DESKTOP_WEBM = '/media/novara-cinematic-hero.webm'
 const DESKTOP_MP4 = '/media/novara-cinematic-hero.mp4'
 const MOBILE_WEBM = '/media/novara-cinematic-hero-mobile.webm'
