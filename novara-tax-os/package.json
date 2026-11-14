@@ -27,7 +27,8 @@
     "test:refund-delivery": "node scripts/test-refund-delivery.mjs",
     "test:final-review": "node scripts/test-final-review-balancedue-onboarding.mjs",
     "test:addendum": "node scripts/test-addendum-modules.mjs",
-    "test:irs-engine": "node scripts/test-irs-isolated-engine.mjs"
+    "test:irs-engine": "node scripts/test-irs-isolated-engine.mjs",
+    "test:irs-golden": "node scripts/test-irs-golden-dual-run.mjs"
   },
   "dependencies": {
     "@fontsource/figtree": "^5.3.0",

@@ -31,3 +31,39 @@ export {
   profileToIrsInput,
 } from './compareDemo'
 export type { DemoIrsComparison } from './compareDemo'
+
+export { GOLDEN_FIXTURES } from './golden/fixtures'
+export { runAllGoldenFixtures, runGoldenFixture } from './golden/runGolden'
+export type {
+  GoldenFixture,
+  GoldenExpected,
+  GoldenCheckResult,
+  GoldenSuiteResult,
+} from './golden/types'
+export { ALL_FILING_STATUSES } from './golden/types'
+
+export {
+  DEFAULT_DUAL_RUN_FLAG,
+  getDualRunFlag,
+  setDualRunFlagForTests,
+  resetDualRunFlag,
+  runDualComparison,
+  mayShowIrsToTaxpayer,
+} from './dualRun'
+export type { DualRunFlag, DualRunReport, DualRunLineDiff } from './dualRun'
+
+export { CALCULATION_GAPS, formatGapInventory, gapsNeedingApproval } from './gaps/proposals'
+export type { CalculationGap, GapStatus } from './gaps/proposals'
+export {
+  stubForm8962,
+  stubForm8995A,
+  stubForm8863,
+  stubScheduleB,
+  stubScheduleD,
+  stubScheduleE,
+  stubAmendedRecalc,
+  ALL_STUBS,
+} from './gaps/stubs'
+
+export { MAXIMIZER_MIGRATION_STEPS, maximizerMigrationSummary } from './maximizerMigrationPlan'
+export type { MigrationStep } from './maximizerMigrationPlan'
