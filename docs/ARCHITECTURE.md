@@ -24,7 +24,7 @@ CC    Portal      Portal       Portal
 ## Core layers (blueprint-aligned)
 
 1. **Frontend shells** — role-aware Next.js App Router portals under `/app/*`
-2. **Authorization** — `src/lib/rbac/policy.ts` enforces role + org isolation (server-side style policy; production will be a dedicated policy service)
+2. **Authorization** — Middleware + HTTP-only session cookie protect `/app/*`. `src/lib/rbac/policy.ts` and `abac.ts` enforce role + org + territory + sensitivity isolation (preview policy; production will be a dedicated policy service). Append-only audit store records allow/deny outcomes.
 3. **Workflow** — DISCOVER → … → ACCOUNT stage model in `src/lib/workflow`
 4. **Synthetic intelligence layer** — labeled preview data until connectors are certified
 5. **AI gateway (preview)** — agent registry with hard ban on final legal determinations
