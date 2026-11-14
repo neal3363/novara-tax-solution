@@ -88,6 +88,22 @@ export {
 } from './transactionalEmail'
 export type { TransactionalEmailRecord, TransactionalEmailKind } from './transactionalEmail'
 
+export {
+  refundBankPartnerStatus,
+  verifyPartnerWebhookSignature,
+  signPartnerWebhookForTests,
+  processPartnerWebhookEvent,
+  listPartnerEventLog,
+  buildReconciliationSnapshot,
+  resetRefundBankPartnerForTests,
+} from './refundBankPartner'
+export type {
+  PartnerWebhookEvent,
+  PartnerEventType,
+  PartnerConnectionStatus,
+  ProcessedPartnerEvent,
+} from './refundBankPartner'
+
 export { appendLedger, listLedger, resetLedgerForTests } from './ledger'
 export type { LedgerEntry, LedgerEntryKind } from './ledger'
 
@@ -103,6 +119,7 @@ import { resetBankingAdapterForTests } from './bankingAdapter'
 import { resetLedgerForTests } from './ledger'
 import { resetRefundSettlementForTests } from './refundSettlementPipeline'
 import { resetTransactionalEmailForTests } from './transactionalEmail'
+import { resetRefundBankPartnerForTests, refundBankPartnerStatus } from './refundBankPartner'
 
 export function resetPhase10ForTests(): void {
   resetPhase10Flags()
@@ -112,12 +129,14 @@ export function resetPhase10ForTests(): void {
   resetLedgerForTests()
   resetRefundSettlementForTests()
   resetTransactionalEmailForTests()
+  resetRefundBankPartnerForTests()
 }
 
 export function phase10Summary(): string {
   const f = getPhase10Flags()
   const pricing = assertApprovedPricingIntact()
   const bank = bankingPartnerConnectionStatus()
+  const refundBank = refundBankPartnerStatus()
   return [
     'NOVARA Phase 10 payments & banking (sandbox only)',
     `version=${PHASE10_VERSION}`,
@@ -126,6 +145,8 @@ export function phase10Summary(): string {
     `tcPersonal=${pricing.tcPersonal}`,
     `tcBusiness=${pricing.tcBusiness}`,
     `partnerConnected=${bank.partnerConnected}`,
+    `refundBankPartnerConnected=${refundBank.partnerConnected}`,
+    `stripeIsNotRefundSettlement=${refundBank.stripeIsNotRefundSettlement}`,
     'STOP before activating live payments or banking products.',
   ].join('\n')
 }

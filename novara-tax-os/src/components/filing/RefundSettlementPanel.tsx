@@ -59,7 +59,9 @@ export function RefundSettlementPanel({ verifiedRefund }: { verifiedRefund: numb
         goes out <strong>only after</strong> the deposit is confirmed — not when the wire first lands.
       </p>
       <p className="muted">
-        Live bank rails stay OFF. This is a sandbox walkthrough for {currentUser?.email ?? 'the taxpayer'}.
+        Live bank rails stay OFF. Stripe checkout is for software fees only — it does not receive IRS refunds or
+        disburse client funds. An authorized refund-banking partner agreement is required before live settlement.
+        Sandbox walkthrough for {currentUser?.email ?? 'the taxpayer'}.
       </p>
 
       {!refundSettlementCase && (

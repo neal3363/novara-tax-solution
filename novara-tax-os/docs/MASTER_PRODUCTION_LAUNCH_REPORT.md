@@ -1,11 +1,12 @@
 # NOVARA Tax OS — Master Production Launch, Backend & QA Report
 
-**As of:** 2026-11-14 7:50 AM America/Chicago  
+**As of:** 2026-11-14 7:50 AM America/Chicago (superseding audit: 10:15 AM America/Chicago)  
 **Branch:** `cursor/master-production-launch-qa-4bf9`  
-**Base:** `cursor/novara-tax-os-v1-local-4bf9` (includes pricing PR #58)  
+**Base:** `cursor/novara-tax-os-v1-local-4bf9` (includes pricing PR #58; later PR #68 settlement sandbox)  
 **Production activation:** OFF  
 **Machine scorecard:** `docs/MASTER_PRODUCTION_LAUNCH_SCORECARD.json`  
-**Harness:** `npm run test:master-production-launch`
+**Latest full audit:** `docs/PRODUCTION_READINESS_AUDIT_2026-11-14.md` + `docs/PRODUCTION_READINESS_SCORECARD_2026-11-14.json`  
+**Harness:** `npm run test:master-production-launch` · `npm run test:prod-readiness-audit`
 
 ---
 

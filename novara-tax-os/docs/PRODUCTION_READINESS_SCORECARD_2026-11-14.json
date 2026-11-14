@@ -1,0 +1,207 @@
+{
+  "generatedAt": "2026-11-14T16:15:00.000Z",
+  "timezoneNote": "America/Chicago local ~10:15 AM",
+  "branch": "cursor/prod-readiness-audit-4bf9",
+  "baseBranch": "cursor/novara-tax-os-v1-local-4bf9",
+  "productionActivation": false,
+  "decisions": {
+    "publicDemoLaunch": "GO_SYNTHETIC_ONLY",
+    "realTaxpayerProduction": "NO-GO"
+  },
+  "statusVocabulary": [
+    "Implemented and verified",
+    "Implemented but unverified",
+    "Simulated",
+    "Blocked",
+    "Missing"
+  ],
+  "pricingPreserved": {
+    "TC": { "personal": 300, "business": 399 },
+    "TP": { "personal": 89, "selfEmployed": 119, "businessEntity": 249 },
+    "OfficeAnnual": { "personal": 899, "selfEmployed": 1199, "business": 1499 },
+    "officePerReturnNovaraFee": 0,
+    "contradictions": []
+  },
+  "prs": {
+    "67": {
+      "product": "Asset Intelligence",
+      "base": "main",
+      "reachedTaxOsBranch": false,
+      "reachedTaxOsDeploy": false
+    },
+    "68": {
+      "product": "Tax OS",
+      "base": "cursor/novara-tax-os-v1-local-4bf9",
+      "reachedTaxOsBranch": true,
+      "capabilityClass": "Simulated",
+      "liveMoney": false
+    }
+  },
+  "rows": [
+    {
+      "id": "sep-tax-tree",
+      "area": "Product separation",
+      "status": "Implemented and verified",
+      "detail": "Tax OS on cursor/novara-tax-os-v1-local-4bf9 under novara-tax-os/"
+    },
+    {
+      "id": "sep-ai-main",
+      "area": "Product separation",
+      "status": "Implemented and verified",
+      "detail": "Asset Intelligence on main root Next.js; no novara-tax-os/"
+    },
+    {
+      "id": "sep-pr67",
+      "area": "Product separation",
+      "status": "Missing",
+      "detail": "PR #67 correctly absent from Tax OS (Asset Intelligence only)"
+    },
+    {
+      "id": "sep-pr68",
+      "area": "Product separation",
+      "status": "Implemented and verified",
+      "detail": "PR #68 merged to Tax OS base; sandbox settlement only"
+    },
+    {
+      "id": "infra-workers",
+      "area": "Infrastructure",
+      "status": "Missing",
+      "detail": "No wrangler.toml / Cloudflare Workers",
+      "severity": "critical"
+    },
+    {
+      "id": "infra-d1",
+      "area": "Infrastructure",
+      "status": "Missing",
+      "detail": "No D1/Postgres production data plane",
+      "severity": "critical"
+    },
+    {
+      "id": "infra-r2",
+      "area": "Infrastructure",
+      "status": "Missing",
+      "detail": "No R2 encrypted document store",
+      "severity": "critical"
+    },
+    {
+      "id": "infra-queues",
+      "area": "Infrastructure",
+      "status": "Missing",
+      "detail": "No production job queue/DLQ"
+    },
+    {
+      "id": "infra-email",
+      "area": "Infrastructure",
+      "status": "Simulated",
+      "detail": "phase10 transactionalEmail sandbox queue"
+    },
+    {
+      "id": "infra-auth-mfa",
+      "area": "Infrastructure",
+      "status": "Blocked",
+      "detail": "Tax data plane lacks production IdP/MFA; staging modules only",
+      "severity": "critical"
+    },
+    {
+      "id": "journey-upload",
+      "area": "Tax journey",
+      "status": "Implemented and verified",
+      "detail": "Upload/classify + suite evidence"
+    },
+    {
+      "id": "journey-extract",
+      "area": "Tax journey",
+      "status": "Simulated",
+      "detail": "Deterministic demo extraction, not production OCR"
+    },
+    {
+      "id": "journey-calc",
+      "area": "Tax journey",
+      "status": "Implemented but unverified",
+      "detail": "Isolated/golden engines; IRS cutover OFF"
+    },
+    {
+      "id": "journey-efile-submit",
+      "area": "E-file",
+      "status": "Simulated",
+      "detail": "MeF mock ATS; liveProductionTransmit=false"
+    },
+    {
+      "id": "efile-provider",
+      "area": "E-file",
+      "status": "Blocked",
+      "detail": "EXT-IRS-PROVIDER / EXT-IRS-ATS",
+      "severity": "critical"
+    },
+    {
+      "id": "pay-stripe",
+      "area": "Payments",
+      "status": "Simulated",
+      "detail": "Software billing sandbox only"
+    },
+    {
+      "id": "pay-refund-settlement-pr68",
+      "area": "Payments",
+      "status": "Simulated",
+      "detail": "Virtual bank fee split ACH/debit email-after-confirm; live OFF"
+    },
+    {
+      "id": "pay-refund-bank-partner",
+      "area": "Payments",
+      "status": "Blocked",
+      "detail": "Authorized refund-banking partner required; Stripe is not settlement",
+      "severity": "critical",
+      "secretNames": [
+        "REFUND_BANK_PARTNER_API_KEY",
+        "REFUND_BANK_PARTNER_WEBHOOK_SECRET",
+        "REFUND_BANK_PARTNER_MERCHANT_ID",
+        "NOVARA_VIRTUAL_SETTLEMENT_ACCOUNT_ID"
+      ]
+    },
+    {
+      "id": "pay-partner-webhooks",
+      "area": "Payments",
+      "status": "Implemented but unverified",
+      "detail": "refundBankPartner sandbox webhooks + idempotency + reconciliation snapshot"
+    },
+    {
+      "id": "pricing",
+      "area": "Pricing",
+      "status": "Implemented and verified",
+      "detail": "fees.ts SSOT; test:pricing PASS; no price changes this pass"
+    },
+    {
+      "id": "sec-isolation",
+      "area": "Security",
+      "status": "Implemented and verified",
+      "detail": "test:isolation PASS"
+    },
+    {
+      "id": "sec-appsec",
+      "area": "Security",
+      "status": "Blocked",
+      "detail": "Independent pen test required; scope in APPSEC_PENTEST_SCOPE.md",
+      "severity": "critical"
+    },
+    {
+      "id": "load-concurrent",
+      "area": "Reliability",
+      "status": "Missing",
+      "detail": "No measured 100/1k/10k concurrent HTTP; scale suite is in-memory only",
+      "severity": "high"
+    },
+    {
+      "id": "dr-restore",
+      "area": "Reliability",
+      "status": "Blocked",
+      "detail": "Production restore drill not executed"
+    }
+  ],
+  "topOwnerActions": [
+    "Authorize and provision production data plane (Workers/API + D1/Postgres + R2/KMS) — tax state must leave the browser store",
+    "Complete IRS e-file provider authorization and official ATS (not mock MeF)",
+    "Sign an authorized refund-banking / refund-transfer partner agreement; bind REFUND_BANK_* secrets — do not use Stripe for IRS settlement",
+    "Bind live Stripe Price IDs matching fees.ts for software billing only; keep livePayments false until PCI/evidence ready",
+    "Engage independent AppSec/pen test per APPSEC_PENTEST_SCOPE.md; keep production locks OFF until remediations close"
+  ]
+}
