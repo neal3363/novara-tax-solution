@@ -837,6 +837,158 @@ export function nextInterviewQuestions(p: TaxpayerProfile, report: OptimizationR
     })
   }
 
+  const isSelfEmployed =
+    p.answers.self_employed === 'yes' ||
+    p.answers.self_employed === 'Yes' ||
+    p.selfEmploymentIncome > 0
+
+  // Business follow-ups — mirror childcare chaining so the Business tab is not empty after SE = yes.
+  if (isSelfEmployed) {
+    if (!answered('business_structure')) {
+      qs.push({
+        id: 'business_structure',
+        prompt: 'How is your business organized for tax purposes?',
+        kind: 'choice',
+        choices: [
+          'Sole proprietorship / Schedule C',
+          'Single-member LLC (Schedule C)',
+          'Partnership',
+          'S corporation',
+          'C corporation',
+          'Not sure',
+        ],
+        mapsTo: 'business_structure',
+        benefitIds: ['qbi', 'mileage', 'se_health'],
+      })
+    }
+    if (!answered('qbi_amount') && p.selfEmploymentIncome <= 0) {
+      qs.push({
+        id: 'qbi_amount',
+        prompt: 'About how much was your net business profit (Schedule C / self-employment income)?',
+        kind: 'number',
+        mapsTo: 'qbi_amount',
+        benefitIds: ['qbi'],
+      })
+    }
+    if (!answered('business_vehicle')) {
+      qs.push({
+        id: 'business_vehicle',
+        prompt: 'Did you use a vehicle for qualifying business purposes during the tax year?',
+        kind: 'yesno',
+        mapsTo: 'business_vehicle',
+        benefitIds: ['mileage'],
+      })
+    }
+    const usedVehicle =
+      p.answers.business_vehicle === 'yes' ||
+      p.answers.business_vehicle === 'Yes' ||
+      p.businessMileage > 0
+    if (usedVehicle && !answered('total_miles')) {
+      qs.push({
+        id: 'total_miles',
+        prompt: 'About how many total miles did you drive during the year?',
+        kind: 'number',
+        mapsTo: 'total_miles',
+        benefitIds: ['mileage'],
+      })
+    }
+    if (usedVehicle && answered('total_miles') && !answered('business_miles') && p.businessMileage <= 0) {
+      qs.push({
+        id: 'business_miles',
+        prompt: 'How many of those miles were qualifying business miles?',
+        kind: 'number',
+        mapsTo: 'business_miles',
+        benefitIds: ['mileage'],
+      })
+    }
+    if (usedVehicle && (answered('business_miles') || p.businessMileage > 0)) {
+      if (!answered('mileage_log')) {
+        qs.push({
+          id: 'mileage_log',
+          prompt: 'Do you have a mileage log or other adequate supporting records?',
+          kind: 'yesno',
+          mapsTo: 'mileage_log',
+          benefitIds: ['mileage'],
+        })
+      }
+      if (!answered('actual_expense_method')) {
+        qs.push({
+          id: 'actual_expense_method',
+          prompt:
+            'Did you have vehicle expenses that may qualify for an actual-expense deduction instead of standard mileage?',
+          kind: 'yesno',
+          mapsTo: 'actual_expense_method',
+          benefitIds: ['mileage'],
+        })
+      }
+      if (!answered('prior_vehicle_depreciation')) {
+        qs.push({
+          id: 'prior_vehicle_depreciation',
+          prompt:
+            'Have you previously claimed depreciation or another vehicle expense method that affects this year’s deduction?',
+          kind: 'yesno',
+          mapsTo: 'prior_vehicle_depreciation',
+          benefitIds: ['mileage'],
+        })
+      }
+    }
+    if (!answered('equipment_depreciation')) {
+      qs.push({
+        id: 'equipment_depreciation',
+        prompt:
+          'Did you buy business equipment, computers, or other property you may depreciate or expense (Section 179 / bonus)?',
+        kind: 'yesno',
+        mapsTo: 'equipment_depreciation',
+        benefitIds: ['qbi'],
+      })
+    }
+    if (
+      (p.answers.equipment_depreciation === 'yes' || p.answers.equipment_depreciation === 'Yes') &&
+      !answered('equipment_depreciation_amount')
+    ) {
+      qs.push({
+        id: 'equipment_depreciation_amount',
+        prompt: 'About how much did you spend on depreciable business equipment this year?',
+        kind: 'number',
+        mapsTo: 'equipment_depreciation_amount',
+        benefitIds: ['qbi'],
+      })
+    }
+    if (!answered('home_office')) {
+      qs.push({
+        id: 'home_office',
+        prompt: 'Did you use part of your home regularly and exclusively for this business?',
+        kind: 'yesno',
+        mapsTo: 'home_office',
+        benefitIds: ['qbi'],
+      })
+    }
+    if (!answered('se_health_premiums_yes')) {
+      qs.push({
+        id: 'se_health_premiums_yes',
+        prompt: 'Did you pay health insurance premiums for yourself while self-employed?',
+        kind: 'yesno',
+        mapsTo: 'se_health_premiums_yes',
+        benefitIds: ['se_health'],
+      })
+    }
+    if (
+      (p.answers.se_health_premiums_yes === 'yes' ||
+        p.answers.se_health_premiums_yes === 'Yes' ||
+        p.answers.se_health_premiums === 'yes') &&
+      !answered('se_health_premium_amount') &&
+      p.seHealthPremiums <= 0
+    ) {
+      qs.push({
+        id: 'se_health_premium_amount',
+        prompt: 'About how much did you pay in self-employed health insurance premiums?',
+        kind: 'number',
+        mapsTo: 'se_health_premium_amount',
+        benefitIds: ['se_health'],
+      })
+    }
+  }
+
   if (!answered('owns_home')) {
     qs.push({
       id: 'owns_home',
