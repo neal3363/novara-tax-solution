@@ -291,8 +291,25 @@
 
 .maximize-section {
   background:
-    radial-gradient(700px 280px at 10% 0%, rgba(20, 146, 135, 0.12), transparent 55%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.35), transparent);
+    radial-gradient(780px 320px at 8% 0%, rgba(20, 146, 135, 0.16), transparent 55%),
+    linear-gradient(180deg, #e4ebe9 0%, #d7e2df 48%, #eef2f0 100%);
+  color: #0c1a18;
+}
+
+.maximize-section .landing-kicker {
+  color: #0f5c55;
+}
+
+.maximize-section h2 {
+  color: #081412;
+}
+
+.maximize-section .section-lead {
+  color: #1a2e2b;
+}
+
+.maximize-section .benefit-bullets {
+  color: #122624;
 }
 
 .benefit-bullets {
@@ -306,31 +323,35 @@
 
 .example-doc-list li {
   display: grid;
-  gap: 0.15rem;
+  gap: 0.2rem;
+  padding: 0.55rem 0.75rem 0.55rem 0.15rem;
+  border-bottom: 1px solid rgba(8, 20, 18, 0.12);
 }
 
 .example-doc-list strong {
-  color: var(--ink, #13201e);
-  font-weight: 650;
+  color: #06110f;
+  font-weight: 700;
+  font-size: 1.02rem;
 }
 
 .example-doc-meta {
   display: block;
-  color: var(--muted);
+  color: #1f3532;
   font-size: 0.95rem;
 }
 
 .example-doc-meta em {
   font-style: normal;
-  color: var(--teal);
-  font-weight: 600;
+  color: #0a6b63;
+  font-weight: 700;
 }
 
 .maximize-closer {
   margin: 0 0 1.25rem;
   font-size: 1.12rem;
-  font-weight: 600;
+  font-weight: 700;
   max-width: 40rem;
+  color: #081412;
 }
 
 .pro-grid {

@@ -32,6 +32,10 @@ assert(landing.includes('stateLawDifferenceBullets') || landing.includes('State 
 assert(landing.includes('Questions only after docs') || landing.includes('only asks'), 'Landing says questions follow docs')
 assert(landing.includes('Money from each form') || landing.includes('money'), 'Landing ties money to each form')
 
+const landingCss = readFileSync(join(root, 'src/pages/Landing.css'), 'utf8')
+assert(landingCss.includes('.maximize-section'), 'docs example section has contrast styles')
+assert(landingCss.includes('#06110f') || landingCss.includes('#081412'), 'docs section uses darker text for readability')
+
 const exampleDocs = readFileSync(join(root, 'src/data/exampleReturnDocs.ts'), 'utf8')
 assert(exampleDocs.includes('Form W-2'), 'example docs include W-2')
 assert(exampleDocs.includes('1098-T'), 'example docs include tuition')

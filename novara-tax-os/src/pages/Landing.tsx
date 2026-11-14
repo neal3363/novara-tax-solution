@@ -364,7 +364,7 @@ export function Landing() {
         </div>
       </section>
 
-      <section className="section soft maximize-section" id="example-docs">
+      <section className="section maximize-section" id="example-docs">
         <div className="container">
           <p className="landing-kicker">Example — maximize a return</p>
           <h2>All docs needed to simplify everything</h2>
