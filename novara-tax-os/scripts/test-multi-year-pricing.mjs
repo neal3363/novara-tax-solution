@@ -46,12 +46,15 @@ const quote = quoteMultiYearOrder(
   ],
   { currentTaxYear: 2025, seasonYear: 2026 },
 )
-assert(TC_PERSONAL_FEE === 399, 'TC personal 399')
-assert(quote.basePreparationTotal === 1596, 'Base fees 1596 got ' + quote.basePreparationTotal)
+assert(TC_PERSONAL_FEE === 300, 'TC personal 300')
+assert(quote.basePreparationTotal === TC_PERSONAL_FEE * 4, 'Base fees 4× TC personal got ' + quote.basePreparationTotal)
 assert(quote.priorYearCount === 3, 'Three prior years')
 assert(PRIOR_YEAR_SURCHARGE === 250, 'Surcharge 250')
 assert(quote.priorYearSurchargeTotal === 750, 'Prior surcharge 750')
-assert(quote.preparationGrandTotal === 2346, 'Total 2346 got ' + quote.preparationGrandTotal)
+assert(
+  quote.preparationGrandTotal === TC_PERSONAL_FEE * 4 + 750,
+  'Total 4× personal + surcharge got ' + quote.preparationGrandTotal,
+)
 
 console.log('=== Surcharge once per year with personal+business ===')
 const mixed = quoteMultiYearOrder(

@@ -22,8 +22,8 @@ export const PRICING = {
   TC: {
     label: 'Tax Client',
     registration: 0,
-    personalReturn: 399,
-    businessReturn: 300,
+    personalReturn: 300,
+    businessReturn: 399,
     unlimitedClients: false,
     unlimitedReturns: false,
   },
