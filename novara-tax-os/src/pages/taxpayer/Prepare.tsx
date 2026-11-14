@@ -33,6 +33,11 @@ import {
 } from '../../engine/documentIntakeEngine'
 import { buildDocumentChecklist } from '../../engine/documentChecklist'
 import { takeLandingUploads } from '../../engine/pendingLandingUploads'
+import {
+  isPersonalIdentityMapsTo,
+  parseTaxpayerStatement,
+  personalIdentityProgress,
+} from '../../engine/naturalLanguageFacts'
 import '../shared.css'
 import './Prepare.css'
 
@@ -118,16 +123,37 @@ export function Prepare() {
         if (parsed.taxYear) actions.setActiveTaxYear(parsed.taxYear)
         actions.setPrepStep(2)
         if (parsed.text) {
-          actions.addMessage('user', parsed.text)
-          actions.addMessage(
-            'assistant',
-            parsed.clarify
-              ? `Got it — ${String(parsed.intent ?? 'filing').replace(/_/g, ' ')}. ${parsed.clarify}`
-              : `Got it — opening your questionnaire for ${String(parsed.intent ?? 'your return').replace(/_/g, ' ')}. Tabs show what’s complete and what’s still needed. Speak, type, or upload anytime.`,
-          )
+          const spokenFacts = parseTaxpayerStatement(parsed.text)
+          const hasPersonal = spokenFacts.some((f) => isPersonalIdentityMapsTo(f.mapsTo))
+          // Speak/type from the landing mic must auto-fill Personal (and other mapped fields).
+          actions.askAi(parsed.text)
+          if (parsed.clarify) {
+            window.setTimeout(() => {
+              actions.addMessage(
+                'assistant',
+                `Got it — ${String(parsed.intent ?? 'filing').replace(/_/g, ' ')}. ${parsed.clarify}`,
+              )
+            }, 500)
+          } else if (spokenFacts.length === 0) {
+            actions.addMessage(
+              'assistant',
+              `Got it — opening your questionnaire for ${String(parsed.intent ?? 'your return').replace(/_/g, ' ')}. Tabs show what’s complete and what’s still needed. Speak, type, or upload anytime.`,
+            )
+          }
+          if (hasPersonal) setSection('personal')
+          else if (parsed.intent === 'personal_and_business' || parsed.intent === 'business') {
+            setSection('business')
+          } else if (parsed.intent === 'amend' || parsed.intent === 'prior_year') {
+            setSection('filing')
+          } else {
+            setSection('filing')
+          }
+        } else if (parsed.intent === 'personal_and_business' || parsed.intent === 'business') {
+          setSection('business')
+        } else {
+          setSection('filing')
         }
         if (parsed.intent === 'personal_and_business' || parsed.intent === 'business') {
-          setSection('business')
           // Unlock business follow-ups (mileage, depreciation, QBI, etc.) in the shared interview.
           actions.answerSmartInterview(
             'self_employed',
@@ -135,10 +161,6 @@ export function Prepare() {
             'Did you earn money from your own business or freelancing?',
           )
           actions.focusInterviewQuestion('business_structure')
-        } else if (parsed.intent === 'amend' || parsed.intent === 'prior_year') {
-          setSection('filing')
-        } else {
-          setSection('filing')
         }
       } catch {
         actions.setPrepStep(2)
@@ -220,6 +242,8 @@ export function Prepare() {
     setMissingDob('')
   }
 
+  const personalRows = useMemo(() => personalIdentityProgress(taxProfile), [taxProfile])
+  const showPersonalPanel = section === 'personal'
   const showUpload =
     section === 'personal' ||
     section === 'income' ||
@@ -239,6 +263,16 @@ export function Prepare() {
   function handleCompose(raw: string) {
     const text = raw.trim()
     if (!text) return
+    // Prefer structured speak/type facts (personal info, amounts) over navigation guesses.
+    const spokenFacts = parseTaxpayerStatement(text)
+    if (spokenFacts.length > 0) {
+      actions.askAi(text)
+      actions.setPrepStep(Math.max(prepStep, 2))
+      if (spokenFacts.some((f) => isPersonalIdentityMapsTo(f.mapsTo))) setSection('personal')
+      setCompose('')
+      setPendingVoice(null)
+      return
+    }
     const cmd = detectFilingIntent(text)
     if (cmd.type === 'yes_no' && activeTurn) {
       void confirmTurn(cmd.value === 'yes' ? 'Yes' : 'No')
@@ -315,6 +349,39 @@ export function Prepare() {
       </p>
 
       <QuestionnaireTabs profile={taxProfile} active={section} onSelect={onSelectSection} />
+
+      {showPersonalPanel && (
+        <section className="list-panel panel rise" aria-label="Personal information">
+          <h2>Personal information</h2>
+          <p className="muted" style={{ marginTop: 0 }}>
+            Speak or type your details once — name, date of birth, address, phone, email, and SSN last four fill in
+            here automatically. Full Social Security numbers are never stored in this demo.
+          </p>
+          {personalRows.map((row) => (
+            <div className="row-item" key={row.mapsTo}>
+              <div>
+                <strong>{row.prompt}</strong>
+                <span className="row-meta">
+                  {row.value
+                    ? row.mapsTo === 'ssn_last4'
+                      ? `***-**-${row.value}`
+                      : row.value
+                    : 'Not provided yet — speak or type it below'}
+                </span>
+              </div>
+              <span className={`badge ${row.status === 'answered' ? 'badge-ok' : 'badge-warn'}`}>
+                {row.status === 'answered' ? 'Filled' : 'Needed'}
+              </span>
+            </div>
+          ))}
+          {currentUser?.name && (
+            <p className="muted" style={{ marginBottom: 0 }}>
+              Account name synced: <strong>{currentUser.name}</strong>
+              {currentUser.email ? ` · ${currentUser.email}` : ''}
+            </p>
+          )}
+        </section>
+      )}
 
       <div className="stepper" aria-label="Preparation steps">
         {STEPS.map((s, i) => (

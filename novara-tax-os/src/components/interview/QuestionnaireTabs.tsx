@@ -4,6 +4,7 @@ import {
   type QuestionCategory,
 } from '../../engine/questionProgress'
 import type { TaxpayerProfile } from '../../engine/benefitOptimizer'
+import { personalIdentityProgress } from '../../engine/naturalLanguageFacts'
 import './QuestionnaireTabs.css'
 
 export type QuestionnaireSectionId =
@@ -103,11 +104,22 @@ export function sectionStats(profile: TaxpayerProfile, sectionId: QuestionnaireS
     }
   }
   if (sectionId === 'personal') {
-    // Personal identity is largely document-driven; show filing opener questions lightly
-    const items = progress.questions.filter((q) => q.category === 'filing_status').slice(0, 1)
+    const identity = personalIdentityProgress(profile).map(
+      (row): ProgressQuestion => ({
+        id: `personal:${row.mapsTo}`,
+        mapsTo: row.mapsTo,
+        prompt: row.prompt,
+        category: 'benefit_discovery',
+        categoryLabel: 'Personal information',
+        status: row.status,
+        statusLabel: row.status === 'answered' ? 'Answered' : 'Still needed',
+      }),
+    )
+    const filingOpener = progress.questions.filter((q) => q.category === 'filing_status').slice(0, 1)
+    const items = [...identity, ...filingOpener]
     return {
       answered: items.filter((i) => i.status === 'answered').length,
-      total: Math.max(items.length, 1),
+      total: items.length,
       unanswered: items.filter((i) => i.status === 'unanswered').length,
       items,
     }
