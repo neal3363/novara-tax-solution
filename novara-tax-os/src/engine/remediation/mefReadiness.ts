@@ -27,12 +27,16 @@ export interface MefReadinessItem {
 
 /** Exact external steps Cursor cannot complete in code. */
 export const MEF_EXTERNAL_CERTIFICATION_STEPS = [
-  'Obtain IRS e-file provider / Authorized IRS e-file Provider status',
-  'Complete EFIN application and receive IRS-verified EFIN (entry ≠ authorization)',
-  'Complete PTIN verification for preparers where required',
-  'Execute official IRS ATS (Assurance Testing System) with IRS-issued credentials',
+  'Obtain IRS e-file provider status for NOVARA legal entity (Software Developer + Transmitter)',
+  'Complete suitability checks for Principals / Responsible Officials (Pub 3112)',
+  'Receive IRS-assigned NOVARA EFIN (office/preparer EFIN is insufficient)',
+  'Receive Software Developer Test ETIN and Transmitter Production ETIN',
+  'Register Software Identification Number(s) and complete ATS questionnaires',
+  'Enroll A2A Application System IDs when using Application-to-Application (Pub 4164)',
+  'Execute official IRS ATS per Pub 1436 with IRS-issued credentials (mock ACKs ≠ approval)',
   'Obtain production MeF schema packs / XSD validation tooling from IRS',
-  'Complete transmitter certificate / ETIN provisioning with authorized transmitter',
+  'Complete Transmitter communication test; wait for IRS Production transmission status',
+  'Complete PTIN verification for preparers where required (separate from Transmitter ETIN)',
   'Pass applicable state e-file approvals separately from federal MeF',
   'Receive human launch authorization after ATS acceptances documented',
 ] as const
