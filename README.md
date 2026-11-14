@@ -6,6 +6,11 @@ Private AI operating system for national asset discovery, recovery, acquisition,
 
 ## Preview (local)
 
+Copy `.env.example` to `.env.local` and set:
+
+- `AUTH_SECRET` — at least 32 characters (signs portal session cookies)
+- `PREVIEW_AUTH_PASSWORD` — at least 12 characters (portal login password)
+
 ```bash
 npm install
 npm run dev
@@ -13,9 +18,9 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-### Demo portal logins
+### Demo portal emails
 
-Password for all preview users: `novara-preview`
+Password is whatever you set in `PREVIEW_AUTH_PASSWORD` (never commit real values).
 
 | Role | Email | Path |
 |------|-------|------|

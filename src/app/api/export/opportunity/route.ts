@@ -7,7 +7,7 @@ import { appendAuditEvent } from "@/lib/audit/store";
 
 export async function POST(request: Request) {
   const jar = await cookies();
-  const session = decodeSession(jar.get(SESSION_COOKIE)?.value);
+  const session = await decodeSession(jar.get(SESSION_COOKIE)?.value);
   const user = session ? sessionToUser(session) : null;
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

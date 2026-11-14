@@ -11,7 +11,7 @@ function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
   const [email, setEmail] = useState(previewUsers.executive.email);
-  const [password, setPassword] = useState("novara-preview");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState(() => {
     if (params.get("error") === "portal_isolation") {
       return "Portal isolation blocked cross-role access. Sign in with the correct role.";
@@ -35,7 +35,7 @@ function LoginForm() {
       });
       const data = (await res.json()) as { error?: string; redirectTo?: string };
       if (!res.ok) {
-        setError(data.error ?? "Invalid preview credentials.");
+        setError(data.error ?? "Invalid credentials.");
         return;
       }
       const next = params.get("next");
@@ -60,8 +60,8 @@ function LoginForm() {
         Asset Intelligence™ · Secure Login
       </div>
       <p className="mt-4 text-sm text-silver">
-        Preview authentication with HTTP-only session cookie and simulated MFA. Portal routes are
-        middleware-protected.
+        Sessions are HMAC-signed with a server secret. Portal passwords come from configured app
+        secrets — they are never shipped in source.
       </p>
       <form onSubmit={onSubmit} className="mt-6 space-y-4">
         <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-silver-muted">
@@ -89,7 +89,7 @@ function LoginForm() {
         </Button>
       </form>
       <div className="mt-6 space-y-2 text-xs text-silver-muted">
-        <div className="font-semibold uppercase tracking-[0.12em] text-silver">Demo roles</div>
+        <div className="font-semibold uppercase tracking-[0.12em] text-silver">Demo emails</div>
         {Object.values(previewUsers).map((u) => (
           <button
             key={u.id}
@@ -100,7 +100,9 @@ function LoginForm() {
             {u.role}: {u.email}
           </button>
         ))}
-        <p className="pt-2">Password for all demo users: novara-preview</p>
+        <p className="pt-2">
+          Enter the password from your Cursor app secrets (`PREVIEW_AUTH_PASSWORD`).
+        </p>
       </div>
     </Panel>
   );
