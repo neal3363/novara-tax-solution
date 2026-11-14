@@ -1,0 +1,478 @@
+{
+  "generatedAt": "2026-11-14T06:40:55.487Z",
+  "checkpoint": "checkpoint/pre-master-qa-4bf9",
+  "productionActivation": false,
+  "totals": {
+    "recorded": 72,
+    "pass": 56,
+    "pass_staging": 4,
+    "fail": 0,
+    "blocked": 5,
+    "not_tested": 7
+  },
+  "harnessFailedAssertions": 0,
+  "decisions": {
+    "publicDemoLaunch": "GO_SYNTHETIC_ONLY",
+    "realTaxpayerProduction": "NO-GO"
+  },
+  "rows": [
+    {
+      "id": "pricing-tc",
+      "area": "Pricing",
+      "status": "PASS",
+      "detail": "TC $300/$399 intact"
+    },
+    {
+      "id": "pricing-tp-office",
+      "area": "Pricing",
+      "status": "PASS",
+      "detail": "TP/Office tiers intact"
+    },
+    {
+      "id": "pricing-prior-year",
+      "area": "Pricing",
+      "status": "PASS",
+      "detail": "Prior-year surcharge $250"
+    },
+    {
+      "id": "homepage-hero-component",
+      "area": "Website",
+      "status": "PASS",
+      "detail": "HeroVideoBackground present"
+    },
+    {
+      "id": "homepage-video-asset",
+      "area": "Website",
+      "status": "PASS",
+      "detail": "Cinematic hero mp4 present"
+    },
+    {
+      "id": "locks-irs",
+      "area": "Production locks",
+      "status": "PASS",
+      "detail": "IRS cutover/visibility OFF"
+    },
+    {
+      "id": "locks-mef",
+      "area": "Production locks",
+      "status": "PASS",
+      "detail": "MeF live OFF"
+    },
+    {
+      "id": "locks-pay-bank",
+      "area": "Production locks",
+      "status": "PASS",
+      "detail": "Payments/banking live OFF"
+    },
+    {
+      "id": "locks-state-biz",
+      "area": "Production locks",
+      "status": "PASS",
+      "detail": "Nationwide/business e-file OFF"
+    },
+    {
+      "id": "auth-sessions",
+      "area": "Accounts",
+      "status": "PASS",
+      "detail": "TC/TP/Office sessions created"
+    },
+    {
+      "id": "tp-no-manage-preparers",
+      "area": "Tax Preparer",
+      "status": "PASS",
+      "detail": "TP cannot manage staff/preparers"
+    },
+    {
+      "id": "office-manage-preparers",
+      "area": "Tax Office",
+      "status": "PASS",
+      "detail": "Office owner can manage preparers"
+    },
+    {
+      "id": "tp-summary-no-staff",
+      "area": "Tax Preparer",
+      "status": "PASS",
+      "detail": "permissionSummary.manageStaff false for TP"
+    },
+    {
+      "id": "cross-tenant-billing",
+      "area": "Security",
+      "status": "PASS",
+      "detail": "Cross-office billing denied"
+    },
+    {
+      "id": "cross-tenant-payment",
+      "area": "Security",
+      "status": "PASS",
+      "detail": "Cross-tenant payment denied"
+    },
+    {
+      "id": "prep-no-financial",
+      "area": "Tax Office",
+      "status": "PASS",
+      "detail": "Office preparer denied financial reports"
+    },
+    {
+      "id": "password-recovery",
+      "area": "Accounts",
+      "status": "BLOCKED",
+      "detail": "No dedicated password recovery / forgot-password UI or API found in src/pages",
+      "severity": "high"
+    },
+    {
+      "id": "registration-prod",
+      "area": "Accounts",
+      "status": "BLOCKED",
+      "detail": "Register flows are DEV-oriented; production redirects to login (known from prior audit)",
+      "severity": "medium"
+    },
+    {
+      "id": "maximizer-basic",
+      "area": "Tax prep workflow",
+      "status": "PASS",
+      "detail": "Maximizer returns hypothetical vs verified"
+    },
+    {
+      "id": "staging-adapter-locks",
+      "area": "Tax prep workflow",
+      "status": "PASS",
+      "detail": "Staging adapter non-visible / no cutover"
+    },
+    {
+      "id": "no-silent-validated",
+      "area": "Tax prep workflow",
+      "status": "PASS",
+      "detail": "Silent fullyValidated rejected"
+    },
+    {
+      "id": "e2e-15-steps",
+      "area": "Tax prep workflow",
+      "status": "PASS",
+      "detail": "Staging E2E 1–15 ok; filing output not validated"
+    },
+    {
+      "id": "max-hsa-flag",
+      "area": "Refund Maximizer",
+      "status": "PASS",
+      "detail": "HSA flagged unsupported for IRS adapter"
+    },
+    {
+      "id": "max-energy-flag",
+      "area": "Refund Maximizer",
+      "status": "PASS",
+      "detail": "Energy flagged unsupported for IRS adapter"
+    },
+    {
+      "id": "maximizer-scenarios",
+      "area": "Refund Maximizer",
+      "status": "PASS",
+      "detail": "13/13 scenarios executed"
+    },
+    {
+      "id": "maximizer-qss",
+      "area": "Refund Maximizer",
+      "status": "BLOCKED",
+      "detail": "TaxpayerProfile.filingStatus has no qss; Phase 9 uses qss_proxy→MFJ — not native QSS in Maximizer",
+      "severity": "medium"
+    },
+    {
+      "id": "irs-year-2022",
+      "area": "Federal accuracy",
+      "status": "PASS",
+      "detail": "TY2022 IRS engine returns result"
+    },
+    {
+      "id": "irs-year-2023",
+      "area": "Federal accuracy",
+      "status": "PASS",
+      "detail": "TY2023 IRS engine returns result"
+    },
+    {
+      "id": "irs-year-2024",
+      "area": "Federal accuracy",
+      "status": "PASS",
+      "detail": "TY2024 IRS engine returns result"
+    },
+    {
+      "id": "irs-year-2025",
+      "area": "Federal accuracy",
+      "status": "PASS",
+      "detail": "TY2025 IRS engine returns result"
+    },
+    {
+      "id": "federal-demo-vs-irs",
+      "area": "Federal accuracy",
+      "status": "PASS_STAGING",
+      "detail": "Demo Maximizer ≠ IRS proof; dual-run/staging adapter used; cutoverReady=false"
+    },
+    {
+      "id": "federal-golden-suite",
+      "area": "Federal accuracy",
+      "status": "PASS_STAGING",
+      "detail": "Executed via npm run test:irs-golden / phase4 / phase5 in matrix (see suite log)"
+    },
+    {
+      "id": "state-TX",
+      "area": "State returns",
+      "status": "PASS",
+      "detail": "TX no PIT"
+    },
+    {
+      "id": "state-FL",
+      "area": "State returns",
+      "status": "PASS",
+      "detail": "FL no PIT"
+    },
+    {
+      "id": "state-CA",
+      "area": "State returns",
+      "status": "PASS",
+      "detail": "CA staging_validated"
+    },
+    {
+      "id": "state-NY",
+      "area": "State returns",
+      "status": "PASS",
+      "detail": "NY staging_validated"
+    },
+    {
+      "id": "state-IL",
+      "area": "State returns",
+      "status": "PASS",
+      "detail": "IL staging_validated"
+    },
+    {
+      "id": "state-ny-part-year",
+      "area": "State returns",
+      "status": "PASS",
+      "detail": "NY part-year allocation"
+    },
+    {
+      "id": "state-unsupported-block",
+      "area": "State returns",
+      "status": "PASS",
+      "detail": "Unsupported state detected"
+    },
+    {
+      "id": "state-no-nationwide",
+      "area": "State returns",
+      "status": "PASS",
+      "detail": "No nationwide claim in prioritized list"
+    },
+    {
+      "id": "biz-1065",
+      "area": "Business returns",
+      "status": "PASS",
+      "detail": "1065 K-1 staging; e-file OFF"
+    },
+    {
+      "id": "biz-1120s",
+      "area": "Business returns",
+      "status": "PASS",
+      "detail": "1120-S staging e-file OFF"
+    },
+    {
+      "id": "biz-1120",
+      "area": "Business returns",
+      "status": "PASS",
+      "detail": "1120 21% staging; e-file OFF"
+    },
+    {
+      "id": "amd-auth-required",
+      "area": "Amended returns",
+      "status": "PASS",
+      "detail": "Authorization required"
+    },
+    {
+      "id": "amd-preserve",
+      "area": "Amended returns",
+      "status": "PASS",
+      "detail": "1040-X computed; original preserved; live OFF"
+    },
+    {
+      "id": "amd-1040x-isolated",
+      "area": "Amended returns",
+      "status": "PASS",
+      "detail": "Isolated 1040-X productionReady=false"
+    },
+    {
+      "id": "pay-idempotent",
+      "area": "Payments",
+      "status": "PASS",
+      "detail": "Duplicate checkout prevented"
+    },
+    {
+      "id": "pay-checkout",
+      "area": "Payments",
+      "status": "PASS",
+      "detail": "Sandbox payment succeeded"
+    },
+    {
+      "id": "pay-raw-pan",
+      "area": "Payments",
+      "status": "PASS",
+      "detail": "Raw PAN rejected"
+    },
+    {
+      "id": "pay-outage",
+      "area": "Payments",
+      "status": "PASS",
+      "detail": "Provider outage throws safely"
+    },
+    {
+      "id": "pay-renew",
+      "area": "Payments",
+      "status": "PASS",
+      "detail": "Subscription renew path works"
+    },
+    {
+      "id": "bank-delivery",
+      "area": "Banking",
+      "status": "PASS",
+      "detail": "DD/check + IRS disclaimer"
+    },
+    {
+      "id": "bank-not-connected",
+      "area": "Banking",
+      "status": "PASS",
+      "detail": "No partner claimed connected"
+    },
+    {
+      "id": "pay-webhook-spoof",
+      "area": "Security",
+      "status": "PASS",
+      "detail": "Invalid webhook signature rejected"
+    },
+    {
+      "id": "sec-xss-csrf-ratelimit",
+      "area": "Security",
+      "status": "NOT_TESTED",
+      "detail": "No automated XSS/CSRF/rate-limit suite in repository; production gate requires dedicated AppSec review",
+      "severity": "high"
+    },
+    {
+      "id": "sec-injection",
+      "area": "Security",
+      "status": "NOT_TESTED",
+      "detail": "No SQL/command injection suite (app is primarily client+staging APIs); needs independent review",
+      "severity": "high"
+    },
+    {
+      "id": "sec-independent-assessment",
+      "area": "Security",
+      "status": "BLOCKED",
+      "detail": "Independent production security assessment not completed",
+      "severity": "critical"
+    },
+    {
+      "id": "sec-no-live-pay",
+      "area": "Security",
+      "status": "PASS",
+      "detail": "Live payments remain disabled during QA"
+    },
+    {
+      "id": "mef-env",
+      "area": "IRS MeF",
+      "status": "PASS",
+      "detail": "MeF env=ats_mock (not production)"
+    },
+    {
+      "id": "mef-official-ats",
+      "area": "IRS MeF",
+      "status": "BLOCKED",
+      "detail": "Official IRS ATS acceptance not executed — mock only",
+      "severity": "critical"
+    },
+    {
+      "id": "mef-suite",
+      "area": "IRS MeF",
+      "status": "PASS_STAGING",
+      "detail": "Covered by npm run test:irs-mef in matrix"
+    },
+    {
+      "id": "ui-desktop-browser",
+      "area": "Website/Mobile",
+      "status": "NOT_TESTED",
+      "detail": "No Playwright/Cypress suite; desktop browser E2E not automated in repo",
+      "severity": "medium"
+    },
+    {
+      "id": "ui-tablet-iphone-android",
+      "area": "Website/Mobile",
+      "status": "NOT_TESTED",
+      "detail": "Real device / responsive device-lab testing not executed in this environment",
+      "severity": "medium"
+    },
+    {
+      "id": "ui-a11y",
+      "area": "Website/Mobile",
+      "status": "NOT_TESTED",
+      "detail": "No axe/lighthouse accessibility automation in package.json",
+      "severity": "medium"
+    },
+    {
+      "id": "ui-homepage-assets",
+      "area": "Website/Mobile",
+      "status": "PASS",
+      "detail": "Landing uses HeroVideoBackground; cinematic assets under public/media/"
+    },
+    {
+      "id": "fail-db-restore",
+      "area": "Failure/Recovery",
+      "status": "NOT_TESTED",
+      "detail": "Production DB connection failure / backup restore drill not executed",
+      "severity": "high"
+    },
+    {
+      "id": "fail-internet",
+      "area": "Failure/Recovery",
+      "status": "NOT_TESTED",
+      "detail": "Client network interruption UX not automated",
+      "severity": "medium"
+    },
+    {
+      "id": "fail-pay-outage",
+      "area": "Failure/Recovery",
+      "status": "PASS_STAGING",
+      "detail": "Payment provider outage path verified above"
+    },
+    {
+      "id": "gate-prod-ready-false",
+      "area": "Launch gate",
+      "status": "PASS",
+      "detail": "productionReady=false"
+    },
+    {
+      "id": "gate-prod-go-false",
+      "area": "Launch gate",
+      "status": "PASS",
+      "detail": "productionGo=false even if humanApproved"
+    },
+    {
+      "id": "gate-demo",
+      "area": "Launch gate",
+      "status": "PASS",
+      "detail": "Synthetic public demo eligible"
+    },
+    {
+      "id": "ui-homepage-smoke",
+      "area": "Website/Mobile",
+      "status": "PASS",
+      "detail": "Computer-use smoke: brand, cinematic video, CTAs, no console errors, 390px layout OK (preview :4181)"
+    }
+  ],
+  "uiSmoke": {
+    "homepage": "PASS",
+    "previewUrl": "http://127.0.0.1:4181/",
+    "artifacts": [
+      "/opt/cursor/artifacts/master-qa-homepage-desktop.webp",
+      "/opt/cursor/artifacts/master-qa-homepage-mobile-390.webp"
+    ]
+  },
+  "suiteMatrix": {
+    "build": 0,
+    "tests": 30,
+    "masterAcceptance": 0,
+    "failures": 0
+  }
+}
