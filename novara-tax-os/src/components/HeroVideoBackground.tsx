@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import './HeroVideoBackground.css'
 
-/** 12s Mixkit-licensed cinematic reel (HQ → networking → fintech workspace). */
+/** 12s Mixkit-licensed cinematic reel (luxury buildings → deals → advisor/client → preparer team). */
 const DESKTOP_WEBM = '/media/novara-cinematic-hero.webm'
 const DESKTOP_MP4 = '/media/novara-cinematic-hero.mp4'
 const MOBILE_WEBM = '/media/novara-cinematic-hero-mobile.webm'
@@ -10,7 +10,7 @@ const POSTER = '/media/novara-cinematic-poster.jpg'
 const POSTER_FALLBACK = '/media/novara-office-poster.jpg'
 
 /**
- * Full-bleed silent cinematic headquarters video — 12s loop.
+ * Full-bleed silent cinematic business/tax-office video — 12s loop.
  * WebM (VP9) + H.264 baseline MP4 for broad browser coverage.
  * Respects prefers-reduced-motion. Never permanently swaps to a still after a
  * transient autoplay/abort error — only reduced-motion uses the poster image.
