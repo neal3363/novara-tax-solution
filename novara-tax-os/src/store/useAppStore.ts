@@ -88,7 +88,7 @@ import {
   syncProfileFromDocuments,
 } from '../engine/smartInterview'
 import { buildInterviewProgress, nextInterviewTurn } from '../engine/questionProgress'
-import {
+import { withBankProductConsent,
   acceptConsent,
   captureSignature,
   defaultFilingAuthState,
@@ -120,6 +120,12 @@ import {
 import { parsePriorReturnExport, type ImportedReturnDraft } from '../engine/priorReturnImport'
 import { runPreFilingQa } from '../engine/qaEngine'
 import { buildCalcAuditTrail } from '../engine/calcAuditTrail'
+import {
+  sanitizeRefundDeliveryForStorage,
+  validateRefundDelivery,
+  type RefundDeliverySelection,
+} from '../engine/refundDelivery'
+import { createOfflineBankApplication } from '../engine/bankProducts'
 import {
   buildClientNotification,
   shouldSuppressDuplicate,
@@ -502,6 +508,8 @@ let state: Store = {
   calcAuditTrail: null,
   filingAuthorized: false,
   filingAuth: null,
+  refundDelivery: null,
+  bankProductApplication: null,
   hydrated: false,
 }
 
@@ -582,6 +590,8 @@ function freshWorkspaceForViewer(ws: {
     calcAuditTrail: null,
     filingAuthorized: false,
     filingAuth: null,
+    refundDelivery: null,
+    bankProductApplication: null,
   }
 }
 
@@ -2577,6 +2587,8 @@ export const actions = {
         calcAuditTrail: null,
         filingAuthorized: false,
         filingAuth: null,
+        refundDelivery: null,
+        bankProductApplication: null,
         hydrated: true,
       }
       emit()
@@ -2877,7 +2889,55 @@ export const actions = {
     emit()
     return { ok: true }
   },
+  saveRefundDelivery(selection: RefundDeliverySelection) {
+    const verified = state.benefitReport?.projectedRefund ?? selection.verifiedRefundAmount
+    const cleaned = sanitizeRefundDeliveryForStorage({
+      ...selection,
+      verifiedRefundAmount: verified,
+    })
+    const check = validateRefundDelivery(cleaned, verified)
+    if (!check.ok) {
+      state = {
+        ...state,
+        auditEvents: appendAudit('refund_delivery_rejected', check.errors.join(' '), {
+          method: cleaned.method,
+        }),
+      }
+      emit()
+      return { ok: false as const, error: check.errors.join(' ') }
+    }
+    let filingAuth = state.filingAuth
+    let bankProductApplication = state.bankProductApplication
+    if (cleaned.method === 'bank_product' && cleaned.bankProductProviderId && cleaned.bankProductCode) {
+      bankProductApplication = createOfflineBankApplication(
+        cleaned.bankProductProviderId,
+        cleaned.bankProductCode,
+      )
+      if (filingAuth) filingAuth = withBankProductConsent(filingAuth)
+    }
+    state = {
+      ...state,
+      refundDelivery: cleaned,
+      bankProductApplication,
+      filingAuth,
+      auditEvents: appendAudit(
+        'refund_delivery_saved',
+        `Refund delivery method saved: ${cleaned.method.replace(/_/g, ' ')} (verified refund only; account masked).`,
+        { method: cleaned.method, verifiedRefund: verified },
+      ),
+    }
+    emit()
+    return { ok: true as const }
+  },
   finalizeAndFile(): { ok: true; message: string } | { ok: false; error: string } {
+    const verified = state.benefitReport?.projectedRefund ?? 0
+    if (!state.refundDelivery) {
+      return { ok: false, error: 'Select a refund delivery method before filing authorization.' }
+    }
+    const deliveryCheck = validateRefundDelivery(state.refundDelivery, verified)
+    if (!deliveryCheck.ok) {
+      return { ok: false, error: deliveryCheck.errors.join(' ') }
+    }
     const packet = buildWorkingReturnPacket({
       profile: state.taxProfile,
       benefitReport: state.benefitReport,

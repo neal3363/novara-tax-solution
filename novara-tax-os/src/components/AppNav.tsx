@@ -28,6 +28,7 @@ export function AppNav() {
           { to: '/app/taxpayer/years', label: 'Years' },
           { to: '/app/taxpayer/assistant', label: 'Chat' },
           { to: '/app/taxpayer/final-review', label: 'Sign & file' },
+          { to: '/app/taxpayer/refund-tracking', label: 'Refund status' },
           { to: '/app/taxpayer/vault', label: 'Vault' },
         ]
       : currentUser.role === 'preparer'

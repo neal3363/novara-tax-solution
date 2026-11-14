@@ -16,6 +16,12 @@ import {
   type ConsentKind,
 } from '../../engine/filingAuthorizations'
 import { runPreFilingQa } from '../../engine/qaEngine'
+import { buildTaxPreparationCompletionScore } from '../../engine/taxReadiness'
+import { buildPreSignFeeBreakdown } from '../../engine/feeLedger'
+import { TaxReadinessScore } from '../../components/filing/TaxReadinessScore'
+import { FeeBreakdownPanel } from '../../components/filing/FeeBreakdownPanel'
+import { RefundDeliveryPanel } from '../../components/filing/RefundDeliveryPanel'
+import { RefundMaximizer } from '../../components/benefits/RefundMaximizer'
 import { buildInterviewProgress } from '../../engine/questionProgress'
 import '../shared.css'
 import './FinalReview.css'
@@ -43,6 +49,7 @@ export function FinalReview() {
     filingAuthorized,
     filingAuth,
     lastQaReport,
+    refundDelivery,
   } = useAppStore()
   const uploadRef = useRef<HTMLInputElement>(null)
   const [typedSig, setTypedSig] = useState('')
@@ -73,6 +80,29 @@ export function FinalReview() {
     [taxProfile, benefitReport, currentUser, mine, filingAuth],
   )
   const progress = useMemo(() => buildInterviewProgress(taxProfile), [taxProfile])
+  const readinessScore = useMemo(
+    () =>
+      buildTaxPreparationCompletionScore({
+        profile: taxProfile,
+        benefitReport,
+        documents,
+        refundDelivery,
+        filingAuth,
+        filingAuthorized,
+        clientName: currentUser?.name,
+        taxReturn: mine,
+      }),
+    [taxProfile, benefitReport, documents, refundDelivery, filingAuth, filingAuthorized, currentUser, mine],
+  )
+  const feeBreakdown = useMemo(
+    () =>
+      buildPreSignFeeBreakdown({
+        accountType: currentUser?.accountType,
+        taxReturn: mine,
+        taxYear: activeTaxYear,
+      }),
+    [currentUser, mine, activeTaxYear],
+  )
   const auth = filingAuth
   const lockCheck = auth ? signatureLockStatus(auth, packet.contentHash) : { valid: false, reason: 'Not initialized' }
   const qa =
@@ -240,6 +270,15 @@ export function FinalReview() {
           </p>
         </div>
       </div>
+
+      <TaxReadinessScore score={readinessScore} />
+      <RefundMaximizer report={benefitReport} profile={taxProfile} preparePath="/app/taxpayer/prepare" />
+      <FeeBreakdownPanel breakdown={feeBreakdown} />
+      <RefundDeliveryPanel
+        verifiedRefund={benefitReport?.projectedRefund ?? mine?.refundOrOwe ?? 0}
+        existing={refundDelivery}
+        officeTenantId={currentUser?.tenantId}
+      />
 
       {/* 1. Document checklist */}
       <section className="list-panel panel rise" style={{ marginTop: '1rem' }}>
@@ -467,6 +506,9 @@ export function FinalReview() {
             Authorize &amp; submit (sandbox e-file)
           </button>
         </div>
+        {!refundDelivery && (
+          <p className="muted">Refund delivery method not selected — required before e-file.</p>
+        )}
         {!benefitReviewSigned && (
           <p className="muted" style={{ marginTop: '0.5rem' }}>
             Tip: complete{' '}
