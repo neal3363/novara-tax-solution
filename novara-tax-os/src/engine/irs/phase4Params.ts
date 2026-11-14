@@ -149,7 +149,9 @@ export const FORM_READINESS = {
   form8863: 'isolated-validated' as const,
   scheduleB: 'isolated-validated' as const,
   scheduleD: 'isolated-validated' as const,
-  scheduleE: 'isolated-partial' as const, // passive loss limitation not fully modeled
+  scheduleE: 'isolated-validated' as const,
+  form8582: 'isolated-validated' as const,
+  form8949: 'isolated-validated' as const,
   form6251Amt: 'isolated-validated' as const,
   form8960Niit: 'isolated-validated' as const,
   form1040x: 'isolated-validated' as const,
