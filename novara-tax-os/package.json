@@ -34,7 +34,8 @@
     "test:phase6-security": "node scripts/test-phase6-security.mjs",
     "test:phase7-staging": "node scripts/test-phase7-staging-security.mjs",
     "test:irs-mef": "node scripts/test-irs-mef-phase8.mjs",
-    "test:irs-phase9": "node scripts/test-irs-phase9-staging.mjs"
+    "test:irs-phase9": "node scripts/test-irs-phase9-staging.mjs",
+    "test:payments-phase10": "node scripts/test-payments-phase10.mjs"
   },
   "dependencies": {
     "@fontsource/figtree": "^5.3.0",

@@ -60,6 +60,7 @@ function securityApiPlugin(): Plugin {
     '/api/security/status': '/api/security/status.ts',
     '/api/security/mef': '/api/security/mef.ts',
     '/api/security/irs-staging': '/api/security/irs-staging.ts',
+    '/api/security/payments': '/api/security/payments.ts',
   }
   return {
     name: 'novara-security-api-staging',
