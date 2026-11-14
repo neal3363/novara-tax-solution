@@ -44,8 +44,7 @@ const ptcRefund = ptcWh - (ptcIncTax - ptcRefundable)
 const eduAgi = 50000
 const eduTi = 35000
 const eduTax = bracketTax(eduTi, B2025_SINGLE)
-const aotcTotal = 2500 // 100%×2000 + 25%×2000
-const aotcRef = 1000
+const aotcRef = 1000 // 40% of $2,500 AOTC
 const aotcNon = 1500
 const eduWh = 5000
 // netTax = tax - aotcNon - aotcRef; refund = WH - netTax
