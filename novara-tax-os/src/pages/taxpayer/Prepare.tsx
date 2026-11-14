@@ -38,8 +38,19 @@ import {
   parseTaxpayerStatement,
   personalIdentityProgress,
 } from '../../engine/naturalLanguageFacts'
+import { classifyDocumentName, summarizeUploadRouting } from '../../engine/documentProcessing'
 import '../shared.css'
 import './Prepare.css'
+
+function sectionFromUploadedNames(names: string[]): QuestionnaireSectionId {
+  const types = names.map((n) => classifyDocumentName(n))
+  if (types.includes('ID')) return 'personal'
+  if (types.some((t) => t === 'W-2' || t === '1099-NEC' || t === '1099-INT')) return 'income'
+  if (types.some((t) => t === 'P&L' || t === 'Trial Balance')) return 'business'
+  if (types.some((t) => t === 'Childcare' || t === '1098-T')) return 'credits'
+  if (types.some((t) => t === '1098' || t === '1098-E' || t === 'Property Tax')) return 'deductions'
+  return 'personal'
+}
 
 const INTENT_KEY = 'novara-pending-intent'
 
@@ -168,12 +179,25 @@ export function Prepare() {
     }
     const stashed = takeLandingUploads()
     if (stashed.length > 0) {
+      const names = stashed.map((f) => f.name)
       actions.uploadFiles(stashed)
       actions.setPrepStep(2)
+      setSection(sectionFromUploadedNames(names))
+      const routing = summarizeUploadRouting(names)
       actions.addMessage(
         'assistant',
-        `Sorted ${stashed.length} landing upload${stashed.length === 1 ? '' : 's'} into your return by document type. Missing a credit receipt? Upload it later from Documents or the Vault — it will route the same way.`,
+        `Sorted ${stashed.length} landing upload${stashed.length === 1 ? '' : 's'} into place: ${routing}. Driver’s license and SS card go to Personal; W-2s and 1099s to Income; 1098s/childcare to Credits & deductions. Missing a credit receipt? Upload it later from Documents or the Vault — same routing.`,
       )
+    } else if (params.get('uploaded')) {
+      // Public demo already uploaded on Landing — open the tab that matches those docs.
+      const count = Number(params.get('uploaded'))
+      if (Number.isFinite(count) && count > 0) {
+        actions.setPrepStep(2)
+        // Prefer Personal when any ID is already in the vault; else Income if wage/1099 present.
+        const hasId = documents.some((d) => d.type === 'ID')
+        const hasIncome = documents.some((d) => d.type === 'W-2' || d.type.startsWith('1099'))
+        setSection(hasId ? 'personal' : hasIncome ? 'income' : 'personal')
+      }
     } else if (params.get('upload') === '1') {
       // Legacy handoff: open the picker if the landing page only set the flag.
       requestAnimationFrame(() => inputRef.current?.click())

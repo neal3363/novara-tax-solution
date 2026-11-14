@@ -25,10 +25,18 @@ assert(landing.includes('beginWithFiles'), 'Landing multi-upload handler present
 assert(landing.includes('Upload all documents'), 'Landing invites bulk upload')
 assert(landing.includes('Add more anytime') || landing.includes('upload later'), 'Landing discloses later upload')
 assert(landing.includes('stashLandingUploads') || landing.includes('uploadFiles'), 'Landing routes files into workspace')
+assert(landing.includes('summarizeUploadRouting'), 'Landing shows auto-sort destinations')
+assert(landing.includes('Social Security card') || landing.includes('driver'), 'Landing invites DL/SS card uploads')
 
 const prepare = readFileSync(join(root, 'src/pages/taxpayer/Prepare.tsx'), 'utf8')
 assert(prepare.includes('takeLandingUploads'), 'Prepare consumes landing uploads')
-assert(prepare.includes('Upload it later'), 'Prepare mentions later credit/doc uploads')
+assert(prepare.includes('Upload it later') || prepare.includes('same routing'), 'Prepare mentions later credit/doc uploads')
+assert(prepare.includes('sectionFromUploadedNames') || prepare.includes('summarizeUploadRouting'), 'Prepare opens matching tab after sort')
+
+const classifySrc = readFileSync(join(root, 'src/engine/documentProcessing.ts'), 'utf8')
+assert(classifySrc.includes('routingPlaceForDocType'), 'routing helper exported')
+assert(classifySrc.includes('ss_card') || classifySrc.includes('ss[\\s\\-_]?card'), 'SS card filename patterns')
+assert(classifySrc.includes('driver'), 'driver license filename patterns')
 
 assert(existsSync(join(root, 'src/engine/pendingLandingUploads.ts')), 'pending upload module exists')
 
@@ -38,7 +46,11 @@ writeFileSync(
   join(tmp, 'run.ts'),
   `
 import { stashLandingUploads, takeLandingUploads, peekLandingUploadCount, clearLandingUploads } from '../src/engine/pendingLandingUploads.ts'
-import { classifyDocumentName } from '../src/engine/documentProcessing.ts'
+import {
+  classifyDocumentName,
+  summarizeUploadRouting,
+  routingPlaceForDocType,
+} from '../src/engine/documentProcessing.ts'
 
 let failed = 0
 function assert(c: boolean, m: string) {
@@ -61,6 +73,26 @@ assert(classifyDocumentName(f2.name) === 'Childcare', 'routes childcare credit s
 assert(classifyDocumentName(f3.name) === '1099-NEC', 'routes 1099-NEC')
 assert(classifyDocumentName('tuition_1098-T.pdf') === '1098-T', 'routes education credit form')
 assert(classifyDocumentName('random_scan.pdf') === 'Other', 'unknown stays Other for later review')
+
+// Front-page identity + income routing (DL, SS card, W-2, 1099)
+assert(classifyDocumentName('DL_Alex_Rivera.pdf') === 'ID', 'routes DL.pdf-style name to ID')
+assert(classifyDocumentName("driver's_license.jpg") === 'ID', 'routes driver’s license')
+assert(classifyDocumentName('drivers-license-front.png') === 'ID', 'routes drivers-license')
+assert(classifyDocumentName('ss_card_Alex.pdf') === 'ID', 'routes ss_card to ID')
+assert(classifyDocumentName('social_security_card.pdf') === 'ID', 'routes social security card')
+assert(classifyDocumentName('SSN_Alex_Rivera.pdf') === 'ID', 'routes SSN card')
+assert(classifyDocumentName('W-2_Acme_2025.pdf') === 'W-2', 'routes W-2 with hyphen')
+assert(classifyDocumentName('1099.pdf') === '1099-NEC', 'generic 1099 → income NEC')
+assert(classifyDocumentName('1099-INT_bank.pdf') === '1099-INT', 'routes 1099-INT')
+assert(classifyDocumentName('simple_scan.pdf') !== 'P&L', 'does not misclassify simple as P&L')
+assert(classifyDocumentName('valid_receipt.pdf') !== 'ID', 'does not misclassify valid as ID')
+
+const summary = summarizeUploadRouting(['DL.pdf', 'ss_card.pdf', 'W2_2025.pdf', '1099-NEC.pdf'])
+assert(summary.includes('Personal ID vault'), 'summary mentions Personal ID vault')
+assert(summary.includes('Income documents'), 'summary mentions Income documents')
+assert(routingPlaceForDocType('ID').vaultCategory === 'primary_taxpayer', 'ID → primary taxpayer vault')
+assert(routingPlaceForDocType('W-2').vaultCategory === 'income', 'W-2 → income vault')
+assert(routingPlaceForDocType('1099-NEC').questionnaireSection === 'income', '1099 opens Income tab')
 
 if (failed) process.exit(1)
 console.log('handoff logic ok')
