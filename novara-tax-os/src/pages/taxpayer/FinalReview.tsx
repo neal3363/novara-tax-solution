@@ -22,6 +22,10 @@ import { TaxReadinessScore } from '../../components/filing/TaxReadinessScore'
 import { FeeBreakdownPanel } from '../../components/filing/FeeBreakdownPanel'
 import { RefundDeliveryPanel } from '../../components/filing/RefundDeliveryPanel'
 import { RefundMaximizer } from '../../components/benefits/RefundMaximizer'
+import { FinalReturnReviewPanel } from '../../components/filing/FinalReturnReviewPanel'
+import { BalanceDuePanel } from '../../components/filing/BalanceDuePanel'
+import { runFinalReturnReview } from '../../engine/finalReturnReview'
+import { buildBalanceDueGuidance } from '../../engine/balanceDuePayments'
 import { buildInterviewProgress } from '../../engine/questionProgress'
 import '../shared.css'
 import './FinalReview.css'
@@ -102,6 +106,29 @@ export function FinalReview() {
         taxYear: activeTaxYear,
       }),
     [currentUser, mine, activeTaxYear],
+  )
+  const finalReview = useMemo(
+    () =>
+      runFinalReturnReview({
+        profile: taxProfile,
+        benefitReport,
+        documents,
+        refundDelivery,
+        filingAuth,
+        filingAuthorized,
+        taxReturn: mine,
+        clientName: currentUser?.name,
+      }),
+    [taxProfile, benefitReport, documents, refundDelivery, filingAuth, filingAuthorized, mine, currentUser],
+  )
+  const balanceGuidance = useMemo(
+    () =>
+      buildBalanceDueGuidance({
+        refundOrBalance: benefitReport?.projectedRefund ?? mine?.refundOrOwe ?? 0,
+        taxYear: activeTaxYear,
+        filingState: String(taxProfile.answers.filing_state || ''),
+      }),
+    [benefitReport, mine, activeTaxYear, taxProfile],
   )
   const auth = filingAuth
   const lockCheck = auth ? signatureLockStatus(auth, packet.contentHash) : { valid: false, reason: 'Not initialized' }
@@ -279,6 +306,8 @@ export function FinalReview() {
         existing={refundDelivery}
         officeTenantId={currentUser?.tenantId}
       />
+      <BalanceDuePanel guidance={balanceGuidance} />
+      <FinalReturnReviewPanel report={finalReview} />
 
       {/* 1. Document checklist */}
       <section className="list-panel panel rise" style={{ marginTop: '1rem' }}>
@@ -506,7 +535,10 @@ export function FinalReview() {
             Authorize &amp; submit (sandbox e-file)
           </button>
         </div>
-        {!refundDelivery && (
+        {!finalReview.canEfile && (
+          <p className="muted">{finalReview.summary}</p>
+        )}
+        {!refundDelivery && benefitReport && (benefitReport.projectedRefund ?? 0) > 0 && (
           <p className="muted">Refund delivery method not selected — required before e-file.</p>
         )}
         {!benefitReviewSigned && (

@@ -2,6 +2,8 @@ import { Link } from 'react-router-dom'
 import { formatMoney } from '../../data/fees'
 import { buildRefundTrackingSnapshot } from '../../engine/refundTracking'
 import { RefundMaximizer } from '../../components/benefits/RefundMaximizer'
+import { BalanceDuePanel } from '../../components/filing/BalanceDuePanel'
+import { buildBalanceDueGuidance } from '../../engine/balanceDuePayments'
 import { actions, useAppStore } from '../../store/useAppStore'
 import '../shared.css'
 import '../../components/filing/FilingPanels.css'
@@ -21,6 +23,12 @@ export function RefundTrackingPage() {
   const mine =
     returns.find((r) => r.id === activeReturnId) ??
     returns.find((r) => r.clientId === currentUser?.id && r.taxYear === activeTaxYear)
+
+  const balanceGuidance = buildBalanceDueGuidance({
+    refundOrBalance: benefitReport?.projectedRefund ?? mine?.refundOrOwe ?? 0,
+    taxYear: activeTaxYear,
+    filingState: String(taxProfile.answers.filing_state || ''),
+  })
 
   const snap = buildRefundTrackingSnapshot({
     taxReturn: mine,
@@ -89,6 +97,7 @@ export function RefundTrackingPage() {
         </ul>
       </section>
 
+      <BalanceDuePanel guidance={balanceGuidance} />
       <RefundMaximizer report={benefitReport} profile={taxProfile} />
     </div>
   )

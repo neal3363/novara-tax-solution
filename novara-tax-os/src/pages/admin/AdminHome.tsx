@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { actions, useAppStore } from '../../store/useAppStore'
 import '../shared.css'
 
@@ -12,6 +13,7 @@ export function AdminHome() {
           <p className="eyebrow">Platform Admin AI</p>
           <h1>System status</h1>
         </div>
+        <Link className="btn btn-secondary" to="/app/admin/tax-law">Tax-law updates</Link>
         <button className="btn btn-secondary" type="button" onClick={() => actions.resetDemo()}>
           Reset local demo data
         </button>

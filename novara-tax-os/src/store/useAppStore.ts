@@ -126,6 +126,15 @@ import {
   type RefundDeliverySelection,
 } from '../engine/refundDelivery'
 import { createOfflineBankApplication } from '../engine/bankProducts'
+import { type OfficeOnboardingDraft } from '../engine/officeOnboarding'
+import {
+  emptyEngagementConsentState,
+  signEngagementConsent as signEngagementConsentEngine,
+  withdrawEngagementConsent as withdrawEngagementConsentEngine,
+  type EngagementConsentKind,
+  type EngagementConsentState,
+} from '../engine/engagementConsent'
+import { runFinalReturnReview } from '../engine/finalReturnReview'
 import {
   buildClientNotification,
   shouldSuppressDuplicate,
@@ -510,6 +519,8 @@ let state: Store = {
   filingAuth: null,
   refundDelivery: null,
   bankProductApplication: null,
+  officeOnboarding: null,
+  engagementConsent: null,
   hydrated: false,
 }
 
@@ -592,6 +603,8 @@ function freshWorkspaceForViewer(ws: {
     filingAuth: null,
     refundDelivery: null,
     bankProductApplication: null,
+    officeOnboarding: null,
+    engagementConsent: null,
   }
 }
 
@@ -2589,6 +2602,8 @@ export const actions = {
         filingAuth: null,
         refundDelivery: null,
         bankProductApplication: null,
+        officeOnboarding: null,
+        engagementConsent: null,
         hydrated: true,
       }
       emit()
@@ -2889,6 +2904,16 @@ export const actions = {
     emit()
     return { ok: true }
   },
+  saveOfficeOnboarding(draft: OfficeOnboardingDraft) {
+    state = {
+      ...state,
+      officeOnboarding: { ...draft, updatedAt: new Date().toISOString() },
+      auditEvents: appendAudit('office_onboarding_saved', 'Office onboarding draft saved', {
+        businessName: draft.businessName.slice(0, 80),
+      }),
+    }
+    emit()
+  },
   saveRefundDelivery(selection: RefundDeliverySelection) {
     const verified = state.benefitReport?.projectedRefund ?? selection.verifiedRefundAmount
     const cleaned = sanitizeRefundDeliveryForStorage({
@@ -2929,14 +2954,70 @@ export const actions = {
     emit()
     return { ok: true as const }
   },
+  ensureEngagementConsent() {
+    if (state.engagementConsent) return
+    state = {
+      ...state,
+      engagementConsent: emptyEngagementConsentState(),
+      auditEvents: appendAudit('engagement_consent_init', 'Engagement/consent package presented'),
+    }
+    emit()
+  },
+  saveEngagementIntake(answers: Record<string, string>) {
+    actions.ensureEngagementConsent()
+    const engagementConsent: EngagementConsentState = {
+      ...state.engagementConsent!,
+      intakeAnswers: { ...state.engagementConsent!.intakeAnswers, ...answers },
+      updatedAt: new Date().toISOString(),
+    }
+    state = {
+      ...state,
+      engagementConsent,
+      auditEvents: appendAudit('engagement_intake_saved', 'Client intake fields updated', {
+        keys: Object.keys(answers).join(','),
+      }),
+    }
+    emit()
+  },
+  signEngagementConsent(kind: EngagementConsentKind, signerName: string): { ok: true } | { ok: false; error: string } {
+    if (!signerName.trim()) return { ok: false, error: 'Signer name required.' }
+    actions.ensureEngagementConsent()
+    const engagementConsent = signEngagementConsentEngine(state.engagementConsent!, kind, signerName)
+    state = {
+      ...state,
+      engagementConsent,
+      auditEvents: appendAudit('engagement_consent_signed', `Engagement consent signed: ${kind}`, { kind }),
+    }
+    emit()
+    return { ok: true }
+  },
+  withdrawEngagementConsent(
+    kind: EngagementConsentKind,
+    reason: string,
+  ): { ok: true } | { ok: false; error: string } {
+    actions.ensureEngagementConsent()
+    const engagementConsent = withdrawEngagementConsentEngine(state.engagementConsent!, kind, reason)
+    state = {
+      ...state,
+      engagementConsent,
+      auditEvents: appendAudit('engagement_consent_withdrawn', `Engagement consent withdrawn: ${kind}`, { kind }),
+    }
+    emit()
+    return { ok: true }
+  },
+  getEngagementConsentSnapshot(): EngagementConsentState | null {
+    return state.engagementConsent
+  },
   finalizeAndFile(): { ok: true; message: string } | { ok: false; error: string } {
     const verified = state.benefitReport?.projectedRefund ?? 0
-    if (!state.refundDelivery) {
-      return { ok: false, error: 'Select a refund delivery method before filing authorization.' }
-    }
-    const deliveryCheck = validateRefundDelivery(state.refundDelivery, verified)
-    if (!deliveryCheck.ok) {
-      return { ok: false, error: deliveryCheck.errors.join(' ') }
+    if (verified > 0) {
+      if (!state.refundDelivery) {
+        return { ok: false, error: 'Select a refund delivery method before filing authorization.' }
+      }
+      const deliveryCheck = validateRefundDelivery(state.refundDelivery, verified)
+      if (!deliveryCheck.ok) {
+        return { ok: false, error: deliveryCheck.errors.join(' ') }
+      }
     }
     const packet = buildWorkingReturnPacket({
       profile: state.taxProfile,
@@ -2954,6 +3035,21 @@ export const actions = {
       state = { ...state, filingAuth }
       emit()
       return { ok: false, error: lock.reason ?? 'Signatures incomplete.' }
+    }
+    const finalReview = runFinalReturnReview({
+      profile: state.taxProfile,
+      benefitReport: state.benefitReport,
+      documents: state.documents,
+      refundDelivery: state.refundDelivery,
+      filingAuth,
+      filingAuthorized: true,
+      taxReturn:
+        state.returns.find((r) => r.id === state.activeReturnId) ??
+        state.returns.find((r) => r.clientId === state.currentUser?.id && r.taxYear === state.activeTaxYear),
+      clientName: state.currentUser?.name,
+    })
+    if (!finalReview.canEfile) {
+      return { ok: false, error: finalReview.summary }
     }
     state = {
       ...state,
