@@ -401,6 +401,12 @@ export function applyHouseholdToProfile(
   const dependents: DependentRecord[] = depCandidates.map((p, i) => {
     const rel = mapRelation(p.relationToPrimary!)
     let dep = emptyDependent(i, taxYear)
+    const ageFromDob =
+      p.dateOfBirth && /^\d{4}-\d{2}-\d{2}$/.test(p.dateOfBirth)
+        ? Number(taxYear) - Number(p.dateOfBirth.slice(0, 4))
+        : -1
+    // Doc-first defaults: kids lived with you all year; you supported them; nobody else claims.
+    // Keeps reading light — user can Edit if custody differs.
     dep = {
       ...dep,
       id: `dep-intake-${i + 1}`,
@@ -409,10 +415,14 @@ export function applyHouseholdToProfile(
       tinLast4: p.tinLast4 ?? '',
       tinStatus: p.tinLast4 ? 'provided' : 'missing',
       relationship: rel,
-    }
-    if (dep.dateOfBirth) {
-      const age = Number(taxYear) - Number(dep.dateOfBirth.slice(0, 4))
-      dep = { ...dep, age: Number.isFinite(age) ? age : -1 }
+      age: Number.isFinite(ageFromDob) ? ageFromDob : -1,
+      monthsLivedWith: 12,
+      providedOwnSupport: false,
+      anotherMayClaim: false,
+      sharedCustody: false,
+      isCustodialParent: true,
+      isStudent: ageFromDob >= 17 && ageFromDob < 24 ? true : ageFromDob >= 0 && ageFromDob < 17 ? false : null,
+      isDisabled: false,
     }
     return evaluateDependent(dep, taxYear)
   })
@@ -428,6 +438,16 @@ export function applyHouseholdToProfile(
   else if (!hasDeps) answers.has_child = 'no'
   if (spouse) {
     answers.married_dec31 = 'yes'
+  }
+
+  // Re-import path: satisfyDocBackedAnswers lives in smartInterview — apply inline defaults here for CTC/EITC
+  if (dependents.some((d) => d.ctcEligible || d.eitcQualifyingChild || d.age >= 0 && d.age < 17)) {
+    answers.child_lived_with = answers.child_lived_with ?? 'yes'
+    answers.child_support = answers.child_support ?? 'yes'
+    answers.another_claimant = answers.another_claimant ?? 'no'
+  }
+  if (hasDeps === false) {
+    answers.has_child = 'no'
   }
 
   return {

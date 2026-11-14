@@ -295,6 +295,8 @@ function docsOnFile(rule: BenefitRule, p: TaxpayerProfile): boolean {
   if ((rule.id === 'aotc' || rule.id === 'llc') && p.tuitionPaid > 0) return true
   if (rule.id === 'student_loan' && p.studentLoanInterest > 0) return true
   if (rule.id === 'eitc' && p.wages + p.selfEmploymentIncome > 0) return true
+  if (rule.id === 'qbi' && p.selfEmploymentIncome > 0) return true
+  if (rule.id === 'cdcc' && p.childcarePaid > 0 && p.answers.cdcc_docs === 'yes') return true
   // Mileage: taxpayer attestation of a log is not verified documentation — stay pending_verification
   if (rule.id === 'mileage' && p.answers.mileage_docs === 'yes') return true
   return false

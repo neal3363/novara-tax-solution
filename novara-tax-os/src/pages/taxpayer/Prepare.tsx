@@ -464,7 +464,7 @@ export function Prepare() {
             <span className="badge">Upload first</span>
             <h2>Drop your ID, SSN card, W-2s, and 1099s</h2>
             <p>
-              We fill name, birth date, Social, and W-2 numbers for you. Less typing. Name files like{' '}
+              We fill your info and apply the credits your forms support. Less questions. Name files like{' '}
               <code>ID_Your_Name.pdf</code> or <code>W2_Your_Name.pdf</code>.
             </p>
             <input
@@ -721,8 +721,8 @@ export function Prepare() {
             <div className="list-panel panel interview-chat">
               <h2>Short questions</h2>
               <p className="muted" style={{ marginTop: 0 }}>
-                Upload docs first so we skip what we already know. Green = done. Orange = still needed. Tap Yes/No —
-                keep reading light.
+                Upload first — W-2, 1099, mortgage, tuition, and childcare credits apply from your docs. We only ask
+                what’s left. Green = done.
               </p>
               <QuestionProgressBar profile={taxProfile} />
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.55rem', marginBottom: '0.75rem', alignItems: 'center' }}>

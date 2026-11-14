@@ -36,7 +36,12 @@ export function answerPresent(p: TaxpayerProfile, key: string): boolean {
   if (key === 'loan_interest_paid') return p.studentLoanInterest > 0 || isEnteredNumber(v) || isExplicitYesNo(v)
   if (key === 'business_miles') return p.businessMileage > 0 || isEnteredNumber(v)
   if (key === 'total_miles') return isEnteredNumber(v)
-  if (key === 'qbi_amount') return isEnteredNumber(v)
+  if (key === 'qbi_amount') return isEnteredNumber(v) || p.selfEmploymentIncome > 0
+  if (key === 'qbi_sstb') return isExplicitYesNo(v)
+  if (key === 'eitc_investment_ok') return isExplicitYesNo(v)
+  if (key === 'aotc_half_time_first4') return isExplicitYesNo(v)
+  if (key === 'felony_drug') return isExplicitYesNo(v)
+  if (key === 'employer_dependent_care') return isExplicitYesNo(v)
   if (key === 'se_health_premium_amount') return p.seHealthPremiums > 0 || isEnteredNumber(v)
   if (key === 'charitable_gift_amount') return p.charitableGifts > 0 || isEnteredNumber(v)
   if (key === 'medical_amount') return p.medicalExpenses > 0 || isEnteredNumber(v)
