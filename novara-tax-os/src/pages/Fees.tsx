@@ -195,6 +195,11 @@ export function Fees() {
         <p className="muted" style={{ marginTop: 0 }}>
           {BANKING_FEES_NOTE}
         </p>
+        <p className="muted">
+          Architecture supports <strong>office-selected</strong> providers and/or a <strong>NOVARA platform</strong>{' '}
+          partner (mode: {PRICING.banking.providerSelectionMode}). Eligibility APIs stay offline until a provider is
+          verified — NOVARA does not simulate approvals.
+        </p>
       </section>
 
       <section className="list-panel panel calculator" style={{ marginTop: '1rem' }}>

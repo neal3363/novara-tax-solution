@@ -23,7 +23,8 @@
     "test:dep-name": "node scripts/test-dependent-name-answer.mjs",
     "test:questionnaire": "node scripts/test-questionnaire-e2e.mjs",
     "test:conversation": "node scripts/test-conversation-intent.mjs",
-    "test:refund-max": "node scripts/test-refund-maximizer.mjs"
+    "test:refund-max": "node scripts/test-refund-maximizer.mjs",
+    "test:refund-delivery": "node scripts/test-refund-delivery.mjs"
   },
   "dependencies": {
     "@fontsource/figtree": "^5.3.0",

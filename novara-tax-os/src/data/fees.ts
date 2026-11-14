@@ -48,8 +48,13 @@ export const PRICING = {
   },
   banking: {
     liveConnectivity: false,
+    /**
+     * Architecture supports office-selected providers and/or a NOVARA platform partner
+     * (see bankProducts.ts). Never set liveConnectivity true until API + agreements verified.
+     */
+    providerSelectionMode: 'either' as const,
     disclosure:
-      'Banking-product and refund-transfer fees are separate from NOVARA software fees, disclosed before authorization, and not activated until provider agreements and testing are complete.',
+      'Banking-product and refund-transfer fees are separate from NOVARA software fees, disclosed before authorization, and not activated until provider agreements and testing are complete. Offices may configure an approved partner or use the platform default when connected — neither is live in this build.',
   },
 } as const
 

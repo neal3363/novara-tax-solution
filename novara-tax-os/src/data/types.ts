@@ -335,4 +335,8 @@ export interface AppState {
   filingAuthorized: boolean
   /** Separate consents, signatures, and locked return version */
   filingAuth: import('../engine/filingAuthorizations').FilingAuthState | null
+  /** Mandatory refund delivery selection (sanitized — no full account numbers) */
+  refundDelivery: import('../engine/refundDelivery').RefundDeliverySelection | null
+  /** Bank-product application status — offline until provider is live */
+  bankProductApplication: import('../engine/bankProducts').BankProductApplication | null
 }
