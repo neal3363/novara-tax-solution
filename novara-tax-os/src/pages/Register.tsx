@@ -195,7 +195,7 @@ export function RegisterFlow() {
     if (result.credentialViews.efin) parts.push(result.credentialViews.efin.displayHint)
     setCredNote(
       parts.length
-        ? `${parts.join(' · ')}. Encrypted at rest — not verified until an authorized validation process completes.`
+        ? `${parts.join(' · ')}. Stored as irreversible fingerprint + last-four only (not recoverable encryption) — not verified until an authorized validation process completes.`
         : 'No professional credentials required for TC.',
     )
     setStep('done')
@@ -298,7 +298,8 @@ export function RegisterFlow() {
                 </div>
                 <p className="muted">
                   No EFIN required for TP. TP = clients only — you cannot invite or manage other preparers. Entered PTIN
-                  is encrypted and stays <strong>pending verification</strong> until an authorized validation completes.
+                  is fingerprinted (not stored in recoverable form) and stays <strong>pending verification</strong> until
+                  an authorized validation completes.
                 </p>
               </>
             )}
@@ -374,8 +375,8 @@ export function RegisterFlow() {
                   </label>
                 </fieldset>
                 <p className="muted">
-                  Office = preparers + clients. EFIN/EIN are encrypted and stay pending verification. Paid preparers you
-                  invite must supply their own PTIN where applicable.
+                  Office = preparers + clients. EFIN/EIN are fingerprinted (not recoverable encryption) and stay pending
+                  verification. Paid preparers you invite must supply their own PTIN where applicable.
                 </p>
               </>
             )}

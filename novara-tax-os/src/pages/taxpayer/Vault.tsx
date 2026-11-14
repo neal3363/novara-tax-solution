@@ -51,7 +51,7 @@ export function Vault() {
     <div className="page container">
       <header className="page-header">
         <div>
-          <p className="eyebrow">Secure Cloud Tax Vault · tenant {currentUser?.tenantId ?? '—'}</p>
+          <p className="eyebrow">Document vault (sandbox · tenant-scoped) · {currentUser?.tenantId ?? '—'}</p>
           <h1>Your documents</h1>
         </div>
         <Link className="btn btn-secondary" to="/app/taxpayer/benefits">

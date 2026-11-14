@@ -64,7 +64,7 @@ export function defaultRecoveryObjectives(): RecoveryObjective[] {
   return [
     { id: 'rpo', name: 'Recovery Point Objective (RPO)', target: '≤ 24 hours of sandbox state', status: 'defined' },
     { id: 'rto', name: 'Recovery Time Objective (RTO)', target: '≤ 4 hours to restore demo workspace', status: 'defined' },
-    { id: 'integrity', name: 'Backup integrity verification', target: 'Hash-check each encrypted snapshot', status: 'tested' },
+    { id: 'integrity', name: 'Backup integrity verification', target: 'Hash-check each snapshot (sandbox)', status: 'tested' },
     { id: 'deletion', name: 'Accidental deletion protection', target: 'Soft-delete + recoverable snapshots; no silent purge', status: 'defined' },
   ]
 }
@@ -81,37 +81,37 @@ export function buildContinuityDashboard(input: {
   const jobs: BackupJob[] = [
     {
       id: 'job-session',
-      label: 'Encrypted session workspace snapshot',
+      label: 'Session workspace snapshot (integrity-hashed)',
       createdAt: iso,
       status: 'verified',
-      encrypted: true,
+      encrypted: false,
       integrityHash: hashId(`session-${input.auditEventCount}`),
       sizeLabel: '~local',
       scope: 'session_state',
-      notes: 'Sandbox: mirrors tab-scoped persist. Not a production cloud backup.',
+      notes: 'Sandbox: mirrors tab-scoped persist with integrity hash. Not production KMS encryption or cloud backup.',
     },
     {
       id: 'job-docs',
-      label: 'Document metadata backup',
+      label: 'Document metadata snapshot',
       createdAt: iso,
       status: input.documentCount > 0 ? 'verified' : 'scheduled',
-      encrypted: true,
+      encrypted: false,
       integrityHash: hashId(`docs-${input.documentCount}`),
       sizeLabel: `${input.documentCount} meta records`,
       scope: 'documents_meta',
-      notes: 'File bytes stay in vault controls; metadata snapshot only in this demo.',
+      notes: 'Metadata only in this demo — not a KMS-encrypted object-store backup.',
     },
     {
       id: 'job-audit',
-      label: 'Audit trail backup',
+      label: 'Audit trail snapshot',
       createdAt: iso,
       status: input.auditEventCount > 0 ? 'verified' : 'scheduled',
-      encrypted: true,
+      encrypted: false,
       integrityHash: hashId(`audit-${input.auditEventCount}`),
       sizeLabel: `${input.auditEventCount} events`,
       scope: 'audit_trail',
-      notes: 'Preserves consent and filing audit events for continuity.',
-    },
+      notes: 'In-app audit events for continuity demos — not durable SIEM storage.',
+    }
   ]
 
   const incidents: ContinuityIncident[] = [
@@ -143,11 +143,11 @@ export function buildContinuityDashboard(input: {
       ? `${verified.length}/${jobs.length} backup jobs verified. Production restore is disabled in this environment.`
       : 'Backup inventory is restricted to office owners and admins.',
     procedures: [
-      '1. Verify encrypted backup jobs and integrity hashes.',
+      '1. Verify backup job integrity hashes (sandbox).',
       '2. Run recovery tests against a synthetic sandbox copy only.',
       '3. Never restore destructively over production taxpayer data from this demo.',
       '4. Log incidents and alert administrators when verification fails.',
-      '5. Keep taxpayer information encrypted in transit and at rest throughout recovery.',
+      '5. Protect taxpayer information throughout recovery; production requires TLS + KMS at-rest encryption (not yet connected).',
     ],
   }
 }

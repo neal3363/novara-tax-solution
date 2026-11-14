@@ -2214,7 +2214,7 @@ export const actions = {
       officeStaff,
       auditEvents: appendAudit(
         'registration_complete',
-        `${input.tier} registration recorded. Credentials stored encrypted; status pending verification (not auto-verified).`,
+        `${input.tier} registration recorded. Credentials stored as fingerprint + last-four only (not recoverable encryption); status pending verification (not auto-verified).`,
         {
           tier: input.tier,
           amount: input.planAmount,
