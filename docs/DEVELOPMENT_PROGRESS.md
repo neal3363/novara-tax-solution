@@ -1,23 +1,28 @@
 # DEVELOPMENT_PROGRESS.md
 
-## Current cycle — OIDC + durable security + export prep
+## Cycle — migration + auth verification (post #69)
 
-### Implemented
-- Production OIDC authorize + PKCE + state/nonce + token exchange + JWKS ID-token validation + MFA claim enforcement
-- OIDC users must be pre-provisioned in `AUTH_USERS_JSON` (no privileged self-registration)
-- Durable rate-limit + audit stores (Postgres when `DATABASE_URL` set; PGlite locally)
-- `cursor-app.json` declares postgres for multi-instance persistence
-- `PREVIEW_AUTH_PASSWORD` removed from application code
-- Secrets-free export script for transfer to `neal3363/novara-asset-intelligence`
-- Registration page clarified: interest only, creates no accounts
+### Completed in code
+- Production OIDC (PKCE, state, nonce, JWKS, MFA claims, roster-only roles)
+- Durable rate-limit + audit (Postgres / PGlite)
+- Obsolete shared-password preview variable removed from code and `.env.example`
+- Secrets-free `npm run export:ai` pack + transfer README
+- Auth configuration docs with exact redirect URIs per environment
 
-### Remaining blockers
-- Human must create GitHub repo `neal3363/novara-asset-intelligence` and push export
-- Confirm removal of obsolete `PREVIEW_AUTH_PASSWORD` in Cursor Secrets UI if still bound
-- Choose/configure real IdP values (issuer/client) before production OIDC login works end-to-end
-- Republish deferred until review approval
+### Verified this cycle
+- Tax OS remote branch still present; not present on AI branches
+- `createRepository` for `neal3363/novara-asset-intelligence` still denied
+- Deployed preview still reachable as private Cursor app (host gate); app-level auth remains closed until nine auth values are set in the secure form
+- Unit/integration suite + production build (see `TEST_RESULTS.md`)
+
+### Blocked on human / missing credentials
+1. Create GitHub repo `neal3363/novara-asset-intelligence` and push export
+2. Confirm unbind of obsolete shared-password secret in Cursor Secrets UI (requested; stays bound until UI confirm)
+3. Add the nine authentication values in the secure form (enables portal login on synthetic data only)
+4. Register IdP redirect URIs and complete live OIDC against a real IdP
+5. Retarget / republish deployment from the new repo only after verification (keep current preview until then)
 
 ### Preserved
-- Tax OS branches untouched
+- Design/portals/business model
 - Synthetic data labeled; live connectors disabled
-- Design/portals/business model unchanged
+- No DNS changes, purchases, or irreversible migrations
