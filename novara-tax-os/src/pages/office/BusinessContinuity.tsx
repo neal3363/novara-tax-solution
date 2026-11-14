@@ -62,7 +62,7 @@ export function BusinessContinuityPage() {
           {view.jobs.map((j) => (
             <li key={j.id} className={`readiness-item status-${j.status === 'verified' ? 'complete' : 'attention'}`}>
               <strong>
-                {j.label} · {j.status} {j.encrypted ? '(encrypted)' : ''}
+                {j.label} · {j.status} {j.encrypted ? '(KMS encrypted)' : '(integrity-hashed sandbox)'}
               </strong>
               <span>
                 {j.sizeLabel} · integrity {j.integrityHash} — {j.notes}

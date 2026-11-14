@@ -4,7 +4,7 @@
  * DISCOVER MISSING → FILING STATUS → BENEFITS
  *
  * Never assume relationship or eligibility from name, gender, age, or docs alone.
- * Sensitive TINs are encrypted at rest (demo) and masked on ordinary screens.
+ * Sensitive TINs are fingerprinted + last-four only (demo; not recoverable encryption) and masked on ordinary screens.
  */
 
 import type { DocType, DocumentRecord } from '../data/types'
