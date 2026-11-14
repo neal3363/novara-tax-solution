@@ -54,7 +54,8 @@ export const MAXIMIZER_MIGRATION_STEPS: MigrationStep[] = [
       'New adapter maps TaxpayerProfile → IrsTaxpayerInput and returns verified line items. Maximizer keeps discovery/ranking of benefits; adapter supplies only arithmetic (tax, credits, refund/balance). Interface of runBenefitOptimization stays stable; optional internal field irsVerifiedNumbers when flag on.',
     touchesMaximizer: true,
     requiresApproval: true,
-    status: 'blocked',
+    // Phase 9: staging-only adapter delivered; production cutover still blocked.
+    status: 'planned',
   },
   {
     order: 5,

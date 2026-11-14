@@ -106,3 +106,15 @@ export {
   resubmitCorrection,
 } from './mef'
 
+/** Phase 9 staging IRS ↔ Maximizer — cutover hard-OFF. */
+export {
+  PHASE9_VERSION,
+  getPhase9Flags,
+  assertNoProductionCutover,
+  runStagingAdapter,
+  runPhase9StagingSuite,
+  verifyMaximizerCompatibility,
+  verifyRollbackReadiness,
+  phase9Summary,
+} from './phase9'
+
