@@ -1,0 +1,27 @@
+{
+  "fenceId": "public-demo-live-4bf9",
+  "fencedAtAmericaChicago": "2026-11-14T02:03:00-06:00",
+  "gitTip": "b99b77f84857184065225d4a609ab02d75ba677b",
+  "baseBranch": "cursor/novara-tax-os-v1-local-4bf9",
+  "checkpointTag": "fence/public-demo-live-4bf9",
+  "rollbackTag": "rollback/fence-public-demo-live-4bf9",
+  "liveUrl": "https://novara-tax-os.apps.grok.bot",
+  "recommendation": "GO_SYNTHETIC_PUBLIC_DEMO",
+  "productionGo": false,
+  "pricing": { "tcPersonal": 300, "tcBusiness": 399 },
+  "mergedPrs": [42, 43, 44, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56],
+  "locksOff": [
+    "liveIrsFiling",
+    "productionCutover",
+    "livePayments",
+    "liveBanking",
+    "realTaxpayerProcessing",
+    "customDns"
+  ],
+  "ownerActionsRemaining": [
+    "Explicit approval before custom DNS",
+    "Confirm Publish Settings visibility as desired",
+    "Complete EXTERNAL_APPROVAL_TRACKER before any real-taxpayer launch",
+    "Optional: authorize later publish for non-blocking security review notes"
+  ]
+}

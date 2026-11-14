@@ -1,11 +1,11 @@
 # NOVARA Tax OS — Public Demo Deployment Report
 
 **As of:** 2026-11-14 America/Chicago  
-**Branch:** `cursor/public-demo-deploy-4bf9`  
-**PR:** https://github.com/neal3363/novara-tax-solution/pull/54  
-**Baseline:** PRs #49–#53 merged; `docs/RELEASE_READINESS_REPORT.md`  
-**Checkpoint:** `checkpoint/pre-public-demo-deploy-4bf9`  
-**Rollback tag:** `rollback/pre-public-demo-deploy-4bf9` (points at pre-demo merge tip `88fad4d`)
+**Fence:** `docs/RELEASE_FENCE.md` · tags `fence/public-demo-live-4bf9` / `rollback/fence-public-demo-live-4bf9`  
+**Git tip:** `b99b77f` (includes PRs #54–#56)  
+**Baseline:** PRs #49–#56 merged; `docs/RELEASE_READINESS_REPORT.md`  
+**Pre-demo checkpoint:** `checkpoint/pre-public-demo-deploy-4bf9`  
+**Pre-demo rollback:** `rollback/pre-public-demo-deploy-4bf9` (tip `88fad4d`)
 
 ## 1. Hosting provider
 
@@ -19,9 +19,8 @@
 
 ## 3. Deployment URL
 
-- **Local preview (this agent VM):** `http://127.0.0.1:4173/` (Vite production preview).
-- **Cursor preview:** open from the app pill in Cursor (branch preview; not a custom public DNS).
-- **Public custom domain:** **not published** — awaiting explicit owner approval.
+- **Live Cursor App Hosting:** https://novara-tax-os.apps.grok.bot (synthetic sample data).
+- **Public custom DNS / purchased domain:** **not configured** — awaiting explicit owner approval.
 
 ## 4. CI and build results
 
@@ -39,7 +38,7 @@
 
 ## 5. Homepage status
 
-**PASS** (manual smoke on preview). NOVARA branding + cinematic hero video preserved. Public demo banner below hero: synthetic-only warning. Screenshot: `/opt/cursor/artifacts/homepage-4173.webp`.
+**PASS.** NOVARA branding preserved. Cinematic hero updated (#56) to luxury buildings / business interactions / advisor–client / preparer team. Public demo banner below hero: synthetic-only warning.
 
 ## 6. Dashboard status
 
@@ -93,11 +92,12 @@ Procedures in `PUBLIC_DEMO_MONITORING.md` / `PUBLIC_DEMO_ROLLBACK.md`. Operation
 
 ## 14. Public demo GO/NO-GO
 
-**GO_SYNTHETIC_PREVIEW** — isolated staging/Cursor preview with synthetic data is ready for owner review.  
-**NO-GO for public DNS / live custom hostname** until you explicitly approve.  
+**GO_SYNTHETIC_PUBLIC_DEMO** — live at https://novara-tax-os.apps.grok.bot (fenced).  
+**NO-GO for custom DNS / purchased domain** until you explicitly approve.  
 **NO-GO for real taxpayer / live IRS / live payments / banking.**
 
-Platform is **not** certified or authorized for live electronic filing.
+Platform is **not** certified or authorized for live electronic filing.  
+Release fence: `docs/RELEASE_FENCE.md`.
 
 ## 15. Exact owner actions
 
