@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE, decodeSession, portalFromPath } from "@/lib/auth/cookies";
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (!pathname.startsWith("/app")) {
@@ -9,7 +9,7 @@ export function middleware(request: NextRequest) {
   }
 
   const token = request.cookies.get(SESSION_COOKIE)?.value;
-  const session = decodeSession(token);
+  const session = await decodeSession(token);
   const requiredPortal = portalFromPath(pathname);
 
   if (!session || !requiredPortal) {
