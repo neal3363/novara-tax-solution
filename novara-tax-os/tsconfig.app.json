@@ -28,6 +28,7 @@
     "src/engine/security/phase7/**",
     "src/engine/payments/phase10/**",
     "src/engine/returns/phase11/**",
-    "src/engine/launch/phase12/**"
+    "src/engine/launch/phase12/**",
+    "src/engine/remediation/**"
   ]
 }

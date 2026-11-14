@@ -63,6 +63,7 @@ function securityApiPlugin(): Plugin {
     '/api/security/payments': '/api/security/payments.ts',
     '/api/security/returns-phase11': '/api/security/returns-phase11.ts',
     '/api/security/launch-phase12': '/api/security/launch-phase12.ts',
+    '/api/security/password-reset': '/api/security/password-reset.ts',
   }
   return {
     name: 'novara-security-api-staging',
