@@ -52,6 +52,17 @@ No Stripe, IRS, or bank secrets are required for the synthetic public demo.
 | `EMAIL_API_KEY` | Provider API key |
 | `EMAIL_WEBHOOK_SECRET` | Bounce/complaint handling |
 
+## Required before live refund settlement (not Stripe)
+
+Stripe Price IDs above cover **software billing only**. IRS refund receipt, fee withhold, and client disbursement need an **authorized refund-banking / refund-transfer partner** — separate from Stripe.
+
+| Name | Purpose |
+|------|---------|
+| `REFUND_BANK_PARTNER_API_KEY` | Partner API credential |
+| `REFUND_BANK_PARTNER_WEBHOOK_SECRET` | Verify partner settlement webhooks |
+| `REFUND_BANK_PARTNER_MERCHANT_ID` | Merchant / EFIN-linked settlement ID from partner |
+| `NOVARA_VIRTUAL_SETTLEMENT_ACCOUNT_ID` | Partner-issued virtual account for inbound IRS wires |
+
 ## Feature flags (code defaults — keep false until GO)
 
 Documented in engine configs, not necessarily env:

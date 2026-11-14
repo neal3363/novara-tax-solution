@@ -256,7 +256,7 @@ export function Landing() {
                   setTyped(e.target.value)
                 }}
                 onFocus={unlockAudio}
-                placeholder='e.g. “My name is Alex Rivera, I live at 12 Oak St, phone 512-555-0100”'
+                placeholder='e.g. “My name is Pat Sample, I live at 12 Oak St, phone 512-555-0100”'
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') submitIntent(draft)
                 }}

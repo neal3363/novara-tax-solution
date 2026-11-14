@@ -9,7 +9,7 @@ Items Cursor **cannot** complete through code alone. Do **not** mark complete wi
 | EXT-STATE-EFILE | Applicable state e-file approvals | Compliance | **BLOCKED** | Per-state approval letters for states to be filed |
 | EXT-PAY-LIVE | Payment processor live-account approval | Finance | **BLOCKED** | Merchant agreement + live keys in secrets manager |
 | EXT-STRIPE-PRICES | Live Stripe Price IDs matching `fees.ts` | Finance | **BLOCKED** | Price IDs for TP $89/$119/$249, Office $899/$1199/$1499, TC $300/$399 |
-| EXT-BANK-PARTNER | Banking partner agreements | Finance / legal | **BLOCKED** | Signed partner agreement + settlement test report |
+| EXT-BANK-PARTNER | Banking partner agreements (refund-transfer / settlement — **not Stripe**) | Finance / legal | **BLOCKED** | Signed partner agreement + settlement test report; secrets `REFUND_BANK_PARTNER_*` / `NOVARA_VIRTUAL_SETTLEMENT_ACCOUNT_ID` |
 | EXT-PCI | PCI compliance obligations | Security / finance | **BLOCKED** | SAQ/ROC or AoC matching hosted-checkout model |
 | EXT-APPSEC | Independent application security assessment | Security | **BLOCKED** | Third-party AppSec / penetration test with remediations closed |
 | EXT-HOST-KEYS | Production hosting and encryption-key infrastructure | Platform | **BLOCKED** | Hosting runbook + KMS/HSM key custody evidence |
