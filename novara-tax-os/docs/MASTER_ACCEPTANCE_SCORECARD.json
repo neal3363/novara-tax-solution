@@ -1,14 +1,14 @@
 {
-  "generatedAt": "2026-11-14T06:40:55.487Z",
-  "checkpoint": "checkpoint/pre-master-qa-4bf9",
+  "generatedAt": "2026-11-14T07:09:25.411Z",
+  "checkpoint": "checkpoint/pre-prod-remediation-4bf9",
   "productionActivation": false,
   "totals": {
-    "recorded": 72,
+    "recorded": 71,
     "pass": 56,
-    "pass_staging": 4,
+    "pass_staging": 9,
     "fail": 0,
-    "blocked": 5,
-    "not_tested": 7
+    "blocked": 3,
+    "not_tested": 3
   },
   "harnessFailedAssertions": 0,
   "decisions": {
@@ -115,9 +115,8 @@
     {
       "id": "password-recovery",
       "area": "Accounts",
-      "status": "BLOCKED",
-      "detail": "No dedicated password recovery / forgot-password UI or API found in src/pages",
-      "severity": "high"
+      "status": "PASS_STAGING",
+      "detail": "WS1 hashed reset tokens single-use (staging); production enforcement OFF"
     },
     {
       "id": "registration-prod",
@@ -171,9 +170,8 @@
     {
       "id": "maximizer-qss",
       "area": "Refund Maximizer",
-      "status": "BLOCKED",
-      "detail": "TaxpayerProfile.filingStatus has no qss; Phase 9 uses qss_proxy→MFJ — not native QSS in Maximizer",
-      "severity": "medium"
+      "status": "PASS",
+      "detail": "Native qss filingStatus on TaxpayerProfile maps to IRS qss"
     },
     {
       "id": "irs-year-2022",
@@ -346,15 +344,15 @@
     {
       "id": "sec-xss-csrf-ratelimit",
       "area": "Security",
-      "status": "NOT_TESTED",
-      "detail": "No automated XSS/CSRF/rate-limit suite in repository; production gate requires dedicated AppSec review",
+      "status": "PASS_STAGING",
+      "detail": "WS1 XSS/CSRF/rate-limit negative tests; independent AppSec still required",
       "severity": "high"
     },
     {
       "id": "sec-injection",
       "area": "Security",
-      "status": "NOT_TESTED",
-      "detail": "No SQL/command injection suite (app is primarily client+staging APIs); needs independent review",
+      "status": "PASS_STAGING",
+      "detail": "WS1 injection guards; independent AppSec still required",
       "severity": "high"
     },
     {
@@ -406,8 +404,8 @@
     {
       "id": "ui-a11y",
       "area": "Website/Mobile",
-      "status": "NOT_TESTED",
-      "detail": "No axe/lighthouse accessibility automation in package.json",
+      "status": "PASS_STAGING",
+      "detail": "Static aria/role inventory via test:a11y-static; axe/Lighthouse/screen-reader/device lab NOT_TESTED",
       "severity": "medium"
     },
     {
@@ -419,8 +417,8 @@
     {
       "id": "fail-db-restore",
       "area": "Failure/Recovery",
-      "status": "NOT_TESTED",
-      "detail": "Production DB connection failure / backup restore drill not executed",
+      "status": "PASS_STAGING",
+      "detail": "Staging durable-store backup/restore simulation PASS; production DB drill NOT_TESTED",
       "severity": "high"
     },
     {
@@ -453,26 +451,6 @@
       "area": "Launch gate",
       "status": "PASS",
       "detail": "Synthetic public demo eligible"
-    },
-    {
-      "id": "ui-homepage-smoke",
-      "area": "Website/Mobile",
-      "status": "PASS",
-      "detail": "Computer-use smoke: brand, cinematic video, CTAs, no console errors, 390px layout OK (preview :4181)"
     }
-  ],
-  "uiSmoke": {
-    "homepage": "PASS",
-    "previewUrl": "http://127.0.0.1:4181/",
-    "artifacts": [
-      "/opt/cursor/artifacts/master-qa-homepage-desktop.webp",
-      "/opt/cursor/artifacts/master-qa-homepage-mobile-390.webp"
-    ]
-  },
-  "suiteMatrix": {
-    "build": 0,
-    "tests": 30,
-    "masterAcceptance": 0,
-    "failures": 0
-  }
+  ]
 }

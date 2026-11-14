@@ -1,0 +1,252 @@
+{
+  "totals": {
+    "pass": 11,
+    "pass_staging": 21,
+    "fail": 0,
+    "blocked": 8,
+    "not_tested": 8,
+    "recorded": 48
+  },
+  "rows": [
+    {
+      "id": "pricing",
+      "status": "PASS",
+      "detail": "TC 300/399"
+    },
+    {
+      "id": "cutover",
+      "status": "PASS",
+      "detail": "cutoverReady false"
+    },
+    {
+      "id": "irs-visible",
+      "status": "PASS",
+      "detail": "IRS not taxpayer visible"
+    },
+    {
+      "id": "mef-live",
+      "status": "PASS",
+      "detail": "MeF live OFF"
+    },
+    {
+      "id": "pay-live",
+      "status": "PASS",
+      "detail": "payments live OFF"
+    },
+    {
+      "id": "enforce",
+      "status": "PASS",
+      "detail": "enforcement OFF"
+    },
+    {
+      "id": "mef:mef-version",
+      "status": "PASS_STAGING",
+      "detail": "version=phase8-mef-2025.1"
+    },
+    {
+      "id": "mef:mef-live-off",
+      "status": "PASS",
+      "detail": "liveProductionTransmit=false"
+    },
+    {
+      "id": "mef:mef-env-mock",
+      "status": "PASS",
+      "detail": "env=ats_mock; officialIrsAtsEnabled=false"
+    },
+    {
+      "id": "mef:mef-schema-years",
+      "status": "PASS_STAGING",
+      "detail": "years=2022,2023,2024,2025; full IRS XSD compile NOT claimed"
+    },
+    {
+      "id": "mef:mef-return-types",
+      "status": "PASS_STAGING",
+      "detail": "supported=Form1040,Form1040SR; blocked includes Form1040NR,Form1120,Form1065"
+    },
+    {
+      "id": "mef:mef-8879",
+      "status": "PASS_STAGING",
+      "detail": "Unsigned/incomplete 8879 correctly blocked"
+    },
+    {
+      "id": "mef:mef-efin-gate",
+      "status": "PASS_STAGING",
+      "detail": "blockers=6; entry alone never authorizes"
+    },
+    {
+      "id": "mef:mef-official-ats",
+      "status": "BLOCKED",
+      "detail": "Mock ATS only — official ATS credentials and acceptance evidence required"
+    },
+    {
+      "id": "mef:mef-certification-claim",
+      "status": "BLOCKED",
+      "detail": "Must not claim IRS certification based on mock tests"
+    },
+    {
+      "id": "pay:pay-version",
+      "status": "PASS_STAGING",
+      "detail": "version=phase10-payments-2025.1"
+    },
+    {
+      "id": "pay:pay-live-off",
+      "status": "PASS",
+      "detail": "livePayments=false"
+    },
+    {
+      "id": "pay:bank-live-off",
+      "status": "PASS",
+      "detail": "liveBankingPartner=false; partnerConnected=false"
+    },
+    {
+      "id": "pay:pay-pricing",
+      "status": "PASS",
+      "detail": "TC personal=300 business=399"
+    },
+    {
+      "id": "pay:pay-hosted-checkout",
+      "status": "PASS_STAGING",
+      "detail": "status=succeeded; mode=sandbox"
+    },
+    {
+      "id": "pay:pay-idempotency",
+      "status": "PASS_STAGING",
+      "detail": "Duplicate idempotency key reused session"
+    },
+    {
+      "id": "pay:pay-webhook-sig",
+      "status": "PASS_STAGING",
+      "detail": "secretConfigured=true; spoofRejected=true"
+    },
+    {
+      "id": "pay:pay-webhook-process",
+      "status": "PASS_STAGING",
+      "detail": "Succeeded event processed"
+    },
+    {
+      "id": "pay:pay-renewal",
+      "status": "PASS_STAGING",
+      "detail": "sub=sub_test_5447afb3f809; renewals=1"
+    },
+    {
+      "id": "pay:pay-refund",
+      "status": "PASS_STAGING",
+      "detail": "status=refunded"
+    },
+    {
+      "id": "pay:pay-outage",
+      "status": "PASS_STAGING",
+      "detail": "Unavailable mode throws safely"
+    },
+    {
+      "id": "pay:pay-pci-live",
+      "status": "BLOCKED",
+      "detail": "Hosted-checkout sandbox only — live PCI obligations require external approval"
+    },
+    {
+      "id": "pay:pay-live-activation",
+      "status": "BLOCKED",
+      "detail": "Provider agreements, credentials, testing, and human approval required"
+    },
+    {
+      "id": "rec:rec-backup-restore",
+      "status": "PASS_STAGING",
+      "detail": "Staging durable-store backup/restore simulation succeeded"
+    },
+    {
+      "id": "rec:rec-prod-db-drill",
+      "status": "NOT_TESTED",
+      "detail": "No production DB in this environment — real outage drill required on hosting infra"
+    },
+    {
+      "id": "rec:rec-pay-provider",
+      "status": "PASS_STAGING",
+      "detail": "Fail-closed; no charge recorded"
+    },
+    {
+      "id": "rec:rec-bank-provider",
+      "status": "PASS_STAGING",
+      "detail": "Partner remains disconnected; no live settlement claimed"
+    },
+    {
+      "id": "rec:rec-mef-outage",
+      "status": "PASS_STAGING",
+      "detail": "Transmitter unavailable; liveProductionTransmit remains false"
+    },
+    {
+      "id": "rec:rec-duplicate",
+      "status": "PASS_STAGING",
+      "detail": "Same checkout returned"
+    },
+    {
+      "id": "rec:rec-session",
+      "status": "PASS_STAGING",
+      "detail": "Session sess_b0aca7741b6827962fc32210a2f4e1fa revoked; requireActiveSession rejects"
+    },
+    {
+      "id": "rec:rec-reset-token",
+      "status": "PASS_STAGING",
+      "detail": "Reset token consumed once; replay rejected"
+    },
+    {
+      "id": "rec:rec-upload-interrupt",
+      "status": "NOT_TESTED",
+      "detail": "No automated browser upload-interrupt harness in this environment"
+    },
+    {
+      "id": "rec:rec-network-interrupt",
+      "status": "NOT_TESTED",
+      "detail": "Client offline/reconnect UX not automated"
+    },
+    {
+      "id": "rec:rec-no-data-exposure",
+      "status": "PASS_STAGING",
+      "detail": "Failure paths throw codes without dumping secrets/PAN/TIN in sandbox adapters"
+    },
+    {
+      "id": "device-iphone",
+      "status": "NOT_TESTED",
+      "detail": "No device lab"
+    },
+    {
+      "id": "device-android",
+      "status": "NOT_TESTED",
+      "detail": "No device lab"
+    },
+    {
+      "id": "device-ipad",
+      "status": "NOT_TESTED",
+      "detail": "No device lab"
+    },
+    {
+      "id": "a11y-screen-reader",
+      "status": "NOT_TESTED",
+      "detail": "No VoiceOver/TalkBack session"
+    },
+    {
+      "id": "load-perf",
+      "status": "NOT_TESTED",
+      "detail": "No controlled staging load test"
+    },
+    {
+      "id": "appsec-independent",
+      "status": "BLOCKED",
+      "detail": "Independent AppSec assessment required"
+    },
+    {
+      "id": "irs-ats-official",
+      "status": "BLOCKED",
+      "detail": "Official IRS ATS required"
+    },
+    {
+      "id": "pci-live",
+      "status": "BLOCKED",
+      "detail": "PCI live obligations outstanding"
+    },
+    {
+      "id": "human-launch",
+      "status": "BLOCKED",
+      "detail": "Human launch authorization required"
+    }
+  ]
+}

@@ -10,6 +10,23 @@ export type { RemediationFlags } from './config'
 
 export * from './security/index'
 
+export {
+  buildMefReadinessChecklist,
+  mefReadinessSummary,
+  MEF_EXTERNAL_CERTIFICATION_STEPS,
+} from './mefReadiness'
+export type { MefReadinessItem } from './mefReadiness'
+
+export {
+  buildPaymentsReadinessChecklist,
+  paymentsReadinessSummary,
+  PAYMENTS_EXTERNAL_ACTIVATION_STEPS,
+} from './paymentsReadiness'
+export type { PaymentsReadinessItem } from './paymentsReadiness'
+
+export { buildRecoveryChecklist } from './recoveryReadiness'
+export type { RecoveryItem } from './recoveryReadiness'
+
 import { REMEDIATION_VERSION, getRemediationFlags, resetRemediationFlags, assertRemediationStagingOnly } from './config'
 import { resetSecurityRemediationForTests } from './security/index'
 import { TC_PERSONAL_FEE, TC_BUSINESS_FEE } from '../../data/fees'
