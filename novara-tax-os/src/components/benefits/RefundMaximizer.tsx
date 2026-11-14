@@ -3,6 +3,7 @@ import { formatMoney } from '../../data/fees'
 import type { BenefitSnapshot } from '../../data/types'
 import { buildCalcAuditTrail } from '../../engine/calcAuditTrail'
 import { runBenefitOptimization, type TaxpayerProfile } from '../../engine/benefitOptimizer'
+import { PUBLIC_DEMO_RESULT_LABEL, isPublicDemoMode } from '../../engine/demo/publicDemo'
 import { actions } from '../../store/useAppStore'
 import './RefundMaximizer.css'
 
@@ -69,6 +70,7 @@ export function RefundMaximizer({
       <p className="refund-max-lead muted">
         Confirmed amounts use verified answers and documents. Potential scenarios stay separate until eligibility is
         confirmed — NOVARA never invents a refund.
+        {isPublicDemoMode() ? ` ${PUBLIC_DEMO_RESULT_LABEL}` : ''}
       </p>
 
       <div className="refund-max-dual">
