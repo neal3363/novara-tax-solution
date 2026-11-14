@@ -1,23 +1,24 @@
 NOVARA Tax OS — ambient media attribution
 ========================================
 
-Video (silent 12-second cinematic homepage hero — luxury buildings → Black woman professional → Black man & woman handshake → Black advisor/client review):
-- Mixkit Free License stock clips (Envato), re-encoded for NOVARA:
+Video (silent 12-second cinematic homepage hero — face-forward Black professionals throughout):
+- Mixkit Free License stock clips (Envato), re-encoded/cropped for NOVARA so faces fill the frame:
   https://mixkit.co/license/#videoFree
-  Scene 1 (0–3s): Clouds moving above a glass skyscraper — Mixkit #27725
-  Scene 2 (3–6s): Focused woman in a professional setting (Afro-American businesswoman) — Mixkit #100322
+  Scene 1 (0–3s): Close-up focused woman in a professional setting (Afro-American businesswoman) — Mixkit #100322
     https://mixkit.co/free-stock-video/focused-woman-in-a-professional-setting-100322/
-  Scenes 3–4 (6–12s): Original cinematic stills produced for NOVARA depicting Black men and Black women
-    in tax/office advisory contexts (handshake; advisor/client document review), animated with subtle
-    camera push for the loop. Source stills archived under public/media/hero-source/.
-  Delivery: 12.0s loop, muted, 24 fps
+  Scene 2 (3–6s): Young Black man in a suit looking at camera — Mixkit #48082
+    https://mixkit.co/free-stock-video/young-black-man-in-a-suit-giving-a-thumbs-up-48082/
+  Scenes 3–4 (6–12s): Original NOVARA stills of Black men and Black women in tax/office advisory contexts
+    (handshake; advisor/client document review), tight face crops with subtle camera push.
+    Source stills archived under public/media/hero-source/.
+  Delivery: 12.0s loop, muted, 24 fps; face-priority crop + brighter grade for readability under the hero veil
     - novara-cinematic-hero.webm (VP9) + novara-cinematic-hero.mp4 (H.264 Constrained Baseline, yuv420p, 1080p)
     - novara-cinematic-hero-mobile.webm / .mp4 (960×540)
-    - novara-cinematic-poster.jpg
+    - novara-cinematic-poster.jpg (face close-up)
   Legacy aliases: novara-office-hero*.mp4 / novara-office-poster.jpg (same baseline encodes).
 
 Demographic note (2026-11-14): People scenes intentionally include Black men and Black women so the
-hero reel is not limited to a single demographic.
+hero reel is not limited to a single demographic. Framing updated so faces are large and readable.
 
 Audio:
 - “Soul Jazz” by Francisco Alvear — Mixkit Stock Music Free License
