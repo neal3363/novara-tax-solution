@@ -79,13 +79,12 @@ export async function GET(request: Request) {
       accountType: SERVER_ASSIGNED_ACCOUNT_TYPE,
       identityKind: identity.kind,
     })
-  } catch (err) {
-    const detail = err instanceof Error ? err.message : 'unknown'
+  } catch {
+    // Never return raw exception text to visitors.
     return json(500, {
       verified: false,
       error: 'session_handler_failed',
       reason: 'session_handler_failed',
-      detail,
     })
   }
 }

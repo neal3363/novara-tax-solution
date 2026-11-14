@@ -105,6 +105,13 @@ assert(
 )
 assert(sessionApiSrc.includes('missing_header'), 'session API returns missing_header for unsigned visits')
 assert(sessionApiSrc.includes('await import('), 'session API loads identity dynamically when header present')
+assert(!sessionApiSrc.includes('detail,'), 'session API does not return raw exception detail')
+assert(storeSrc.includes('loginAsPublicGuest'), 'public guest workspace helper present')
+assert(storeSrc.includes('actions.clearSession()'), 'logout wipes workspace via clearSession')
+assert(
+  !readFileSync(join(root, 'src/pages/Login.tsx'), 'utf8').includes('Sign in with Cursor'),
+  'Login no longer sends public users to broken Cursor apps-gate',
+)
 console.log('=== Tenant isolation engine ===')
 const iso = spawnSync('npm', ['run', 'test:isolation'], { cwd: root, encoding: 'utf8', shell: true })
 assert(iso.status === 0, 'tenant isolation tests pass')

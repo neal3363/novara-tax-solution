@@ -7,6 +7,7 @@ import { MusicControls } from '../components/MusicControls'
 import { VoiceInput } from '../components/VoiceInput'
 import { useAmbientAudio } from '../ambient/AmbientAudioContext'
 import { detectFilingIntent } from '../engine/conversationIntent'
+import { actions } from '../store/useAppStore'
 import {
   OFFICE_BUSINESS_FEE,
   OFFICE_PERSONAL_FEE,
@@ -118,7 +119,15 @@ export function Landing() {
       }
     }
     const q = opts?.upload ? '?upload=1' : ''
-    navigate(`/login?next=${encodeURIComponent(`/app/taxpayer/prepare${q}`)}`)
+    const dest = `/app/taxpayer/prepare${q}`
+    // Public host: open the questionnaire directly — do not send people through
+    // Cursor apps-gate (that path shows a dead “page doesn’t exist” screen).
+    if (!import.meta.env.DEV) {
+      actions.loginAsPublicGuest()
+      navigate(dest)
+      return
+    }
+    navigate(`/login?next=${encodeURIComponent(dest)}`)
   }
 
   function submitIntent(raw: string) {

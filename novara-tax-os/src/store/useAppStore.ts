@@ -131,8 +131,10 @@ const ROLE_KEY = 'novara-tax-os-role'
 const USER_KEY = 'novara-tax-os-user-id'
 /** Signed-in account JSON (session-scoped; avoids shipping other tenants in the bundle) */
 const USER_JSON_KEY = 'novara-tax-os-user-json'
-/** Sample sandbox flag — allows editable demo sessions without elevating roles */
+/** Sample sandbox flag — allows editable demo sessions without elevating roles (DEV only) */
 export const SAMPLE_SANDBOX_KEY = 'novara-tax-os-sample-sandbox'
+/** Public-host ephemeral guest (memory-only taxpayer workspace; no Cursor identity) */
+export const PUBLIC_GUEST_KEY = 'novara-tax-os-public-guest'
 /**
  * Session-scoped UI progress (clears when the tab closes).
  * Production never writes tax PII / interview answers into this key — those stay in memory only.
@@ -829,7 +831,7 @@ export const actions = {
     emit()
   },
   /**
-   * Local-dev only guest workspace. Production requires a verified Cursor session.
+   * Local-dev only guest workspace. Production uses loginAsPublicGuest for the public host.
    */
   loginAsSampleSandbox(label?: string) {
     if (!import.meta.env.DEV) {
@@ -849,33 +851,64 @@ export const actions = {
       role: 'taxpayer',
       accountType: 'tc',
     })
-    const sameTenant =
-      state.currentUser?.id === ws.user.id &&
-      state.currentUser?.tenantId === ws.user.tenantId &&
-      state.returns.length > 0
+    state = { ...freshWorkspaceForViewer(ws), hydrated: true }
+    emit()
+  },
+  /**
+   * Public published host: open an ephemeral taxpayer workspace without Cursor identity.
+   * Private/team hosts normally never reach this — the platform gate signs the visitor in first.
+   * Tax data stays in tab memory only (not written to sessionStorage in production).
+   */
+  loginAsPublicGuest(label?: string) {
+    try {
+      sessionStorage.removeItem(SAMPLE_SANDBOX_KEY)
+      sessionStorage.setItem(PUBLIC_GUEST_KEY, '1')
+    } catch {
+      /* ignore */
+    }
+    const guestKey =
+      (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('novara-public-guest-key')) ||
+      `public-${Math.random().toString(36).slice(2, 10)}`
+    try {
+      sessionStorage.setItem('novara-public-guest-key', guestKey)
+    } catch {
+      /* ignore */
+    }
+    const display = (label || 'Taxpayer').trim() || 'Taxpayer'
+    const expectedId = `u-${guestKey.replace(/[^a-zA-Z0-9]/g, '').slice(0, 24) || 'owner'}`
+    const sameGuest =
+      state.currentUser?.id === expectedId &&
+      state.returns.length > 0 &&
+      state.currentUser?.role === 'taxpayer'
+    if (sameGuest) {
+      emit()
+      return
+    }
+    const ws = buildViewerWorkspace({
+      sub: guestKey,
+      name: display,
+      email: `${guestKey}@public.novara.local`,
+      role: 'taxpayer',
+      accountType: 'tc',
+    })
+    wipeLegacySessionKeys()
+    try {
+      sessionStorage.setItem(PUBLIC_GUEST_KEY, '1')
+      sessionStorage.setItem('novara-public-guest-key', guestKey)
+    } catch {
+      /* ignore */
+    }
     state = {
-      ...state,
-      currentUser: ws.user,
-      accountTier: 'TC',
-      documents: sameTenant ? state.documents : ws.documents,
-      returns: sameTenant ? state.returns : ws.returns,
-      officeStaff: [],
-      activeReturnId: sameTenant
-        ? state.activeReturnId || ws.returns[0]?.id || ''
-        : ws.returns[0]?.id || '',
-      entryPlan: sameTenant ? state.entryPlan : [],
-      entryPlanStatus: sameTenant ? state.entryPlanStatus : 'awaiting_approval',
-      preEntryNotes: sameTenant ? state.preEntryNotes : [],
-      messages: sameTenant
-        ? state.messages
-        : [
-            {
-              id: 'm0',
-              role: 'assistant',
-              text: 'Sample sandbox ready — upload documents, answer questions, and edit this return. Changes stay on this device.',
-              at: new Date().toISOString(),
-            },
-          ],
+      ...freshWorkspaceForViewer(ws),
+      messages: [
+        {
+          id: 'm0',
+          role: 'assistant',
+          text: 'Welcome — this public browser session stays on this device. Upload documents or answer questions to start. Speak, type, or upload anytime.',
+          at: new Date().toISOString(),
+        },
+      ],
+      hydrated: true,
     }
     emit()
   },
@@ -992,8 +1025,14 @@ export const actions = {
     return access.allowed
   },
   logout() {
-    state = { ...state, currentUser: null }
-    emit()
+    // Full wipe — never leave tax workspace in memory after Sign out.
+    try {
+      sessionStorage.removeItem(PUBLIC_GUEST_KEY)
+      sessionStorage.removeItem('novara-public-guest-key')
+    } catch {
+      /* ignore */
+    }
+    actions.clearSession()
   },
   setPrepStep(step: number) {
     state = { ...state, prepStep: step }
