@@ -94,3 +94,15 @@ export {
   cutoverBlockingCriteria,
   formatCutoverCriteriaReport,
 } from './cutoverCriteria'
+
+/** Phase 8 MeF — isolated; live IRS transmit hard-blocked. */
+export {
+  PHASE8_MEF_VERSION,
+  getMefFlags,
+  assertNoLiveIrsTransmit,
+  mefPackageSummary,
+  prepareForTransmission,
+  transmitPrepared,
+  resubmitCorrection,
+} from './mef'
+
