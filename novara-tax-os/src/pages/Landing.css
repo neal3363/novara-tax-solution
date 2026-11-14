@@ -304,6 +304,28 @@
   line-height: 1.45;
 }
 
+.example-doc-list li {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.example-doc-list strong {
+  color: var(--ink, #13201e);
+  font-weight: 650;
+}
+
+.example-doc-meta {
+  display: block;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.example-doc-meta em {
+  font-style: normal;
+  color: var(--teal);
+  font-weight: 600;
+}
+
 .maximize-closer {
   margin: 0 0 1.25rem;
   font-size: 1.12rem;

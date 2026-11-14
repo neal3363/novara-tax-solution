@@ -27,6 +27,20 @@ assert(landing.includes('Add more anytime') || landing.includes('upload later'),
 assert(landing.includes('stashLandingUploads') || landing.includes('uploadFiles'), 'Landing routes files into workspace')
 assert(landing.includes('summarizeUploadRouting'), 'Landing shows auto-sort destinations')
 assert(landing.includes('Social Security card') || landing.includes('driver'), 'Landing invites DL/SS card uploads')
+assert(landing.includes('EXAMPLE_RETURN_DOCS') || landing.includes('example-docs'), 'Landing shows example docs list')
+assert(landing.includes('stateLawDifferenceBullets') || landing.includes('State credit laws differ'), 'Landing explains state law differences')
+assert(landing.includes('Questions only after docs') || landing.includes('only asks'), 'Landing says questions follow docs')
+assert(landing.includes('Money from each form') || landing.includes('money'), 'Landing ties money to each form')
+
+const exampleDocs = readFileSync(join(root, 'src/data/exampleReturnDocs.ts'), 'utf8')
+assert(exampleDocs.includes('Form W-2'), 'example docs include W-2')
+assert(exampleDocs.includes('1098-T'), 'example docs include tuition')
+assert(exampleDocs.includes('Childcare'), 'example docs include childcare')
+
+const stateCredits = readFileSync(join(root, 'src/engine/stateCredits.ts'), 'utf8')
+assert(stateCredits.includes('federalEitcMatchRate'), 'state credits encode per-state EITC match')
+assert(stateCredits.includes('Texas'), 'state credits call out Texas no-PIT')
+assert(stateCredits.includes('California'), 'state credits call out California extras')
 
 const prepare = readFileSync(join(root, 'src/pages/taxpayer/Prepare.tsx'), 'utf8')
 assert(prepare.includes('takeLandingUploads'), 'Prepare consumes landing uploads')

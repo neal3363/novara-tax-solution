@@ -24,27 +24,34 @@ import {
   UNLIMITED_CLIENTS_COPY,
   formatMoney,
 } from '../data/fees'
+import { EXAMPLE_FLOW_POINTS, EXAMPLE_RETURN_DOCS } from '../data/exampleReturnDocs'
+import { stateLawDifferenceBullets } from '../engine/stateCredits'
 import './Landing.css'
 
 const FEATURES: { title: string; body: string; status: 'live' | 'partial' | 'soon' }[] = [
   {
-    title: 'AI Document Upload & Extraction',
-    body: 'Upload W-2s, 1099s, and IDs — AI extracts the facts so clients confirm values instead of typing tax forms.',
+    title: 'Upload every doc once',
+    body: 'ID, SSN cards, W-2s, 1099s, 1098s, tuition, childcare — one drop finishes most of the return and maximizes lawful credits.',
+    status: 'live',
+  },
+  {
+    title: 'Questions only after docs',
+    body: 'Once NOVARA sees your forms, it knows what those documents already answer. It only asks what’s still missing or needs something else beyond the form.',
+    status: 'live',
+  },
+  {
+    title: 'Money from each form',
+    body: 'Each uploaded form generates savings on the return — wages and EITC from W-2s, QBI from 1099s, AOTC from 1098-T, CDCC from childcare, and more.',
+    status: 'live',
+  },
+  {
+    title: 'State laws differ',
+    body: 'Some states add EITC and family credits on top of federal; Texas and Florida have no state income tax. Your address sets the right state rules.',
     status: 'live',
   },
   {
     title: 'No Manual Tax Data Entry',
     body: 'Clients speak, type, or upload into one questionnaire. NOVARA fills the working return from answers and documents.',
-    status: 'live',
-  },
-  {
-    title: 'Intelligent Tailored Questions',
-    body: 'Only asks what still matters for this taxpayer — personal, family, income, business, deductions, and credits.',
-    status: 'live',
-  },
-  {
-    title: 'Credits & Deduction Exploration',
-    body: 'Comprehensively explores eligible deductions and tax credits, then applies allowable amounts to the live refund projection.',
     status: 'live',
   },
   {
@@ -68,11 +75,6 @@ const FEATURES: { title: string; body: string; status: 'live' | 'partial' | 'soo
     status: 'live',
   },
   {
-    title: 'Federal & State Returns',
-    body: 'Federal return workflow is in the demo. Broader state coverage expands as jurisdictions are enabled.',
-    status: 'partial',
-  },
-  {
     title: 'Filing Status Assistance',
     body: 'Helps evaluate Single, MFJ, MFS, Head of Household, and Qualifying Surviving Spouse eligibility.',
     status: 'live',
@@ -90,12 +92,14 @@ const FEATURES: { title: string; body: string; status: 'live' | 'partial' | 'soo
 ]
 
 const COMPARE = [
-  ['Manual form filling', 'Document upload + AI extraction'],
-  ['Guess which credits apply', 'Proactive tax-benefit discovery interview'],
-  ['Stop when the return “looks done”', 'Stop only after benefit review is complete'],
-  ['Separate tools for offices', 'Unified taxpayer + preparer + office OS'],
+  ['Manual form filling', 'Upload all docs → money applies per form'],
+  ['Long questionnaire first', 'Docs first — ask only what’s still missing'],
+  ['Same credits in every state', 'State laws differ — more credits where enacted'],
+  ['Stop when the return “looks done”', 'Stop when docs finish the return (optional extras later)'],
   ['Opaque software fees', 'Transparent subscription vs per-return vs bank fees'],
 ]
+
+const STATE_LAW_BULLETS = stateLawDifferenceBullets()
 
 const INTENT_KEY = 'novara-pending-intent'
 
@@ -327,26 +331,29 @@ export function Landing() {
       <section className="section" id="how">
         <div className="container">
           <p className="landing-kicker">How NOVARA works</p>
-          <h2>One questionnaire. Three ways to answer.</h2>
+          <h2>Docs first. Questions only when needed.</h2>
           <p className="section-lead">
-            Speak, type, or upload into the same return. Tabs show what’s complete and what’s still unanswered — then
-            NOVARA explores eligible credits before you review and file.
+            Upload everything that belongs on the return. NOVARA reads each form, applies the money it unlocks, and only
+            asks what those documents don’t already answer — including different credit rules by state.
           </p>
           <div className="steps-grid">
             {[
               [
-                'STEP 1 — SPEAK OR UPLOAD ALL',
-                'Use the mic, type, or upload every document you have at once. Files are sorted into your return automatically.',
+                'STEP 1 — UPLOAD ALL DOCS',
+                'Drop every form at once: ID, SSN cards, W-2s, 1099s, 1098s, tuition, childcare. Sorted into Personal, Income, and Credits automatically.',
               ],
               [
-                'STEP 2 — QUESTIONNAIRE TABS',
-                'Personal, filing status, dependents, income, business, deductions, credits, review — one workspace.',
+                'STEP 2 — MONEY FROM EACH FORM',
+                'W-2s drive wages and EITC. 1099s unlock QBI. 1098-T unlocks education credits. Childcare statements unlock CDCC. The return builds as forms land.',
               ],
               [
-                'STEP 3 — FILL GAPS & ADD LATER',
-                'NOVARA asks what’s still missing. Discover a credit mid-way? Upload the receipt later — it still routes correctly.',
+                'STEP 3 — ASK ONLY WHAT’S LEFT',
+                'After docs are read, NOVARA knows most answers. It asks only gaps or items that need something else beyond the form — never re-asks what a W-2 or 1098 already proved.',
               ],
-              ['STEP 4 — REVIEW & FILE', 'Confirm the estimate, sign, and complete preparation without blank tax forms.'],
+              [
+                'STEP 4 — STATE RULES + REVIEW',
+                'Your address sets state credit laws (some states add EITC; others have none). Confirm the estimate, sign, and prepare to file.',
+              ],
             ].map(([t, b]) => (
               <div key={t}>
                 <h3>{t}</h3>
@@ -357,13 +364,50 @@ export function Landing() {
         </div>
       </section>
 
-      <section className="section soft">
+      <section className="section soft maximize-section" id="example-docs">
+        <div className="container">
+          <p className="landing-kicker">Example — maximize a return</p>
+          <h2>All docs needed to simplify everything</h2>
+          <p className="section-lead">
+            This is the full example set for a typical family return. Upload these once so NOVARA can apply credits and
+            skip questions those forms already answer.
+          </p>
+          <ul className="benefit-bullets example-doc-list">
+            {EXAMPLE_RETURN_DOCS.map((d) => (
+              <li key={d.form}>
+                <strong>{d.form}</strong>
+                <span className="example-doc-meta">
+                  {d.unlocks} · <em>{d.moneyHint}</em>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <ul className="benefit-bullets">
+            {EXAMPLE_FLOW_POINTS.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+          <p className="maximize-closer">State credit laws differ — some states have more than others</p>
+          <ul className="benefit-bullets">
+            {STATE_LAW_BULLETS.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+          <div className="hero-actions" style={{ marginTop: '1.25rem' }}>
+            <button className="btn btn-primary" type="button" onClick={() => goToPrepare()}>
+              Get Started with your docs
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section className="section">
         <div className="container">
           <p className="landing-kicker">Why NOVARA</p>
           <h2>Professional tax technology, exceptionally simple</h2>
           <p className="section-lead">
-            Built for taxpayers, preparers, and offices — AI-assisted preparation with secure documents and human
-            verification before electronic filing.
+            Built for taxpayers, preparers, and offices — docs first, state-aware credits, and human verification before
+            electronic filing.
           </p>
           <div className="feature-grid">
             {FEATURES.map((f) => (

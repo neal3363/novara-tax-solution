@@ -19,6 +19,7 @@ import {
   type DependentRecord,
 } from './dependentsEngine'
 import { buildAppliedFormLines, formMappingFor } from './returnForms'
+import { estimateStateEitcCredit, getStateCreditProfile } from './stateCredits'
 
 export type ProfileAnswers = Record<string, string | number | boolean | undefined>
 export type { DependentRecord }
@@ -276,13 +277,21 @@ function estimateFor(rule: BenefitRule, p: TaxpayerProfile): number {
     case 'ptc':
       return p.answers.had_marketplace === 'yes' || p.answers.marketplace_coverage === 'yes' ? 1400 : 0
     case 'state_eitc': {
-      const state = String(p.answers.filing_state || '').toLowerCase()
-      if (!state || state === 'tx' || state === 'texas' || state === 'florida' || state === 'fl') return 0
+      // State laws differ: TX/FL have no PIT/EITC; CA/NY/IL match a share of federal.
       const kids = kidsUnder17(p)
       const earned = p.wages + p.selfEmploymentIncome
       if (earned <= 0) return 0
-      const federalish = kids >= 2 ? Math.min(6960, Math.round(earned * 0.4)) : kids === 1 ? Math.min(4213, Math.round(earned * 0.34)) : Math.min(632, Math.round(earned * 0.0765))
-      return Math.round(federalish * 0.3)
+      const federalish =
+        kids >= 2
+          ? Math.min(6960, Math.round(earned * 0.4))
+          : kids === 1
+            ? Math.min(4213, Math.round(earned * 0.34))
+            : Math.min(632, Math.round(earned * 0.0765))
+      return estimateStateEitcCredit({
+        filingState: String(p.answers.filing_state || ''),
+        federalEitcEstimate: federalish,
+        qualifyingChildren: kids,
+      })
     }
     default:
       return 0
@@ -494,6 +503,22 @@ function evaluateRule(rule: BenefitRule, p: TaxpayerProfile, facts: Record<strin
     })
   }
 
+  // State credit laws differ — never block a federal docs-complete return on state EITC.
+  if (rule.id === 'state_eitc') {
+    const stateProfile = getStateCreditProfile(String(p.answers.filing_state || ''))
+    if (stateProfile && !stateProfile.hasPersonalIncomeTax) {
+      return baseFinding(rule, {
+        status: 'ineligible',
+        estimatedSavings: 0,
+        explanation: stateProfile.lawDifference,
+      })
+    }
+    // Federal EITC eligibility is implied once earned income is on file from W-2/1099.
+    if (p.wages + p.selfEmploymentIncome > 0) {
+      missingAnswers = missingAnswers.filter((k) => k !== 'federal_eitc_eligible')
+    }
+  }
+
   if (missingAnswers.length > 0) {
     return baseFinding(rule, {
       status: 'needs_info',
@@ -502,6 +527,7 @@ function evaluateRule(rule: BenefitRule, p: TaxpayerProfile, facts: Record<strin
       missingAnswers,
       missingDocs: rule.requiredDocs,
       docStatus: 'requested',
+      optionalDiscovery: rule.id === 'state_eitc' || rule.category === 'state',
     })
   }
 

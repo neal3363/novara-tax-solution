@@ -322,7 +322,8 @@ export const BENEFIT_CATALOG_2025: BenefitRule[] = [
     category: 'state',
     name: 'State earned-income credit (where enacted)',
     shortName: 'State EITC',
-    description: 'State-level EITC patterned on federal eligibility when the filing state offers a credit. Demo evaluates Texas residency as not offering a general EITC and flags other states for review.',
+    description:
+      'State credit laws differ by jurisdiction. TX/FL have no state EITC; CA/NY/IL match a share of federal EITC (and CA may add young-child support). Filing state comes from your ID address or interview.',
     ruleCitation: 'State conformity · TY2025',
     // Soft until taxpayer opts in with a filing state — never hold a federal docs-complete return.
     triggerFacts: ['filing_state_ready'],

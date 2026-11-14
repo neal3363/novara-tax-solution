@@ -50,6 +50,7 @@
     "test:public-demo-deploy": "node scripts/test-public-demo-deploy.mjs",
     "test:master-production-launch": "node scripts/test-master-production-launch.mjs",
     "test:landing-speak-upload": "node scripts/test-landing-speak-upload.mjs",
+    "test:state-credits": "node scripts/test-state-credits.mjs",
     "test:speak-fill-personal": "node scripts/test-speak-fill-personal.mjs",
     "test:refund-settlement": "node scripts/test-refund-settlement-pipeline.mjs",
     "test:prod-readiness-audit": "node scripts/test-prod-readiness-audit.mjs",

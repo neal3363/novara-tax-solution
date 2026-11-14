@@ -6,6 +6,7 @@ import {
   runBenefitOptimization,
   type TaxpayerProfile,
 } from './benefitOptimizer'
+import { filingStateFromAddress } from './stateCredits'
 
 export type InterviewPhase = 'upload' | 'confirm' | 'filing_status' | 'benefits' | 'calculation' | 'review' | 'done'
 
@@ -99,6 +100,8 @@ export function syncProfileFromDocuments(profile: TaxpayerProfile, documents: Do
         }
         if (/^address$/i.test(f.label) && typeof f.value === 'string' && f.value.trim() && !next.answers.address) {
           next.answers.address = f.value.trim()
+          const st = filingStateFromAddress(f.value)
+          if (st && !next.answers.filing_state) next.answers.filing_state = st
         }
       })
     }
@@ -226,6 +229,12 @@ export function satisfyDocBackedAnswers(profile: TaxpayerProfile): TaxpayerProfi
   if (next.wages > 0 || next.selfEmploymentIncome > 0) {
     if (!a.has_earned_income_q) a.has_earned_income_q = 'yes'
     if (!a.has_earned_income) a.has_earned_income = 'yes'
+  }
+
+  // ID address already proves filing state — apply that state’s credit laws without re-asking.
+  if (!a.filing_state) {
+    const st = filingStateFromAddress(String(a.address || ''))
+    if (st) a.filing_state = st
   }
 
   if (next.wages > 0 && !a.had_w2) a.had_w2 = 'yes'
