@@ -122,3 +122,18 @@ export {
   buildAllSyntheticAtsPacks,
 } from './ats/syntheticTestReturns'
 export type { SyntheticAtsReturn } from './ats/syntheticTestReturns'
+
+export {
+  officialAtsSubmissionSteps,
+  buildOfficialAtsSubmissionPackage,
+} from './ats/atsSubmissionPackage'
+export type { AtsSubmissionStep, AtsPackageSnapshot } from './ats/atsSubmissionPackage'
+
+export {
+  resetAtsResultsForTests,
+  listAtsResults,
+  recordAtsScenarioResult,
+  officialAtsPassCount,
+  claimOfficialAtsComplete,
+} from './ats/atsResultsTracker'
+export type { AtsResultSource, AtsScenarioResult } from './ats/atsResultsTracker'

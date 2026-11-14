@@ -89,7 +89,7 @@ assert(taxYearUpdateProgram().atsRetestEachSeason === true, 'ATS each season')
 
 const mobile = mobileDistributionChecklist()
 assert(mobile.some(m => m.platform === 'web_responsive' && m.status === 'available'), 'web available')
-assert(mobile.some(m => m.platform === 'ios' && m.status === 'not_built'), 'ios not built')
+assert(mobile.some(m => m.platform === 'ios' && m.status === 'account_required'), 'ios needs owner account')
 
 assert(getMefFlags().liveProductionTransmit === false, 'MeF live OFF')
 assert(getPhase10Flags().livePayments === false, 'payments live OFF')

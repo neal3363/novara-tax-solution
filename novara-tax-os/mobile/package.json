@@ -1,0 +1,28 @@
+{
+  "name": "novara-tax-os-mobile",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Capacitor shell for NOVARA Tax OS iOS/Android — shares web platform business logic",
+  "scripts": {
+    "sync:web": "npm --prefix .. run build && node ./scripts/copy-web-dist.mjs",
+    "cap:sync": "npx cap sync",
+    "test:mobile-scaffold": "node ./scripts/test-mobile-scaffold.mjs"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.4.3",
+    "@capacitor/app": "^7.1.0",
+    "@capacitor/camera": "^7.0.2",
+    "@capacitor/core": "^7.4.3",
+    "@capacitor/filesystem": "^7.1.4",
+    "@capacitor/haptics": "^7.0.2",
+    "@capacitor/ios": "^7.4.3",
+    "@capacitor/keyboard": "^7.0.3",
+    "@capacitor/preferences": "^7.0.2",
+    "@capacitor/push-notifications": "^7.0.3",
+    "@capacitor/status-bar": "^7.0.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.4.3",
+    "typescript": "~5.9.2"
+  }
+}

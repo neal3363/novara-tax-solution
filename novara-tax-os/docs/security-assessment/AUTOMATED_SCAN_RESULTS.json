@@ -1,0 +1,45 @@
+{
+  "generatedAt": "2026-11-14T16:41:39.203Z",
+  "timezoneNote": "Machine UTC; report times for users in America/Chicago",
+  "independentPentestComplete": false,
+  "disclaimer": "Internal automated scans do not substitute for an independent penetration test by a qualified external assessor.",
+  "npmAuditVulnerabilitiesTotal": 0,
+  "suiteResults": [
+    {
+      "label": "tenant_isolation",
+      "ok": true,
+      "status": 0
+    },
+    {
+      "label": "account_permissions",
+      "ok": true,
+      "status": 0
+    },
+    {
+      "label": "phase6_security",
+      "ok": true,
+      "status": 0
+    },
+    {
+      "label": "phase7_staging",
+      "ok": true,
+      "status": 0
+    },
+    {
+      "label": "publish_security",
+      "ok": true,
+      "status": 0
+    },
+    {
+      "label": "security_remediation",
+      "ok": true,
+      "status": 0
+    }
+  ],
+  "moduleOk": true,
+  "pricingUnchanged": true,
+  "liveLocks": {
+    "note": "Production locks must remain off"
+  },
+  "nextOwnerAction": "Engage external firm per docs/APPSEC_EXTERNAL_FIRM_PACKAGE.md"
+}
