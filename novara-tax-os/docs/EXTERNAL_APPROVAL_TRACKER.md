@@ -8,10 +8,20 @@ Items Cursor **cannot** complete through code alone. Do **not** mark complete wi
 | EXT-IRS-ATS | Official IRS ATS testing | E-file / transmitter | **BLOCKED** | ATS acceptance documentation (not mock) |
 | EXT-STATE-EFILE | Applicable state e-file approvals | Compliance | **BLOCKED** | Per-state approval letters for states to be filed |
 | EXT-PAY-LIVE | Payment processor live-account approval | Finance | **BLOCKED** | Merchant agreement + live keys in secrets manager |
+| EXT-STRIPE-PRICES | Live Stripe Price IDs matching `fees.ts` | Finance | **BLOCKED** | Price IDs for TP $89/$119/$249, Office $899/$1199/$1499, TC $300/$399 |
 | EXT-BANK-PARTNER | Banking partner agreements | Finance / legal | **BLOCKED** | Signed partner agreement + settlement test report |
 | EXT-PCI | PCI compliance obligations | Security / finance | **BLOCKED** | SAQ/ROC or AoC matching hosted-checkout model |
-| EXT-APPSEC | Independent application security assessment | Security | **BLOCKED** | Third-party AppSec report with remediations closed |
+| EXT-APPSEC | Independent application security assessment | Security | **BLOCKED** | Third-party AppSec / penetration test with remediations closed |
 | EXT-HOST-KEYS | Production hosting and encryption-key infrastructure | Platform | **BLOCKED** | Hosting runbook + KMS/HSM key custody evidence |
+| EXT-CF-DNS | Official domain + Cloudflare DNS/SSL/WAF | Platform / owner | **BLOCKED** | Owner-approved DNS cutover evidence |
+| EXT-EMAIL | Branded business + transactional email | Ops | **BLOCKED** | Domain verified + ESP live + templates |
+| EXT-SUPPORT | Production ticket / helpdesk system | Ops | **BLOCKED** | Staffed support channel evidence |
+| EXT-LEGAL | Final Privacy Policy & Terms | Legal | **BLOCKED** | Counsel-approved policies (draft pages exist only) |
+| EXT-SEO | Google Search Console / GA4 / Business Profile | Marketing | **BLOCKED** | Property verification + sitemap submit on owned domain |
+| EXT-IOS | Apple App Store release | Mobile | **BLOCKED** | TestFlight + App Review submission (no native app yet) |
+| EXT-ANDROID | Google Play release | Mobile | **BLOCKED** | Signed AAB + Play Console listing (no native app yet) |
+| EXT-LOAD | Controlled load test evidence (100 / 1k / 10k) | Platform | **BLOCKED** | Measured results on staging infra — not claimed |
+| EXT-DR | Production backup restore drill | Platform | **BLOCKED** | Timed restore evidence on production-class storage |
 | EXT-HUMAN-LAUNCH | Human launch authorization | Executive | **BLOCKED** | Signed go-live decision after gates pass |
 
 ## Related code locks (must stay OFF until approvals)
@@ -28,3 +38,4 @@ Items Cursor **cannot** complete through code alone. Do **not** mark complete wi
 - Synthetic public demo may proceed under `GO_SYNTHETIC_ONLY` without completing this tracker.
 - Real taxpayer production remains **NO-GO** until every critical row has evidence.
 - **Release fence (2026-11-14):** public synthetic demo is live and locked — see `RELEASE_FENCE.md` (`fence/public-demo-live-4bf9`).
+- Pricing SSOT update (PR #58) does not authorize live Stripe Price creation — owner must create and bind IDs.

@@ -27,7 +27,12 @@ import {
   lockReturnVersion,
 } from '../src/engine/filingAuthorizations.ts'
 import { buildWorkingReturnPacket } from '../src/engine/returnPacket.ts'
-import { OFFICE_PERSONAL_FEE, OFFICE_BUSINESS_FEE } from '../src/data/fees.ts'
+import {
+  OFFICE_PERSONAL_FEE,
+  OFFICE_BUSINESS_FEE,
+  OFFICE_SUBSCRIPTION_PERSONAL,
+  OFFICE_SUBSCRIPTION_BUSINESS,
+} from '../src/data/fees.ts'
 
 let failed = 0
 function assert(c: boolean, m: string) {
@@ -227,8 +232,9 @@ console.log('=== Office onboarding readiness ===')
     zip: '78701',
     authorizedRep: 'Office Owner',
     efinInput: '123456',
-    officeServicePersonalFee: OFFICE_PERSONAL_FEE,
-    officeServiceBusinessFee: OFFICE_BUSINESS_FEE,
+    // Office-set client preparation charges (not NOVARA platform fees).
+    officeServicePersonalFee: 250,
+    officeServiceBusinessFee: 450,
     selectedBankProviderId: 'novara-platform-default',
     completedSteps: ['registration', 'efin', 'preparers', 'pricing', 'banking', 'readiness'] as any,
     updatedAt: now,
@@ -263,7 +269,8 @@ console.log('=== Office onboarding readiness ===')
   assert(ready.steps.find((s) => s.id === 'banking')?.complete, 'banking selection complete')
   assert(ready.percentComplete > incomplete.percentComplete, 'progress increases with data')
   assert(ready.summary.length > 0, 'readiness summary')
-  assert(OFFICE_PERSONAL_FEE > 0 && OFFICE_BUSINESS_FEE > 0, 'platform fee constants preserved')
+  assert(OFFICE_SUBSCRIPTION_PERSONAL === 899 && OFFICE_SUBSCRIPTION_BUSINESS === 1499, 'Office annual subscription constants preserved')
+  assert(OFFICE_PERSONAL_FEE === 0 && OFFICE_BUSINESS_FEE === 0, 'Office covered returns carry $0 NOVARA per-return fee')
 }
 
 if (failed) {

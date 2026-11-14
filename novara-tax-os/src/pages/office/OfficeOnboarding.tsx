@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  OFFICE_BUSINESS_FEE,
   OFFICE_PERSONAL_FEE,
   OFFICE_SUBSCRIPTION_FLOOR,
   OFFICE_SUBSCRIPTION_HIGH,
@@ -184,9 +183,11 @@ export function OfficeOnboarding() {
           <>
             <h2>Office pricing</h2>
             <p className="muted">
-              NOVARA platform fees (unchanged): subscription {formatMoney(OFFICE_SUBSCRIPTION_FLOOR)}–
-              {formatMoney(OFFICE_SUBSCRIPTION_HIGH)}; personal return {formatMoney(OFFICE_PERSONAL_FEE)}; business{' '}
-              {formatMoney(OFFICE_BUSINESS_FEE)}.
+              NOVARA Office annual plans: {formatMoney(OFFICE_SUBSCRIPTION_FLOOR)}–
+              {formatMoney(OFFICE_SUBSCRIPTION_HIGH)} per year. Covered returns under the subscribed plan
+              have {formatMoney(OFFICE_PERSONAL_FEE)} additional NOVARA per-return fee (including returns
+              completed by office-employed preparers). Set your own client preparation charges below —
+              those are office fees, not NOVARA prices. Bank-product fees stay separate.
             </p>
             <div className="delivery-fields">
               <label>

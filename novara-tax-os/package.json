@@ -46,7 +46,8 @@
     "test:recovery-remediation": "node scripts/test-recovery-remediation.mjs",
     "test:a11y-static": "node scripts/test-a11y-static.mjs",
     "test:prod-readiness": "node scripts/test-prod-readiness.mjs",
-    "test:public-demo-deploy": "node scripts/test-public-demo-deploy.mjs"
+    "test:public-demo-deploy": "node scripts/test-public-demo-deploy.mjs",
+    "test:master-production-launch": "node scripts/test-master-production-launch.mjs"
   },
   "dependencies": {
     "@fontsource/figtree": "^5.3.0",

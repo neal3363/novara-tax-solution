@@ -94,3 +94,6 @@ Allowed without reopening the fence only when owner asks: security/publish harde
 - `PUBLIC_DEMO_ROLLBACK.md`
 - `RELEASE_READINESS_REPORT.md`
 - `EXTERNAL_APPROVAL_TRACKER.md`
+- `MASTER_PRODUCTION_LAUNCH_REPORT.md` (owner-authorized launch audit; production remains NO-GO)
+- `BUSINESS_CONTINUITY.md`
+- `PRICING_UPDATE_TP_OFFICE.md` (merged pricing SSOT — PR #58)

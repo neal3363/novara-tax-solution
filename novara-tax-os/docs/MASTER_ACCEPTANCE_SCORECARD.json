@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-14T07:09:25.411Z",
+  "generatedAt": "2026-11-14T14:00:27.759Z",
   "checkpoint": "checkpoint/pre-prod-remediation-4bf9",
   "productionActivation": false,
   "totals": {
@@ -26,7 +26,7 @@
       "id": "pricing-tp-office",
       "area": "Pricing",
       "status": "PASS",
-      "detail": "TP/Office tiers intact"
+      "detail": "TP pay-per-return + Office annual plans intact"
     },
     {
       "id": "pricing-prior-year",

@@ -369,8 +369,31 @@ export function Landing() {
               </div>
             ))}
           </div>
+          <p style={{ marginTop: '1.5rem' }}>
+            <Link className="nav-text" to="/fees">
+              Full fee schedule
+            </Link>
+          </p>
         </div>
       </section>
+
+      <footer className="section soft" style={{ paddingTop: '2rem', paddingBottom: '2.5rem' }}>
+        <div className="container" style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <span className="muted">NOVARA Tax OS</span>
+          <Link className="nav-text" to="/fees">
+            Fees
+          </Link>
+          <Link className="nav-text" to="/help">
+            Help
+          </Link>
+          <Link className="nav-text" to="/privacy">
+            Privacy
+          </Link>
+          <Link className="nav-text" to="/terms">
+            Terms
+          </Link>
+        </div>
+      </footer>
     </div>
   )
 }
