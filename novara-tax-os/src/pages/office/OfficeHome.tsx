@@ -20,7 +20,7 @@ export function OfficeHome() {
         <span className="badge badge-ok">{UNLIMITED_CLIENTS_COPY}</span>
       </header>
       <p className="muted">
-        Tenant-isolated workspace. Invite preparers and assign clients on <Link to="/app/office/staff">Staff</Link>.
+        Tenant-isolated workspace. Invite preparers and assign clients on <Link to="/app/office/staff">Staff</Link>. New offices: start the <Link to="/app/office/onboarding">onboarding wizard</Link>. Continuity: <Link to="/app/office/continuity">backup & recovery</Link>.
         Independent TP accounts cannot access staff tools. EFIN verification required before e-file.
       </p>
 

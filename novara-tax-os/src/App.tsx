@@ -22,6 +22,11 @@ import { Workspace } from './pages/preparer/Workspace'
 import { EntryPlan } from './pages/preparer/EntryPlan'
 import { ReturnEditor } from './pages/preparer/ReturnEditor'
 import { OfficeHome } from './pages/office/OfficeHome'
+import { OfficeOnboarding } from './pages/office/OfficeOnboarding'
+import { BusinessContinuityPage } from './pages/office/BusinessContinuity'
+import { EngagementConsentPage } from './pages/taxpayer/EngagementConsent'
+import { AmendmentCenterPage } from './pages/taxpayer/AmendmentCenter'
+import { TaxLawUpdatesPage } from './pages/admin/TaxLawUpdates'
 import { Staff } from './pages/office/Staff'
 import { Pipeline } from './pages/office/Pipeline'
 import { AdminHome } from './pages/admin/AdminHome'
@@ -53,10 +58,13 @@ export default function App() {
         <Route path="taxpayer/dependents" element={<RoleGate roles={['taxpayer']}><Dependents /></RoleGate>} />
         <Route path="taxpayer/final-review" element={<RoleGate roles={['taxpayer']}><FinalReview /></RoleGate>} />
         <Route path="taxpayer/refund-tracking" element={<RoleGate roles={['taxpayer']}><RefundTrackingPage /></RoleGate>} />
+        <Route path="taxpayer/engagement" element={<RoleGate roles={['taxpayer']}><EngagementConsentPage /></RoleGate>} />
+        <Route path="taxpayer/amendments" element={<RoleGate roles={['taxpayer']}><AmendmentCenterPage /></RoleGate>} />
         <Route path="preparer/documents" element={<RoleGate roles={['preparer']}><DocumentsNeeded /></RoleGate>} />
         <Route path="preparer/dependents" element={<RoleGate roles={['preparer']}><Dependents /></RoleGate>} />
         <Route path="preparer/final-review" element={<RoleGate roles={['preparer']}><FinalReview /></RoleGate>} />
         <Route path="preparer/refund-tracking" element={<RoleGate roles={['preparer']}><RefundTrackingPage /></RoleGate>} />
+        <Route path="preparer/amendments" element={<RoleGate roles={['preparer']}><AmendmentCenterPage /></RoleGate>} />
         <Route path="taxpayer/ai" element={<RoleGate roles={['taxpayer']}><TaxpayerAi /></RoleGate>} />
         <Route path="taxpayer/benefits" element={<RoleGate roles={['taxpayer']}><BenefitDashboard /></RoleGate>} />
         <Route path="taxpayer/benefits/interview" element={<RoleGate roles={['taxpayer']}><BenefitInterview /></RoleGate>} />
@@ -74,12 +82,15 @@ export default function App() {
         <Route path="preparer/benefits/review" element={<RoleGate roles={['preparer']}><BenefitReview /></RoleGate>} />
 
         <Route path="office" element={<RoleGate roles={['efin_owner']}><OfficeHome /></RoleGate>} />
+        <Route path="office/onboarding" element={<RoleGate roles={['efin_owner']}><OfficeOnboarding /></RoleGate>} />
+        <Route path="office/continuity" element={<RoleGate roles={['efin_owner']}><BusinessContinuityPage /></RoleGate>} />
         <Route path="office/staff" element={<RoleGate roles={['efin_owner']}><Staff /></RoleGate>} />
         <Route path="office/pipeline" element={<RoleGate roles={['efin_owner']}><Pipeline /></RoleGate>} />
         <Route path="office/request-docs" element={<RoleGate roles={['efin_owner']}><RequestDocuments /></RoleGate>} />
 
         <Route path="admin" element={<RoleGate roles={['admin']}><AdminHome /></RoleGate>} />
         <Route path="admin/tenants" element={<RoleGate roles={['admin']}><Tenants /></RoleGate>} />
+        <Route path="admin/tax-law" element={<RoleGate roles={['admin']}><TaxLawUpdatesPage /></RoleGate>} />
 
         <Route
           path="fees"

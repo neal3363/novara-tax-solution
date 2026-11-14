@@ -27,6 +27,8 @@ export function AppNav() {
           { to: '/app/taxpayer/benefits', label: 'Savings' },
           { to: '/app/taxpayer/years', label: 'Years' },
           { to: '/app/taxpayer/assistant', label: 'Chat' },
+          { to: '/app/taxpayer/engagement', label: 'Consent' },
+          { to: '/app/taxpayer/amendments', label: 'Amend' },
           { to: '/app/taxpayer/final-review', label: 'Sign & file' },
           { to: '/app/taxpayer/refund-tracking', label: 'Refund status' },
           { to: '/app/taxpayer/vault', label: 'Vault' },
@@ -37,6 +39,7 @@ export function AppNav() {
             { to: '/app/preparer/clients', label: 'Clients' },
             { to: '/app/preparer/request-docs', label: 'Request' },
             { to: '/app/preparer/return', label: 'Return' },
+            { to: '/app/preparer/amendments', label: 'Amend' },
             { to: '/app/preparer/final-review', label: 'Sign & file' },
             { to: '/app/preparer/benefits', label: 'Benefits' },
           ]
@@ -44,6 +47,8 @@ export function AppNav() {
           ? [
               { to: '/app/office', label: 'Office' },
               { to: '/app/office/staff', label: 'Staff' },
+              { to: '/app/office/onboarding', label: 'Setup' },
+              { to: '/app/office/continuity', label: 'Backup' },
               { to: '/app/office/pipeline', label: 'Pipeline' },
               { to: '/app/office/request-docs', label: 'Request' },
               { to: '/app/fees', label: 'Pricing' },
@@ -52,6 +57,7 @@ export function AppNav() {
               { to: '/app/admin', label: 'Platform' },
               { to: '/app/fees', label: 'Fee Catalog' },
               { to: '/app/admin/tenants', label: 'Tenants' },
+              { to: '/app/admin/tax-law', label: 'Tax law' },
             ]
 
   return (

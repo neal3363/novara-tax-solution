@@ -24,7 +24,9 @@
     "test:questionnaire": "node scripts/test-questionnaire-e2e.mjs",
     "test:conversation": "node scripts/test-conversation-intent.mjs",
     "test:refund-max": "node scripts/test-refund-maximizer.mjs",
-    "test:refund-delivery": "node scripts/test-refund-delivery.mjs"
+    "test:refund-delivery": "node scripts/test-refund-delivery.mjs",
+    "test:final-review": "node scripts/test-final-review-balancedue-onboarding.mjs",
+    "test:addendum": "node scripts/test-addendum-modules.mjs"
   },
   "dependencies": {
     "@fontsource/figtree": "^5.3.0",
