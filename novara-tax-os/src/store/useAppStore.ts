@@ -1122,7 +1122,10 @@ export const actions = {
   ingestTaxpayerStatement(text: string) {
     const facts = parseTaxpayerStatement(text)
     if (facts.length === 0) {
-      actions.addMessage('assistant', 'I couldn’t map that statement to a tax field. Try including an amount and what it was for.')
+      actions.addMessage(
+        'assistant',
+        'I couldn’t map that statement to a tax field yet. Try speaking personal details (name, address, phone, email, date of birth) or an expense with an amount.',
+      )
       return
     }
     const taxProfile = applyParsedFacts(state.taxProfile, facts)
@@ -1139,29 +1142,102 @@ export const actions = {
         },
       ]
     })
+    const spokenName = facts.find((f) => f.mapsTo === 'full_name' && typeof f.value === 'string')
+    const spokenEmail = facts.find((f) => f.mapsTo === 'email' && typeof f.value === 'string')
+    const currentUser =
+      state.currentUser && (spokenName || spokenEmail)
+        ? {
+            ...state.currentUser,
+            name: spokenName ? String(spokenName.value) : state.currentUser.name,
+            email: spokenEmail ? String(spokenEmail.value) : state.currentUser.email,
+          }
+        : state.currentUser
+    // Seed household primary candidate when the taxpayer speaks their name before uploads.
+    let householdIntake = state.householdIntake
+    if (spokenName && typeof spokenName.value === 'string') {
+      const name = String(spokenName.value)
+      const existingPrimary = householdIntake.primaryPersonId
+        ? householdIntake.candidates.find((c) => c.id === householdIntake.primaryPersonId)
+        : null
+      if (!existingPrimary) {
+        const id = uid('person')
+        const dobFact = facts.find((f) => f.mapsTo === 'date_of_birth')
+        const ssnFact = facts.find((f) => f.mapsTo === 'ssn_last4')
+        const addrFact = facts.find((f) => f.mapsTo === 'address')
+        householdIntake = {
+          ...householdIntake,
+          primaryPersonId: id,
+          candidates: [
+            {
+              id,
+              fullLegalName: name,
+              dateOfBirth: dobFact ? String(dobFact.value) : undefined,
+              tinLast4: ssnFact ? String(ssnFact.value) : undefined,
+              address: addrFact ? String(addrFact.value) : undefined,
+              sourceDocIds: [],
+              sourceLabels: ['Spoken personal information'],
+              confidence: 0.82,
+              needsConfirmation: true,
+              relationToPrimary: null,
+              mayQualifyDependent: null,
+              onReturn: true,
+            },
+            ...householdIntake.candidates,
+          ],
+        }
+      } else {
+        const dobFact = facts.find((f) => f.mapsTo === 'date_of_birth')
+        const ssnFact = facts.find((f) => f.mapsTo === 'ssn_last4')
+        const addrFact = facts.find((f) => f.mapsTo === 'address')
+        householdIntake = {
+          ...householdIntake,
+          candidates: householdIntake.candidates.map((c) =>
+            c.id === existingPrimary.id
+              ? {
+                  ...c,
+                  fullLegalName: name,
+                  dateOfBirth: dobFact ? String(dobFact.value) : c.dateOfBirth,
+                  tinLast4: ssnFact ? String(ssnFact.value) : c.tinLast4,
+                  address: addrFact ? String(addrFact.value) : c.address,
+                }
+              : c,
+          ),
+        }
+      }
+    }
     const benefitReport = toSnapshot(taxProfile, 'Saved your statement to the tax return and recalculated benefits.')
     const applied = (benefitReport.lastApplications ?? []).filter((a) => a.ruleId !== 'recalc')
+    const personalBits = facts.filter((f) =>
+      ['full_name', 'date_of_birth', 'email', 'phone', 'address', 'ssn_last4'].includes(f.mapsTo),
+    )
     state = {
       ...state,
+      currentUser,
       taxProfile,
       interviewAnswers,
+      householdIntake,
       benefitReport,
       benefitReviewSigned: false,
       returns: syncReturnRefund(benefitReport),
       auditEvents: appendAudit(
         'nl_fact_ingest',
-        'Structured tax facts captured from conversational statement (amount details omitted from audit).',
+        personalBits.length
+          ? 'Personal information captured from spoken/typed statement (TIN limited to last four; full SSN not stored).'
+          : 'Structured tax facts captured from conversational statement (amount details omitted from audit).',
       ),
     }
     emit()
     const lines = applied.length
       ? applied.map((a) => `${a.name} ${money(a.amount)} applied → refund ${money(a.updatedRefund)}`).join(' · ')
       : benefitReport.lastChangeNote
+    const personalNote = personalBits.length
+      ? ` Personal info updated: ${personalBits.map((f) => f.prompt.replace(/ from your spoken statement/i, '')).join(', ')}.`
+      : ''
     setTimeout(
       () =>
         actions.addMessage(
           'assistant',
-          `Saved to your return: ${facts.map((f) => `${f.prompt} = ${f.value}`).join('; ')}. ${lines} You can upload a receipt later in the Vault if needed.`,
+          `Saved to your return: ${facts.map((f) => `${f.prompt} = ${f.value}`).join('; ')}.${personalNote} ${lines} You can upload a receipt later in the Vault if needed.`,
         ),
       350,
     )

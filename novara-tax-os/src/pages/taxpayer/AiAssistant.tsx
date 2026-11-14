@@ -20,6 +20,7 @@ import {
 } from '../../engine/documentIntakeEngine'
 import { buildDocumentChecklist } from '../../engine/documentChecklist'
 import { runPreFilingQa } from '../../engine/qaEngine'
+import { parseTaxpayerStatement } from '../../engine/naturalLanguageFacts'
 import '../shared.css'
 
 /**
@@ -116,6 +117,13 @@ export function AiAssistant() {
   function handleConversation(raw: string) {
     const text = raw.trim()
     if (!text) return
+    // Spoken/typed personal info and expense facts fill the return before intent routing.
+    if (parseTaxpayerStatement(text).length > 0) {
+      actions.askAi(text)
+      setTyped('')
+      setPendingVoice(null)
+      return
+    }
     const cmd = detectFilingIntent(text)
 
     if (cmd.type === 'yes_no' && activeTurn) {

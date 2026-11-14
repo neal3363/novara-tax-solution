@@ -48,7 +48,8 @@
     "test:prod-readiness": "node scripts/test-prod-readiness.mjs",
     "test:public-demo-deploy": "node scripts/test-public-demo-deploy.mjs",
     "test:master-production-launch": "node scripts/test-master-production-launch.mjs",
-    "test:landing-speak-upload": "node scripts/test-landing-speak-upload.mjs"
+    "test:landing-speak-upload": "node scripts/test-landing-speak-upload.mjs",
+    "test:speak-fill-personal": "node scripts/test-speak-fill-personal.mjs"
   },
   "dependencies": {
     "@fontsource/figtree": "^5.3.0",
