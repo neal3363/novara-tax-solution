@@ -66,11 +66,6 @@ export function getAuthSecret(): string | null {
   return secret && secret.length >= 32 ? secret : null;
 }
 
-export function getPreviewAuthPassword(): string | null {
-  const password = process.env.PREVIEW_AUTH_PASSWORD?.trim();
-  return password && password.length >= 12 ? password : null;
-}
-
 export function timingSafeEqualString(a: string, b: string): boolean {
   const encoder = new TextEncoder();
   const left = encoder.encode(a);

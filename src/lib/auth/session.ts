@@ -33,10 +33,13 @@ export function isOidcConfigured(): boolean {
   const mode = getAuthMode();
   if (!getAuthSecret()) return false;
   if (mode !== "oidc" && mode !== "both") return false;
+  // Roster required so OIDC cannot invent privileged roles.
+  if (loadAuthUsers().length === 0) return false;
   return Boolean(
     process.env.AUTH_OIDC_ISSUER?.trim() &&
       process.env.AUTH_OIDC_CLIENT_ID?.trim() &&
-      process.env.AUTH_OIDC_CLIENT_SECRET?.trim(),
+      process.env.AUTH_OIDC_CLIENT_SECRET?.trim() &&
+      process.env.AUTH_OIDC_REDIRECT_URI?.trim(),
   );
 }
 

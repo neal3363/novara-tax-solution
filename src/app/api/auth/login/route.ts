@@ -36,9 +36,9 @@ export async function POST(request: Request) {
   const password = body.password ?? "";
   const key = clientKey(request, email || "unknown");
 
-  const precheck = checkLoginRateLimit(key);
+  const precheck = await checkLoginRateLimit(key);
   if (!precheck.allowed) {
-    appendAuditEvent({
+    await appendAuditEvent({
       actor: email || "unknown",
       action: "login_rate_limited",
       resource: "auth",
@@ -52,8 +52,8 @@ export async function POST(request: Request) {
 
   const result = authenticatePassword(email, password);
   if (!result) {
-    const limited = registerLoginFailure(key);
-    appendAuditEvent({
+    const limited = await registerLoginFailure(key);
+    await appendAuditEvent({
       actor: email || "unknown",
       action: "login_attempt",
       resource: "auth",
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
   }
 
-  registerLoginSuccess(key);
+  await registerLoginSuccess(key);
   const rosterFp = authRosterFingerprint();
   const response = NextResponse.json({
     ok: true,
@@ -96,7 +96,7 @@ export async function POST(request: Request) {
       path: "/",
       maxAge: 10 * 60,
     });
-    appendAuditEvent({
+    await appendAuditEvent({
       actor: result.session.id,
       action: "login_password_ok_mfa_pending",
       resource: `portal:${result.session.role}`,
@@ -120,7 +120,7 @@ export async function POST(request: Request) {
     path: "/",
     maxAge: 60 * 60 * 8,
   });
-  appendAuditEvent({
+  await appendAuditEvent({
     actor: result.session.id,
     action: "login_success",
     resource: `portal:${result.session.role}`,

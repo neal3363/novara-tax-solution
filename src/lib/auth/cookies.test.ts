@@ -40,6 +40,19 @@ describe("signed session cookies v2", () => {
     expect(await decodeSession(`${body}.tamperedsignaturevalue`)).toBeNull();
   });
 
+  it("invalidates sessions when AUTH_SESSION_VERSION bumps", async () => {
+    const token = await encodeSession({
+      role: "executive",
+      userId: "usr_exec_001",
+      organizationId: "org_novara",
+      mfaVerified: true,
+      authSource: "password",
+      rosterFp: "abc",
+    });
+    process.env.AUTH_SESSION_VERSION = "3";
+    expect(await decodeSession(token)).toBeNull();
+  });
+
   it("maps portal paths to roles", () => {
     expect(portalFromPath("/app/executive/discovery")).toBe("executive");
     expect(portalFromPath("/app/partner/cases")).toBe("partner");

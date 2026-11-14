@@ -5,18 +5,24 @@
   "description": "NOVARA Asset Intelligence — AI-first national asset discovery, recovery, acquisition, and intelligence OS. Separate from NOVARA Tax OS.",
   "scripts": {
     "dev": "next dev --turbopack --hostname 0.0.0.0 --port 3000",
-    "build": "next build",
+    "build": "next build && node scripts/migrate.mjs",
     "start": "next start --hostname 0.0.0.0 --port 3000",
     "lint": "eslint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "migrate": "node scripts/migrate.mjs",
+    "export:ai": "bash scripts/prepare-asset-intelligence-export.sh"
   },
   "dependencies": {
+    "@electric-sql/pglite": "^0.5.16",
+    "@types/pg": "^8.23.1",
     "clsx": "^2.1.1",
     "framer-motion": "^14.14.0",
+    "jose": "^6.2.17",
     "lucide-react": "^0.544.0",
     "next": "15.5.29",
     "otpauth": "^9.6.0",
+    "pg": "^8.23.1",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "recharts": "^3.10.1",

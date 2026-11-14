@@ -33,7 +33,7 @@ export async function POST(request: Request) {
 
   const ok = verifyTotpCode(user.totpSecret, body.code ?? "");
   if (!ok) {
-    appendAuditEvent({
+    await appendAuditEvent({
       actor: user.id,
       action: "mfa_failed",
       resource: `portal:${user.role}`,
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     path: "/",
     maxAge: 60 * 60 * 8,
   });
-  appendAuditEvent({
+  await appendAuditEvent({
     actor: user.id,
     action: "mfa_verified",
     resource: `portal:${user.role}`,

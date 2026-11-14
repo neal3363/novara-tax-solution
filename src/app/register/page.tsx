@@ -19,10 +19,11 @@ export default function RegisterPage() {
         </div>
         {submitted ? (
           <div className="mt-6">
-            <h1 className="font-display text-3xl text-white">Request received</h1>
+            <h1 className="font-display text-3xl text-white">Request recorded</h1>
             <p className="mt-3 text-sm text-silver">
-              This preview records interest locally only. Production registration requires MFA,
-              organization verification, and compliance review. No live onboarding is activated.
+              This form does <strong className="text-white">not</strong> create accounts or assign
+              privileged roles. An administrator must provision users in the identity roster /
+              IdP and enable MFA before portal access is possible.
             </p>
             <Link href="/login" className="mt-6 inline-block">
               <Button>Go to Login</Button>
@@ -37,8 +38,8 @@ export default function RegisterPage() {
             }}
           >
             <p className="text-sm text-silver">
-              Request partner, attorney, or claimant access. Seat availability is limited to two
-              partners per state and 100 external partners maximum.
+              Request interest only. Privileged roles cannot be self-assigned. Production access
+              requires admin provisioning, MFA, and compliance review.
             </p>
             <input
               required
@@ -53,11 +54,11 @@ export default function RegisterPage() {
             />
             <select
               className="w-full rounded-md border border-[rgba(183,195,213,0.2)] bg-midnight px-3 py-2.5 text-sm text-white outline-none focus:border-champagne/50"
-              defaultValue="partner"
+              defaultValue="partner_interest"
             >
-              <option value="partner">Partner seat inquiry</option>
-              <option value="attorney">Attorney network</option>
-              <option value="owner">Owner / heir workspace</option>
+              <option value="partner_interest">Partner seat interest (not an account)</option>
+              <option value="attorney_interest">Attorney network interest (not an account)</option>
+              <option value="owner_interest">Owner / heir workspace interest (not an account)</option>
             </select>
             <textarea
               rows={4}
@@ -65,7 +66,7 @@ export default function RegisterPage() {
               className="w-full rounded-md border border-[rgba(183,195,213,0.2)] bg-midnight px-3 py-2.5 text-sm text-white outline-none focus:border-champagne/50"
             />
             <Button type="submit" className="w-full">
-              Submit request
+              Submit interest request
             </Button>
           </form>
         )}
