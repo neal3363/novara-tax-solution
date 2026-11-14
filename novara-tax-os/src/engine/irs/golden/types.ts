@@ -16,6 +16,15 @@ export interface GoldenExpected {
   eitc?: number
   cdcc?: number
   qbiDeduction?: number
+  ptc?: number
+  excessAptcRepayment?: number
+  educationNonrefundable?: number
+  educationRefundable?: number
+  amt?: number
+  niit?: number
+  scheduleBInterestDividends?: number
+  scheduleDNet?: number
+  scheduleENet?: number
   refundOrBalanceDue: number
 }
 

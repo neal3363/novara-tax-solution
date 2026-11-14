@@ -112,12 +112,13 @@ setDualRunFlagForTests({ enabled: true, audience: 'taxpayer_visible' as any })
 assert(getDualRunFlag().audience === 'internal_only', 'cannot set taxpayer_visible via test setter')
 resetDualRunFlag()
 
-console.log('=== Gap inventory + stubs (not complete forms) ===')
+console.log('=== Gap inventory + stubs (isolated, not production-ready) ===')
 assert(CALCULATION_GAPS.length >= 7, 'gap inventory covers requested forms')
 assert(gapsNeedingApproval().every((g) => g.approvalRequired), 'approval flags set')
 for (const stub of ALL_STUBS) {
   const r = stub()
-  assert(r.supported === false, 'stub unsupported: ' + r.form)
+  assert(r.productionReady === false, 'not production-ready: ' + r.form)
+  assert(r.isolatedImplemented === true, 'isolated implemented: ' + r.form)
 }
 const forms = CALCULATION_GAPS.map((g) => g.form)
 for (const need of ['Form 8962', 'Form 8995-A', 'Form 8863', 'Schedule B', 'Schedule D', 'Schedule E', 'Form 1040-X']) {

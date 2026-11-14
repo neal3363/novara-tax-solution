@@ -50,6 +50,8 @@ export interface DualRunReport {
     | 'taxableIncome'
     | 'incomeTaxBeforeCredits'
     | 'seTax'
+    | 'amt'
+    | 'niit'
     | 'nonrefundableCredits'
     | 'refundableCredits'
     | 'totalPayments'
@@ -59,6 +61,10 @@ export interface DualRunReport {
     | 'eitc'
     | 'cdcc'
     | 'ptc'
+    | 'excessAptcRepayment'
+    | 'educationNonrefundable'
+    | 'educationRefundable'
+    | 'qbiDeduction'
   >
   diffs: DualRunLineDiff[]
   summary: string
@@ -116,6 +122,8 @@ export function runDualComparison(
     { field: 'taxable_income', demo: null, irs: irs.taxableIncome, delta: null },
     { field: 'income_tax', demo: null, irs: irs.incomeTaxBeforeCredits, delta: null },
     { field: 'se_tax', demo: null, irs: irs.seTax, delta: null },
+    { field: 'amt', demo: null, irs: irs.amt, delta: null },
+    { field: 'niit', demo: null, irs: irs.niit, delta: null },
     {
       field: 'credits_nonrefundable',
       demo: null,
@@ -134,6 +142,10 @@ export function runDualComparison(
     { field: 'eitc', demo: null, irs: irs.eitc, delta: null },
     { field: 'cdcc', demo: null, irs: irs.cdcc, delta: null },
     { field: 'ptc', demo: null, irs: irs.ptc, delta: null },
+    { field: 'excess_aptc', demo: null, irs: irs.excessAptcRepayment, delta: null },
+    { field: 'education_nonref', demo: null, irs: irs.educationNonrefundable, delta: null },
+    { field: 'education_ref', demo: null, irs: irs.educationRefundable, delta: null },
+    { field: 'qbi', demo: null, irs: irs.qbiDeduction, delta: null },
   ]
 
   return {
@@ -152,6 +164,8 @@ export function runDualComparison(
       taxableIncome: irs.taxableIncome,
       incomeTaxBeforeCredits: irs.incomeTaxBeforeCredits,
       seTax: irs.seTax,
+      amt: irs.amt,
+      niit: irs.niit,
       nonrefundableCredits: irs.nonrefundableCredits,
       refundableCredits: irs.refundableCredits,
       totalPayments: irs.totalPayments,
@@ -161,6 +175,10 @@ export function runDualComparison(
       eitc: irs.eitc,
       cdcc: irs.cdcc,
       ptc: irs.ptc,
+      excessAptcRepayment: irs.excessAptcRepayment,
+      educationNonrefundable: irs.educationNonrefundable,
+      educationRefundable: irs.educationRefundable,
+      qbiDeduction: irs.qbiDeduction,
     },
     diffs: flag.verbose ? diffs : diffs.slice(0, 1),
     summary: `Internal dual-run TY${profile.taxYear}: demo ${cmp.demoProjectedRefund} vs IRS ${cmp.irsRefundOrBalanceDue} (Δ ${cmp.delta}). Hidden from taxpayers.`,

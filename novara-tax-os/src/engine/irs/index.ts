@@ -52,7 +52,7 @@ export {
 } from './dualRun'
 export type { DualRunFlag, DualRunReport, DualRunLineDiff } from './dualRun'
 
-export { CALCULATION_GAPS, formatGapInventory, gapsNeedingApproval } from './gaps/proposals'
+export { CALCULATION_GAPS, formatGapInventory, gapsNeedingApproval, completedPhase4Forms } from './gaps/proposals'
 export type { CalculationGap, GapStatus } from './gaps/proposals'
 export {
   stubForm8962,
@@ -67,3 +67,15 @@ export {
 
 export { MAXIMIZER_MIGRATION_STEPS, maximizerMigrationSummary } from './maximizerMigrationPlan'
 export type { MigrationStep } from './maximizerMigrationPlan'
+
+export { FORM_READINESS, getPhase4Params, applicableFigure } from './phase4Params'
+export { computeForm8962 } from './forms/form8962'
+export { computeForm8995A } from './forms/form8995A'
+export { computeForm8863 } from './forms/form8863'
+export { computeScheduleB } from './forms/scheduleB'
+export { computeScheduleD } from './forms/scheduleD'
+export { computeScheduleE } from './forms/scheduleE'
+export { computeForm6251 } from './forms/form6251Amt'
+export { computeForm8960 } from './forms/form8960Niit'
+export { computeForm1040X } from './forms/form1040x'
+export { PHASE4_GOLDEN_FIXTURES } from './golden/phase4Fixtures'
