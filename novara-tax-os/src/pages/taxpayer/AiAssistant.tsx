@@ -4,6 +4,8 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { actions, useAppStore } from '../../store/useAppStore'
 import { formatMoney } from '../../data/fees'
 import { RefundTracker } from '../../components/benefits/RefundTracker'
+import { AppliedBenefitBanner } from '../../components/benefits/AppliedBenefitBanner'
+import { SavingsOpportunityPanel } from '../../components/benefits/SavingsOpportunityPanel'
 import { InterviewChoice } from '../../components/interview/InterviewChoice'
 import { VoiceInput } from '../../components/VoiceInput'
 import { NovaraSpeak } from '../../components/NovaraSpeak'
@@ -315,6 +317,14 @@ export function AiAssistant() {
         <section className="list-panel panel">
           <h2>2. Live estimate</h2>
           <RefundTracker report={benefitReport} />
+          <AppliedBenefitBanner events={benefitReport?.lastApplications} returnPath="/app/taxpayer/assistant" />
+          <SavingsOpportunityPanel
+            report={benefitReport}
+            compact
+            onOpenMapsTo={(mapsTo) => {
+              actions.focusInterviewQuestion(mapsTo)
+            }}
+          />
           <p className="muted">
             Status:{' '}
             {benefitReport?.refundIncomplete

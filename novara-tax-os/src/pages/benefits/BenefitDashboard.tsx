@@ -6,6 +6,7 @@ import { getQuestionnaire, listSupportedBenefitQuestionnaires } from '../../engi
 import { buildDocumentChecklist, documentsStillNeeded } from '../../engine/documentChecklist'
 import { AppliedBenefitBanner } from '../../components/benefits/AppliedBenefitBanner'
 import { RefundTracker } from '../../components/benefits/RefundTracker'
+import { SavingsOpportunityPanel } from '../../components/benefits/SavingsOpportunityPanel'
 import { actions, useAppStore } from '../../store/useAppStore'
 import '../shared.css'
 import './Benefits.css'
@@ -64,7 +65,7 @@ export function BenefitDashboard() {
       <header className="page-header">
         <div>
           <p className="eyebrow">Answer or upload → Apply → Recalculate</p>
-          <h1>Tax Savings</h1>
+          <h1>Maximize all tax savings</h1>
         </div>
         <div className="benefit-actions">
           <button className="btn btn-secondary" type="button" onClick={() => actions.runBenefitScan()}>
@@ -77,12 +78,15 @@ export function BenefitDashboard() {
       </header>
 
       <p className="muted" style={{ marginTop: '-0.35rem', maxWidth: '44rem' }}>
-        Each benefit has its own questionnaire. Answer or upload → NOVARA evaluates that benefit → applies the allowable
-        amount to your working return → then shows only the documents still needed for filing.
+        NOVARA investigates every applicable credit and deduction. Answer, upload, or speak — allowable amounts apply to
+        your working return immediately, and open opportunities stay listed until they are applied or ruled out.
       </p>
 
       <RefundTracker report={report} />
       <AppliedBenefitBanner events={report?.lastApplications} returnPath={preparePath} />
+      <div style={{ marginTop: '1rem' }}>
+        <SavingsOpportunityPanel report={report} interviewBase={interviewBase} preparePath={preparePath} />
+      </div>
 
       <section style={{ marginTop: '1.25rem' }}>
         <h2 className="savings-section-title">Applied benefits</h2>

@@ -5,6 +5,7 @@ import { actions, useAppStore } from '../../store/useAppStore'
 import { formatMoney } from '../../data/fees'
 import { AppliedBenefitBanner } from '../../components/benefits/AppliedBenefitBanner'
 import { RefundTracker } from '../../components/benefits/RefundTracker'
+import { SavingsOpportunityPanel } from '../../components/benefits/SavingsOpportunityPanel'
 import { AnswerHistory, InterviewChoice } from '../../components/interview/InterviewChoice'
 import { QuestionOverview, QuestionProgressBar } from '../../components/interview/QuestionProgress'
 import {
@@ -618,10 +619,10 @@ export function Prepare() {
         <section className="smart-interview rise">
           <div className="interview-layout">
             <div className="list-panel panel interview-chat">
-              <h2>Tax questions &amp; benefits</h2>
+              <h2>Tax questions &amp; maximize savings</h2>
               <p className="muted" style={{ marginTop: 0 }}>
-                Green means answered. Orange means unanswered. Use the tabs above to jump sections. Speak, type, or
-                upload — one shared answer system.
+                Green means answered. Orange means unanswered. Each answer can apply a credit or deduction to your live
+                refund — see All possible tax savings on the right. Speak, type, or upload into the same return.
               </p>
               <QuestionProgressBar profile={taxProfile} />
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.55rem', marginBottom: '0.75rem', alignItems: 'center' }}>
@@ -722,6 +723,16 @@ export function Prepare() {
             <div className="side-stack">
               <RefundTracker report={benefitReport} />
               <AppliedBenefitBanner events={benefitReport?.lastApplications} returnPath="/app/taxpayer/prepare" />
+              <SavingsOpportunityPanel
+                report={benefitReport}
+                preparePath="/app/taxpayer/prepare"
+                onOpenMapsTo={(mapsTo) => {
+                  actions.focusInterviewQuestion(mapsTo)
+                  requestAnimationFrame(() => {
+                    document.querySelector('.active-turn')?.scrollIntoView({ behavior: 'auto', block: 'center' })
+                  })
+                }}
+              />
               <section className="list-panel panel">
                 <h2>Outstanding documents</h2>
                 {outstanding.length === 0 && checklist.filter((c) => c.status === 'needed').length === 0 && (
