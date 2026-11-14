@@ -1,6 +1,7 @@
 import type { DocumentRecord } from '../data/types'
 import {
   applyAnswer,
+  isProvenByDocuments,
   nextInterviewQuestions,
   runBenefitOptimization,
   type TaxpayerProfile,
@@ -294,6 +295,15 @@ export function satisfyDocBackedAnswers(profile: TaxpayerProfile): TaxpayerProfi
   }
   if (next.dependents.some((d) => d.age >= 0 && d.age < 17) && !a.has_child) a.has_child = 'yes'
 
+  // Household / ID docs already list dependents — don't re-ask the filing probe.
+  if (next.dependents.length > 0) {
+    if (!a.potential_dependents) a.potential_dependents = 'yes'
+    if (!a.has_dependents) a.has_dependents = 'yes'
+    if (a.dependent_count === undefined || a.dependent_count === '') {
+      a.dependent_count = next.dependents.length
+    }
+  }
+
   // CTC residency defaults when per-dep interview already recorded months/support
   const depReady = next.dependents.some(
     (d) => d.monthsLivedWith != null && d.providedOwnSupport != null && d.anotherMayClaim != null,
@@ -506,15 +516,9 @@ export function nextBenefitDiscoveryTurn(profile: TaxpayerProfile): SmartTurn | 
       .flatMap((f) => f.missingAnswers),
   )
 
-  // Skip questions already known from documents / household intake
+  // Skip every question the uploaded docs already represent (unless a hard blocker needs more).
   const filtered = qs.filter((q) => {
-    if (q.mapsTo === 'had_w2' && (profile.wages > 0 || profile.answers.had_w2 === 'yes')) return false
-    if (q.mapsTo === 'had_1099' && (profile.selfEmploymentIncome > 0 || profile.answers.had_1099 === 'yes')) return false
-    if (q.mapsTo === 'self_employed' && profile.selfEmploymentIncome > 0) return false
-    if (q.mapsTo === 'owns_home' && (profile.mortgageInterest > 0 || profile.propertyTax > 0)) return false
-    if (q.mapsTo === 'education_expenses' && profile.tuitionPaid > 0) return false
-    if (q.mapsTo === 'student_loan_interest' && profile.studentLoanInterest > 0) return false
-    if (q.mapsTo === 'paid_childcare' && profile.childcarePaid > 0) return false
+    if (isProvenByDocuments(profile, q.mapsTo)) return false
     if (q.mapsTo === 'has_dependents' && depsAnswered) return false
     if (q.mapsTo === 'has_child') {
       if (profile.answers.has_dependents === 'no' || profile.answers.potential_dependents === 'no') return false
@@ -528,17 +532,22 @@ export function nextBenefitDiscoveryTurn(profile: TaxpayerProfile): SmartTurn | 
     ) {
       return false
     }
-    // After docs apply credits, skip soft "fishing" questions — only ask blockers
     if (docsAppliedCredits && DEFERRED_SOFT_PROBES.has(q.mapsTo) && !blockingKeys.has(q.mapsTo)) {
       return false
     }
     return true
   })
 
-  // Prefer a hard blocker; if docs already applied credits, stop the required queue
-  // (optional soft probes stay available via Maximize more / Edit).
+  // Prefer a hard blocker. Soft probes (charity/home/tuition fishing) only run when
+  // docs have not already finished applying credits — never re-ask doc-covered facts.
   const blocker = filtered.find((q) => blockingKeys.has(q.mapsTo))
-  const q = blocker ?? (docsAppliedCredits || report.auditComplete ? null : filtered.find((q) => !DEFERRED_SOFT_PROBES.has(q.mapsTo)) ?? null)
+  const primary = filtered.find((q) => !DEFERRED_SOFT_PROBES.has(q.mapsTo))
+  const soft = filtered.find((q) => DEFERRED_SOFT_PROBES.has(q.mapsTo))
+  const q =
+    blocker ??
+    primary ??
+    (docsAppliedCredits || report.auditComplete ? null : soft) ??
+    null
   if (!q) return null
 
   const childCount = profile.dependents.filter((d) => d.age < 17).length

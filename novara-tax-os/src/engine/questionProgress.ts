@@ -6,7 +6,7 @@
 
 import { answerPresent } from './benefitAnswers'
 import type { TaxpayerProfile } from './benefitOptimizer'
-import { nextInterviewQuestions, runBenefitOptimization } from './benefitOptimizer'
+import { isProvenByDocuments, nextInterviewQuestions, runBenefitOptimization } from './benefitOptimizer'
 import { applyDependentAnswer, emptyDependent, nextDependentQuestion } from './dependentsEngine'
 import { nextBenefitDiscoveryTurn, nextFilingStatusTurn } from './smartInterview'
 import { lookupRegistryQuestion, registryTurnIfUnanswered } from './interviewRegistry'
@@ -149,62 +149,97 @@ export function buildInterviewProgress(profile: TaxpayerProfile): InterviewProgr
       // Skip entirely from totals when not applicable (do not count)
       continue
     }
+    const docProven = isProvenByDocuments(profile, f.mapsTo)
+    const answeredAlready = isAnswered(profile, f.mapsTo) || docProven
+    // Docs already answered this filing fact — don't show as unanswered required work.
+    if (docProven && !isAnswered(profile, f.mapsTo)) {
+      push({
+        id: `filing:${f.mapsTo}`,
+        mapsTo: f.mapsTo,
+        prompt: f.prompt,
+        category: 'filing_status',
+        categoryLabel: 'Filing status',
+        status: 'answered',
+      })
+      continue
+    }
     push({
       id: `filing:${f.mapsTo}`,
       mapsTo: f.mapsTo,
       prompt: f.prompt,
       category: 'filing_status',
       categoryLabel: 'Filing status',
-      status: isAnswered(profile, f.mapsTo) ? 'answered' : 'unanswered',
+      status: answeredAlready ? 'answered' : 'unanswered',
     })
   }
 
   // Dependent interview — replay from discovery so answered names show GREEN,
   // then stop at the first unanswered (Continue never restarts completed facts).
+  // Skip the walk when household/ID docs already completed dependents (no rediscovery).
   {
-    let walkAnswers: Record<string, string | number | boolean | undefined> = { ...profile.answers }
-    for (const key of Object.keys(walkAnswers)) {
-      if (key.startsWith('dep_')) delete walkAnswers[key]
-    }
-    const declared =
-      typeof profile.answers.dependent_count === 'number'
-        ? profile.answers.dependent_count
-        : Number(profile.answers.dependent_count) || profile.dependents.length
-    let walkDeps = Array.from({ length: Math.max(0, declared) }, (_, i) => emptyDependent(i))
-    const guard = new Set<string>()
-    for (let i = 0; i < 40; i++) {
-      const q = nextDependentQuestion(walkAnswers, walkDeps)
-      if (!q) break
-      if (guard.has(q.mapsTo)) break
-      guard.add(q.mapsTo)
+    const depsFromDocs =
+      profile.dependents.length > 0 &&
+      profile.dependents.every(
+        (d) =>
+          Boolean(d.fullLegalName?.trim()) &&
+          (Boolean(d.dateOfBirth?.trim()) || d.age >= 0) &&
+          d.tinStatus !== 'missing',
+      )
+    if (!depsFromDocs) {
+      let walkAnswers: Record<string, string | number | boolean | undefined> = { ...profile.answers }
+      for (const key of Object.keys(walkAnswers)) {
+        if (key.startsWith('dep_')) delete walkAnswers[key]
+      }
+      const declared =
+        typeof profile.answers.dependent_count === 'number'
+          ? profile.answers.dependent_count
+          : Number(profile.answers.dependent_count) || profile.dependents.length
+      let walkDeps = Array.from({ length: Math.max(0, declared) }, (_, i) => emptyDependent(i))
+      const guard = new Set<string>()
+      for (let i = 0; i < 40; i++) {
+        const q = nextDependentQuestion(walkAnswers, walkDeps)
+        if (!q) break
+        if (guard.has(q.mapsTo)) break
+        guard.add(q.mapsTo)
 
-      const idx = q.dependentIndex ?? -1
-      const profileDep = idx >= 0 ? profile.dependents[idx] : undefined
-      const answered =
-        isAnswered(profile, q.mapsTo) ||
-        (q.mapsTo.endsWith('_name') && Boolean(profileDep?.fullLegalName?.trim())) ||
-        (q.mapsTo.endsWith('_dob') && Boolean(profileDep?.dateOfBirth?.trim())) ||
-        (q.mapsTo.endsWith('_tin_path') && profileDep != null && profileDep.tinStatus !== 'missing') ||
-        (q.mapsTo.endsWith('_tin_last4') && Boolean(profileDep?.tinLast4))
+        const idx = q.dependentIndex ?? -1
+        const profileDep = idx >= 0 ? profile.dependents[idx] : undefined
+        const answered =
+          isAnswered(profile, q.mapsTo) ||
+          (q.mapsTo.endsWith('_name') && Boolean(profileDep?.fullLegalName?.trim())) ||
+          (q.mapsTo.endsWith('_dob') && Boolean(profileDep?.dateOfBirth?.trim())) ||
+          (q.mapsTo.endsWith('_tin_path') && profileDep != null && profileDep.tinStatus !== 'missing') ||
+          (q.mapsTo.endsWith('_tin_last4') && Boolean(profileDep?.tinLast4))
 
+        push({
+          id: `dep:${q.mapsTo}`,
+          mapsTo: q.mapsTo,
+          prompt: q.prompt,
+          category: 'dependents',
+          categoryLabel: 'Dependents',
+          status: answered ? 'answered' : 'unanswered',
+        })
+
+        if (!answered) break
+
+        let val: string | number | boolean | undefined = profile.answers[q.mapsTo]
+        if (val === undefined && q.mapsTo.endsWith('_name')) val = profileDep?.fullLegalName
+        if (val === undefined && q.mapsTo.endsWith('_dob')) val = profileDep?.dateOfBirth
+        if (val === undefined) break
+        const stepped = applyDependentAnswer(walkAnswers, walkDeps, q.mapsTo, val, profile.taxYear)
+        walkAnswers = stepped.answers
+        walkDeps = stepped.dependents
+      }
+    } else {
+      // Show completed household as answered, not as open questions.
       push({
-        id: `dep:${q.mapsTo}`,
-        mapsTo: q.mapsTo,
-        prompt: q.prompt,
+        id: 'dep:from_docs',
+        mapsTo: 'dependents_from_docs',
+        prompt: `${profile.dependents.length} dependent(s) from uploaded IDs`,
         category: 'dependents',
         categoryLabel: 'Dependents',
-        status: answered ? 'answered' : 'unanswered',
+        status: 'answered',
       })
-
-      if (!answered) break
-
-      let val: string | number | boolean | undefined = profile.answers[q.mapsTo]
-      if (val === undefined && q.mapsTo.endsWith('_name')) val = profileDep?.fullLegalName
-      if (val === undefined && q.mapsTo.endsWith('_dob')) val = profileDep?.dateOfBirth
-      if (val === undefined) break
-      const stepped = applyDependentAnswer(walkAnswers, walkDeps, q.mapsTo, val, profile.taxYear)
-      walkAnswers = stepped.answers
-      walkDeps = stepped.dependents
     }
   }
 

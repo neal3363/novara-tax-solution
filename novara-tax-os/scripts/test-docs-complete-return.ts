@@ -4,8 +4,8 @@
  */
 import { syncProfileFromDocuments, satisfyDocBackedAnswers } from '../src/engine/smartInterview'
 import { applyHouseholdToProfile, type HouseholdIntakeState } from '../src/engine/documentIntakeEngine'
-import { runBenefitOptimization } from '../src/engine/benefitOptimizer'
-import { nextInterviewTurn } from '../src/engine/questionProgress'
+import { nextInterviewQuestions, runBenefitOptimization } from '../src/engine/benefitOptimizer'
+import { buildInterviewProgress, nextInterviewTurn } from '../src/engine/questionProgress'
 
 const empty = {
   taxYear: 2025,
@@ -156,6 +156,9 @@ profile = satisfyDocBackedAnswers(applyHouseholdToProfile(profile, intake, 2025)
 const report = runBenefitOptimization(profile)
 const hard = report.findings.filter((f) => f.status === 'needs_info' && !f.optionalDiscovery)
 const turn = nextInterviewTurn(profile)
+const queued = nextInterviewQuestions(profile, report)
+const progress = buildInterviewProgress(profile)
+const unanswered = progress.questions.filter((q) => q.status === 'unanswered')
 
 function assert(cond: boolean, msg: string) {
   if (!cond) {
@@ -170,5 +173,10 @@ assert(hard.length === 0, `no hard needs_info (got ${hard.map((f) => f.ruleId).j
 assert(report.blockers.length === 0, `no blockers (got ${report.blockers.join('; ')})`)
 assert(report.auditComplete, 'auditComplete when docs finish the return')
 assert(turn === null, `no required interview turn (got ${turn?.mapsTo})`)
+assert(queued.length === 0, `no doc-covered questions queued (got ${queued.map((q) => q.mapsTo).join(',')})`)
+assert(
+  unanswered.length === 0,
+  `progress has no unanswered doc-covered questions (got ${unanswered.map((q) => q.mapsTo).join(',')})`,
+)
 assert(report.verifiedSavings > 0, 'credits applied from documents')
 console.log('All docs-complete return checks passed.')

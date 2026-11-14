@@ -870,7 +870,7 @@ export function nextInterviewQuestions(p: TaxpayerProfile, report: OptimizationR
     })
   }
 
-  if (!answered('education_expenses')) {
+  if (!answered('education_expenses') && p.tuitionPaid <= 0) {
     qs.push({
       id: 'education_expenses',
       prompt: 'Any college tuition?',
@@ -890,44 +890,19 @@ export function nextInterviewQuestions(p: TaxpayerProfile, report: OptimizationR
     })
   }
 
-  if (!answered('retirement_contributions')) {
-    qs.push({
-      id: 'retirement_contributions',
-      prompt: 'Put money in IRA or 401k?',
-      kind: 'yesno',
-      mapsTo: 'retirement_contributions',
-      benefitIds: ['savers'],
-    })
-  }
-
+  const seFromDocs = p.selfEmploymentIncome > 0
   const isSelfEmployed =
     p.answers.self_employed === 'yes' ||
     p.answers.self_employed === 'Yes' ||
-    p.selfEmploymentIncome > 0
+    seFromDocs
 
-  // Business follow-ups — mirror childcare chaining so the Business tab is not empty after SE = yes.
-  if (isSelfEmployed) {
-    if (!answered('business_structure')) {
-      qs.push({
-        id: 'business_structure',
-        prompt: 'How is your business organized for tax purposes?',
-        kind: 'choice',
-        choices: [
-          'Sole proprietorship / Schedule C',
-          'Single-member LLC (Schedule C)',
-          'Partnership',
-          'S corporation',
-          'C corporation',
-          'Not sure',
-        ],
-        mapsTo: 'business_structure',
-        benefitIds: ['qbi', 'mileage', 'se_health'],
-      })
-    }
+  // SE follow-ups ONLY when taxpayer said Yes without a 1099/SE amount on file.
+  // A 1099 already represents SE income + QBI — don't re-ask structure/mileage/office.
+  if (isSelfEmployed && !seFromDocs) {
     if (!answered('qbi_amount') && p.selfEmploymentIncome <= 0) {
       qs.push({
         id: 'qbi_amount',
-        prompt: 'About how much was your net business profit (Schedule C / self-employment income)?',
+        prompt: 'About how much was your net business profit?',
         kind: 'number',
         mapsTo: 'qbi_amount',
         benefitIds: ['qbi'],
@@ -936,7 +911,7 @@ export function nextInterviewQuestions(p: TaxpayerProfile, report: OptimizationR
     if (!answered('business_vehicle')) {
       qs.push({
         id: 'business_vehicle',
-        prompt: 'Did you use a vehicle for qualifying business purposes during the tax year?',
+        prompt: 'Used a vehicle for business?',
         kind: 'yesno',
         mapsTo: 'business_vehicle',
         benefitIds: ['mileage'],
@@ -949,7 +924,7 @@ export function nextInterviewQuestions(p: TaxpayerProfile, report: OptimizationR
     if (usedVehicle && !answered('total_miles')) {
       qs.push({
         id: 'total_miles',
-        prompt: 'About how many total miles did you drive during the year?',
+        prompt: 'Total miles driven this year?',
         kind: 'number',
         mapsTo: 'total_miles',
         benefitIds: ['mileage'],
@@ -958,101 +933,24 @@ export function nextInterviewQuestions(p: TaxpayerProfile, report: OptimizationR
     if (usedVehicle && answered('total_miles') && !answered('business_miles') && p.businessMileage <= 0) {
       qs.push({
         id: 'business_miles',
-        prompt: 'How many of those miles were qualifying business miles?',
+        prompt: 'How many business miles?',
         kind: 'number',
         mapsTo: 'business_miles',
         benefitIds: ['mileage'],
       })
     }
-    if (usedVehicle && (answered('business_miles') || p.businessMileage > 0)) {
-      if (!answered('mileage_log')) {
-        qs.push({
-          id: 'mileage_log',
-          prompt: 'Do you have a mileage log or other adequate supporting records?',
-          kind: 'yesno',
-          mapsTo: 'mileage_log',
-          benefitIds: ['mileage'],
-        })
-      }
-      if (!answered('actual_expense_method')) {
-        qs.push({
-          id: 'actual_expense_method',
-          prompt:
-            'Did you have vehicle expenses that may qualify for an actual-expense deduction instead of standard mileage?',
-          kind: 'yesno',
-          mapsTo: 'actual_expense_method',
-          benefitIds: ['mileage'],
-        })
-      }
-      if (!answered('prior_vehicle_depreciation')) {
-        qs.push({
-          id: 'prior_vehicle_depreciation',
-          prompt:
-            'Have you previously claimed depreciation or another vehicle expense method that affects this year’s deduction?',
-          kind: 'yesno',
-          mapsTo: 'prior_vehicle_depreciation',
-          benefitIds: ['mileage'],
-        })
-      }
-    }
-    if (!answered('equipment_depreciation')) {
+    if (usedVehicle && (answered('business_miles') || p.businessMileage > 0) && !answered('mileage_log')) {
       qs.push({
-        id: 'equipment_depreciation',
-        prompt:
-          'Did you buy business equipment, computers, or other property you may depreciate or expense (Section 179 / bonus)?',
+        id: 'mileage_log',
+        prompt: 'Have a mileage log?',
         kind: 'yesno',
-        mapsTo: 'equipment_depreciation',
-        benefitIds: ['qbi'],
-      })
-    }
-    if (
-      (p.answers.equipment_depreciation === 'yes' || p.answers.equipment_depreciation === 'Yes') &&
-      !answered('equipment_depreciation_amount')
-    ) {
-      qs.push({
-        id: 'equipment_depreciation_amount',
-        prompt: 'About how much did you spend on depreciable business equipment this year?',
-        kind: 'number',
-        mapsTo: 'equipment_depreciation_amount',
-        benefitIds: ['qbi'],
-      })
-    }
-    if (!answered('home_office')) {
-      qs.push({
-        id: 'home_office',
-        prompt: 'Did you use part of your home regularly and exclusively for this business?',
-        kind: 'yesno',
-        mapsTo: 'home_office',
-        benefitIds: ['qbi'],
-      })
-    }
-    if (!answered('se_health_premiums_yes')) {
-      qs.push({
-        id: 'se_health_premiums_yes',
-        prompt: 'Did you pay health insurance premiums for yourself while self-employed?',
-        kind: 'yesno',
-        mapsTo: 'se_health_premiums_yes',
-        benefitIds: ['se_health'],
-      })
-    }
-    if (
-      (p.answers.se_health_premiums_yes === 'yes' ||
-        p.answers.se_health_premiums_yes === 'Yes' ||
-        p.answers.se_health_premiums === 'yes') &&
-      !answered('se_health_premium_amount') &&
-      p.seHealthPremiums <= 0
-    ) {
-      qs.push({
-        id: 'se_health_premium_amount',
-        prompt: 'About how much did you pay in self-employed health insurance premiums?',
-        kind: 'number',
-        mapsTo: 'se_health_premium_amount',
-        benefitIds: ['se_health'],
+        mapsTo: 'mileage_log',
+        benefitIds: ['mileage'],
       })
     }
   }
 
-  if (!answered('owns_home')) {
+  if (!answered('owns_home') && p.mortgageInterest <= 0 && p.propertyTax <= 0) {
     qs.push({
       id: 'owns_home',
       prompt: 'Own a home?',
@@ -1062,52 +960,92 @@ export function nextInterviewQuestions(p: TaxpayerProfile, report: OptimizationR
     })
   }
 
-  if (!answered('had_marketplace')) {
-    qs.push({
-      id: 'had_marketplace',
-      prompt: 'Health insurance from Healthcare.gov?',
-      kind: 'yesno',
-      mapsTo: 'had_marketplace',
-      benefitIds: ['ptc'],
-    })
-  }
+  // Soft probes (charity, medical, Marketplace, retirement, state, SE extras) are NOT
+  // required interview questions — docs don't cover them, so they stay in Maximize savings.
 
-  if (!answered('charitable_gifts')) {
-    qs.push({
-      id: 'charitable_gifts',
-      prompt: 'Any charity donations?',
-      kind: 'yesno',
-      mapsTo: 'charitable_gifts',
-      benefitIds: ['charity'],
-    })
-  }
+  // Only keep questions that hard-block a credit OR aren't already proven by docs/profile.
+  const hardNeeded = new Set(
+    report.findings
+      .filter((f) => f.status === 'needs_info' && !f.optionalDiscovery)
+      .flatMap((f) => f.missingAnswers),
+  )
 
-  if (!answered('high_medical')) {
-    qs.push({
-      id: 'high_medical',
-      prompt: 'Big medical bills this year?',
-      kind: 'yesno',
-      mapsTo: 'high_medical',
-      benefitIds: ['medical'],
-    })
-  }
+  // When docs already finished the return, do not keep fishing for soft probes.
+  const docsFinished = report.auditComplete && hardNeeded.size === 0
 
-  if (!answered('filing_state')) {
-    qs.push({
-      id: 'filing_state',
-      prompt: 'Which state do you live in?',
-      kind: 'choice',
-      choices: ['Texas', 'California', 'New York', 'Florida', 'Other'],
-      mapsTo: 'filing_state',
-      benefitIds: ['state_eitc'],
-    })
-  }
-
-  // Prioritize needs_info — but never silently drop unlocked follow-ups (old .slice(0,6) starved the queue).
-  const needed = new Set(report.findings.filter((f) => f.status === 'needs_info').flatMap((f) => f.missingAnswers))
   return qs
     .filter((q) => !answered(q.mapsTo))
-    .sort((a, b) => Number(needed.has(b.mapsTo)) - Number(needed.has(a.mapsTo)))
+    .filter((q) => {
+      if (isProvenByDocuments(p, q.mapsTo)) return false
+      if (docsFinished) return false
+      return true
+    })
+    .sort((a, b) => Number(hardNeeded.has(b.mapsTo)) - Number(hardNeeded.has(a.mapsTo)))
+}
+
+/** Facts already on the return from uploaded forms — do not re-ask. */
+export function isProvenByDocuments(p: TaxpayerProfile, mapsTo: string): boolean {
+  if (mapsTo === 'had_w2' || mapsTo === 'has_earned_income' || mapsTo === 'has_earned_income_q') return p.wages > 0
+  if (mapsTo === 'had_1099' || mapsTo === 'self_employed' || mapsTo === 'qbi_amount' || mapsTo === 'qbi_sstb') {
+    return p.selfEmploymentIncome > 0
+  }
+  if (mapsTo === 'owns_home' || mapsTo === 'mortgage_interest_paid' || mapsTo === 'mortgage_interest_amount') {
+    return p.mortgageInterest > 0
+  }
+  if (mapsTo === 'property_taxes' || mapsTo === 'property_tax_amount') return p.propertyTax > 0
+  if (mapsTo === 'education_expenses' || mapsTo === 'tuition_paid' || mapsTo === 'aotc_half_time_first4' || mapsTo === 'felony_drug') {
+    return p.tuitionPaid > 0
+  }
+  if (mapsTo === 'student_loan_interest' || mapsTo === 'loan_interest_paid') return p.studentLoanInterest > 0
+  if (
+    mapsTo === 'paid_childcare' ||
+    mapsTo === 'childcare_amount' ||
+    mapsTo === 'care_provider' ||
+    mapsTo === 'employer_dependent_care'
+  ) {
+    return p.childcarePaid > 0
+  }
+  if (
+    mapsTo === 'has_dependents' ||
+    mapsTo === 'potential_dependents' ||
+    mapsTo === 'dependent_count' ||
+    mapsTo === 'has_child' ||
+    mapsTo === 'child_lived_with' ||
+    mapsTo === 'child_support' ||
+    mapsTo === 'another_claimant'
+  ) {
+    return (
+      p.dependents.length > 0 ||
+      p.answers.potential_dependents === 'no' ||
+      p.answers.has_dependents === 'no'
+    )
+  }
+  // 1099/SE amount already on file — structure/mileage/office aren't on the form;
+  // they are optional "something else" and must not sit in the required queue.
+  if (
+    p.selfEmploymentIncome > 0 &&
+    (mapsTo === 'business_structure' ||
+      mapsTo === 'business_vehicle' ||
+      mapsTo === 'total_miles' ||
+      mapsTo === 'business_miles' ||
+      mapsTo === 'mileage_log' ||
+      mapsTo === 'actual_expense_method' ||
+      mapsTo === 'prior_vehicle_depreciation' ||
+      mapsTo === 'equipment_depreciation' ||
+      mapsTo === 'equipment_depreciation_amount' ||
+      mapsTo === 'home_office' ||
+      mapsTo === 'se_health_premiums_yes' ||
+      mapsTo === 'se_health_premium_amount')
+  ) {
+    return true
+  }
+  if (mapsTo === 'full_name' || mapsTo === 'date_of_birth' || mapsTo === 'ssn_last4' || mapsTo === 'address') {
+    return Boolean(p.answers[mapsTo])
+  }
+  if (mapsTo === 'married_dec31' || mapsTo === 'married_filing_plan' || mapsTo === 'maintained_home') {
+    return Boolean(p.answers.married_dec31) && p.filingStatus !== 'unknown'
+  }
+  return false
 }
 
 function normalizeYesNo(value: string | number | boolean): string | number | boolean {
