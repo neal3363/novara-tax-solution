@@ -197,19 +197,22 @@ export function encryptTinIfPresent(raw: string | undefined): { tinFingerprint?:
 
 /** Classify vault folder for a document */
 export function vaultCategoryForDoc(doc: DocumentRecord, intake: HouseholdIntakeState): VaultCategory {
-  if (doc.type === 'W-2' || doc.type === '1099-NEC' || doc.type === '1099-INT') return 'income'
-  if (['1098', '1098-T', '1098-E', 'Childcare', 'Property Tax'].includes(doc.type)) return 'credits_deductions'
-  if (doc.type === 'P&L' || doc.type === 'Trial Balance') return 'business'
   if (doc.type === 'ID') {
-    const nameFact = doc.facts.find((f) => f.label.toLowerCase().includes('name'))
+    const nameFact = doc.facts.find((f) => /full name|employee name|^name$/i.test(f.label))
     const person = intake.candidates.find(
       (c) => nameFact && c.fullLegalName.toLowerCase() === nameFact.value.toLowerCase(),
     )
     if (person?.id === intake.primaryPersonId) return 'primary_taxpayer'
     if (person?.relationToPrimary === 'spouse') return 'spouse'
     if (person && person.relationToPrimary && person.relationToPrimary !== 'not_on_return') return 'dependents'
+    // Default ID / DL / SS card from the front page → primary taxpayer vault
     return 'primary_taxpayer'
   }
+  if (doc.type === 'W-2' || doc.type === '1099-NEC' || doc.type === '1099-INT') return 'income'
+  if (['1098', '1098-T', '1098-E', 'Childcare', 'Property Tax'].includes(doc.type)) return 'credits_deductions'
+  if (doc.type === 'P&L' || doc.type === 'Trial Balance') return 'business'
+  if (doc.type === 'Prior Return') return 'filing_authorizations'
+  if (doc.type === 'Bank Statement') return 'other'
   return 'other'
 }
 

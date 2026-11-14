@@ -11,33 +11,141 @@ export type UploadIssue = {
 const MONEY = (n: number) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n)
 
+/**
+ * Classify an uploaded filename into a tax document type for vault routing.
+ * Prefer exact form tokens (W-2, 1099, DL, SS card) over loose substring matches.
+ */
 export function classifyDocumentName(name: string): DocType {
-  const n = name.toLowerCase()
-  if (n.includes('w-2') || n.includes('w2')) return 'W-2'
-  if (n.includes('1099-int') || n.includes('1099int') || (n.includes('1099') && n.includes('int'))) return '1099-INT'
-  if (n.includes('1099-nec') || n.includes('1099nec') || n.includes('nec')) return '1099-NEC'
-  if (n.includes('1099')) return '1099-NEC'
-  if (n.includes('1098-t') || n.includes('1098t') || n.includes('tuition')) return '1098-T'
-  if (n.includes('1098-e') || n.includes('1098e') || n.includes('student loan')) return '1098-E'
-  if (n.includes('1098') || n.includes('mortgage')) return '1098'
-  if (n.includes('childcare') || n.includes('daycare') || n.includes('dependent care')) return 'Childcare'
-  if (n.includes('property tax') || n.includes('prop-tax')) return 'Property Tax'
-  if (n.includes('pl') || n.includes('p&l') || n.includes('profit')) return 'P&L'
-  if (n.includes('trial')) return 'Trial Balance'
-  if (n.includes('bank')) return 'Bank Statement'
+  const base = name
+    .toLowerCase()
+    .replace(/\.[^.]+$/, '')
+    .replace(/%20/g, ' ')
+    .replace(/[_\-.]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  // Income forms (normalize underscores so “W2_Acme” and “1099-NEC_x” still match)
+  if (/\bw[\s\-]?2\b/.test(base)) return 'W-2'
+  if (/1099[\s\-]?int\b|1099int\b|\bint(?:erest)?\b.*1099|1099.*\bint(?:erest)?\b/.test(base)) return '1099-INT'
+  if (/1099[\s\-]?(?:nec|misc)\b|1099(?:nec|misc)\b|non[\s\-]?employee/.test(base)) return '1099-NEC'
+  if (/1099/.test(base)) return '1099-NEC'
+  if (/1098[\s\-]?t\b|1098t\b|\btuition\b|\bcollege\b|\buniversity\b/.test(base)) return '1098-T'
+  if (/1098[\s\-]?e\b|1098e\b|student[\s\-]?loan/.test(base)) return '1098-E'
+  if (/1098|\bmortgage\b/.test(base)) return '1098'
+
+  // Credits / deductions support
+  if (/child[\s\-]?care|day[\s\-]?care|dependent[\s\-]?care|babysit/.test(base)) return 'Childcare'
+  if (/property[\s\-]?tax|prop[\s\-]?tax/.test(base)) return 'Property Tax'
+
+  // Business books — avoid matching “simple”, “apply”, etc. via bare “pl”
+  if (/\bp\s*&\s*l\b|profit[\s\-]?and[\s\-]?loss|profit[\s\-]?loss|\bpl\b/.test(base)) {
+    return 'P&L'
+  }
+  if (/trial[\s\-]?balance/.test(base)) return 'Trial Balance'
+  if (/\bbank\b/.test(base) && /(statement|checking|savings|deposit)/.test(base)) return 'Bank Statement'
+  if (/\bbank\b|bank[\s\-]?statement/.test(base) && !/1099/.test(base)) return 'Bank Statement'
+
+  // Identity: driver’s license / DL / photo ID
   if (
-    n.includes('ssn') ||
-    n.includes('social') ||
-    n.includes('id') ||
-    n.includes('license') ||
-    n.includes('passport') ||
-    n.includes('dependent') ||
-    n.includes('birth') ||
-    n.includes('itin')
-  )
+    /\bdl\b/.test(base) ||
+    /driver'?s?[\s\-]?licen[cs]e|driving[\s\-]?licen[cs]e/.test(base) ||
+    /\blicen[cs]e\b/.test(base) ||
+    /passport|photo[\s\-]?id|state[\s\-]?id/.test(base)
+  ) {
     return 'ID'
-  if (n.includes('1040') || n.includes('prior')) return 'Prior Return'
+  }
+
+  // Identity: Social Security / ITIN card
+  if (
+    /\bssn\b/.test(base) ||
+    /social[\s\-]?security|\bss\s*card\b|sscard|itin[\s\-]?card|\bitin\b/.test(base)
+  ) {
+    return 'ID'
+  }
+
+  // Other household ID / relationship docs (word-boundary “id”, not “valid” / “middle”)
+  if (/\bid\b/.test(base) || /birth[\s\-]?cert|dependent|spouse/.test(base)) {
+    return 'ID'
+  }
+
+  if (/1040|prior[\s\-]?year|prior[\s\-]?return|amended[\s\-]?return/.test(base)) return 'Prior Return'
   return 'Other'
+}
+
+/** Human vault destination for a classified document type. */
+export function routingPlaceForDocType(type: DocType): {
+  vaultCategory: NonNullable<DocumentRecord['vaultCategory']>
+  questionnaireSection: 'personal' | 'income' | 'deductions' | 'credits' | 'business' | 'review'
+  placeLabel: string
+} {
+  switch (type) {
+    case 'ID':
+      return {
+        vaultCategory: 'primary_taxpayer',
+        questionnaireSection: 'personal',
+        placeLabel: 'Personal ID vault',
+      }
+    case 'W-2':
+    case '1099-NEC':
+    case '1099-INT':
+      return {
+        vaultCategory: 'income',
+        questionnaireSection: 'income',
+        placeLabel: 'Income documents',
+      }
+    case '1098':
+    case '1098-T':
+    case '1098-E':
+    case 'Childcare':
+    case 'Property Tax':
+      return {
+        vaultCategory: 'credits_deductions',
+        questionnaireSection: type === 'Childcare' || type === '1098-T' ? 'credits' : 'deductions',
+        placeLabel: 'Credits & deductions',
+      }
+    case 'P&L':
+    case 'Trial Balance':
+      return {
+        vaultCategory: 'business',
+        questionnaireSection: 'business',
+        placeLabel: 'Business records',
+      }
+    case 'Prior Return':
+      return {
+        vaultCategory: 'filing_authorizations',
+        questionnaireSection: 'review',
+        placeLabel: 'Prior returns',
+      }
+    case 'Bank Statement':
+      return {
+        vaultCategory: 'other',
+        questionnaireSection: 'income',
+        placeLabel: 'Supporting statements',
+      }
+    default:
+      return {
+        vaultCategory: 'other',
+        questionnaireSection: 'review',
+        placeLabel: 'Needs review',
+      }
+  }
+}
+
+/** One-line sort summary for landing / Prepare after multi-upload. */
+export function summarizeUploadRouting(fileNames: string[]): string {
+  if (fileNames.length === 0) return 'No documents selected.'
+  const groups = new Map<string, string[]>()
+  fileNames.forEach((name) => {
+    const type = classifyDocumentName(name)
+    const { placeLabel } = routingPlaceForDocType(type)
+    const key = `${type} → ${placeLabel}`
+    const list = groups.get(key) ?? []
+    list.push(name)
+    groups.set(key, list)
+  })
+  return Array.from(groups.entries())
+    .map(([dest, names]) => `${dest} (${names.length})`)
+    .join(' · ')
 }
 
 function fact(id: string, label: string, value: string, confidence: number, page = 1): ExtractedFact {
@@ -47,12 +155,12 @@ function fact(id: string, label: string, value: string, confidence: number, page
 function nameFromFile(fileName: string, fallback: string): string {
   const base = fileName.replace(/\.[^.]+$/, '')
   const m = base.match(
-    /(?:id|license|passport|ssn|social|birth|cert|dependent|spouse|child|w2|w-2)[_\-\s]+(.+)/i,
+    /(?:id|dl|license|licen[cs]e|passport|ssn|ss[\s\-_]?card|social|birth|cert|dependent|spouse|child|w2|w-2|1099)[_\-\s]+(.+)/i,
   )
   if (m) {
     const cleaned = m[1]
       .replace(/[_\-.]+/g, ' ')
-      .replace(/\b(ssn|id|license|passport|birth|cert|card|w2|doc)\b/gi, '')
+      .replace(/\b(ssn|ss|id|dl|license|licen[cs]e|passport|birth|cert|card|w2|1099|doc)\b/gi, '')
       .replace(/\s+/g, ' ')
       .trim()
     if (cleaned.length > 2) {
@@ -63,6 +171,23 @@ function nameFromFile(fileName: string, fallback: string): string {
     }
   }
   return fallback
+}
+
+function identityKindFromFile(fileName: string): 'driver_license' | 'ssn_card' | 'id' {
+  const n = fileName.toLowerCase()
+  if (
+    /(^|[_\-\s])dl([_\-\s.]|$)/.test(n) ||
+    /driver'?s?[\s\-_]?licen[cs]e|driving[\s\-_]?licen[cs]e|(^|[_\-\s])licen[cs]e([_\-\s.]|$)/.test(n)
+  ) {
+    return 'driver_license'
+  }
+  if (
+    /(^|[_\-\s])ssn([_\-\s.]|$)/.test(n) ||
+    /social[\s\-_]?security|ss[\s\-_]?card|sscard|itin/.test(n)
+  ) {
+    return 'ssn_card'
+  }
+  return 'id'
 }
 
 /** Deterministic demo extraction from document type — values stay consistent for the same type. */
@@ -112,6 +237,7 @@ export function extractFactsForType(
     case 'Property Tax':
       return [fact(uid('f'), 'Property taxes', '$5,100.00', confidence)]
     case 'ID': {
+      const kind = identityKindFromFile(fileName)
       const isChild =
         /child|birth|dependent|emma|liam|sophia|noah/i.test(fileName) ||
         /child|birth|dependent/i.test(personName)
@@ -119,10 +245,17 @@ export function extractFactsForType(
       const dob = isChild ? '06/02/2016' : isSpouse ? '11/08/1990' : '03/14/1988'
       // TIN stored as masked fact only — full value never placed on ordinary screens
       const last4 = isChild ? '4412' : isSpouse ? '7781' : '9021'
+      const docLabel =
+        kind === 'driver_license'
+          ? 'Driver’s license'
+          : kind === 'ssn_card'
+            ? 'Social Security card'
+            : 'Photo ID'
       return [
+        fact(uid('f'), 'Document kind', docLabel, 0.97),
         fact(uid('f'), 'Full name', personName, 0.96),
         fact(uid('f'), 'Date of birth', dob, 0.94),
-        fact(uid('f'), 'Tax ID (SSN/ITIN)', `***-**-${last4}`, 0.93),
+        fact(uid('f'), 'Tax ID (SSN/ITIN)', `***-**-${last4}`, kind === 'ssn_card' ? 0.96 : 0.9),
         fact(uid('f'), 'Address', '1842 Harbor Ave, Austin, TX', isChild ? 0.88 : 0.91),
       ]
     }

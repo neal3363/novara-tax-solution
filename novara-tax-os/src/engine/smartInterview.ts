@@ -78,7 +78,29 @@ export function syncProfileFromDocuments(profile: TaxpayerProfile, documents: Do
   let has1099 = false
 
   documents.forEach((d) => {
-    if (d.type === 'ID') hasId = true
+    if (d.type === 'ID') {
+      hasId = true
+      // Front-page DL / SS card / photo ID → Personal tab fields (masked TIN only).
+      d.facts.forEach((f) => {
+        if (/^full name$/i.test(f.label) && typeof f.value === 'string' && f.value.trim() && !next.answers.full_name) {
+          next.answers.full_name = f.value.trim()
+        }
+        if (/date of birth|dob/i.test(f.label) && typeof f.value === 'string' && f.value.trim() && !next.answers.date_of_birth) {
+          const raw = f.value.trim()
+          const mdy = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+          next.answers.date_of_birth = mdy
+            ? `${mdy[3]}-${mdy[1].padStart(2, '0')}-${mdy[2].padStart(2, '0')}`
+            : raw
+        }
+        if (/tax id|ssn|itin/i.test(f.label) && typeof f.value === 'string' && !next.answers.ssn_last4) {
+          const last4 = f.value.replace(/\D/g, '').slice(-4)
+          if (last4.length === 4) next.answers.ssn_last4 = last4
+        }
+        if (/^address$/i.test(f.label) && typeof f.value === 'string' && f.value.trim() && !next.answers.address) {
+          next.answers.address = f.value.trim()
+        }
+      })
+    }
     if (d.type === 'W-2') {
       hasW2 = true
       d.facts.forEach((f) => {
