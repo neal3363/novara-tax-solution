@@ -23,5 +23,5 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src"],
-  "exclude": ["src/engine/security/phase6/**"]
+  "exclude": ["src/engine/security/phase6/**", "src/engine/security/phase7/**"]
 }

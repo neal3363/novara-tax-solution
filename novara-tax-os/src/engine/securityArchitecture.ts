@@ -4,7 +4,12 @@
  * Documents required server-side controls; provides stub interfaces only.
  */
 
-export type SecurityControlStatus = 'designed' | 'stub_module' | 'not_connected' | 'requires_approval'
+export type SecurityControlStatus =
+  | 'designed'
+  | 'stub_module'
+  | 'staging_connected'
+  | 'not_connected'
+  | 'requires_approval'
 
 export interface SecurityArchitectureComponent {
   id: string
@@ -56,50 +61,50 @@ export const SECURITY_ARCHITECTURE: SecurityArchitectureComponent[] = [
   {
     id: 'server-authz',
     name: 'Server-side authorization',
-    status: 'stub_module',
+    status: 'staging_connected',
     purpose: 'Enforce RBAC + tenant isolation on every tax-data API call (not browser-only).',
-    interfaces: ['authorize(principal, action, resource) → AuthzDecision', 'phase6/authorize.ts'],
-    dependencies: ['identity provider', 'tenant membership store', 'phase6 sessions'],
+    interfaces: ['authorize()', 'api/security/authorize.ts', 'phase7/protectedOps'],
+    dependencies: ['phase6 sessions', 'phase7 staging API'],
     notes:
-      'Phase 6 authorize() + sessions implemented (isolated). Not wired to UI RoleGate. Enforcement flags default OFF.',
+      'Phase 7 staging APIs require server authorize for protected ops. Not wired to UI RoleGate. productionAuthPath OFF.',
   },
   {
     id: 'mfa',
     name: 'Multi-factor authentication',
-    status: 'stub_module',
+    status: 'staging_connected',
     purpose: 'Require MFA for TP / Office / Admin before accessing taxpayer data.',
-    interfaces: ['beginTotpEnrollment', 'verifyMfaChallenge', 'consumeRecoveryCode'],
+    interfaces: ['api/security/mfa.ts', 'phase7/mfaWorkflows', 'adminResetMfa'],
     dependencies: ['TOTP RFC 6238', 'optional WebAuthn stub'],
     notes:
-      'Phase 6 MFA enrollment/verify/recovery implemented. mfaMandatoryForExistingUsers remains false until approved.',
+      'Phase 7 staging MFA enroll/verify/recovery/admin reset. mfaMandatoryForExistingUsers remains false (STOP).',
   },
   {
     id: 'kms-storage',
     name: 'Encrypted document storage + KMS',
-    status: 'stub_module',
+    status: 'staging_connected',
     purpose: 'At-rest encryption for documents and secrets via envelope encryption.',
-    interfaces: ['vaultUpload', 'downloadWithSignedToken', 'verifyEncryptionRoundTrip'],
-    dependencies: ['local envelope KMS', 'cloud KMS stub'],
+    interfaces: ['stagingCloudKmsProvider', 'api/security/vault.ts', 'durable vault store'],
+    dependencies: ['staging-cloud-kms-adapter', 'phase6 vault'],
     notes:
-      'Phase 6 vault + KMS local verification available. Do not claim production operational until cloud KMS wired + verified.',
+      'Phase 7 staging KMS + durable encrypted blobs. Production cloud account NOT claimed operational.',
   },
   {
     id: 'signed-doc-access',
     name: 'Signed document access tokens',
-    status: 'stub_module',
+    status: 'staging_connected',
     purpose: 'Short-lived HMAC/JWT document URLs instead of unsigned base64 tokens.',
-    interfaces: ['issueSignedDownloadToken', 'downloadWithSignedToken'],
-    dependencies: ['HMAC secret (runtime)', 'phase6 vault'],
-    notes: 'Phase 6 HMAC signed tokens implemented for vault. Demo tenantIsolation tokens remain for UI demo only.',
+    interfaces: ['issueSignedDownloadToken', 'api/security/vault.ts'],
+    dependencies: ['HMAC secret (runtime)', 'phase6/7 vault'],
+    notes: 'Staging vault API issues short-lived signed tokens; auth required on every op.',
   },
   {
     id: 'durable-audit',
     name: 'Durable audit logging',
-    status: 'stub_module',
+    status: 'staging_connected',
     purpose: 'Append-only, hash-chained audit log retained outside tab memory.',
-    interfaces: ['appendAudit', 'verifyAuditChain'],
-    dependencies: ['phase6 auditLog in-memory chain — swap for SIEM before prod'],
-    notes: 'Phase 6 hash-chained audit implemented (in-memory for validation). No SSNs/full documents in logs.',
+    interfaces: ['durableAppendAudit', 'api/security/audit.ts'],
+    dependencies: ['phase7 durable JSONL store', 'phase6 hash chain'],
+    notes: 'Staging durable append-only audit with tamper verify. No SSNs/full documents. Not production SIEM.',
   },
 ]
 
