@@ -33,7 +33,21 @@ export const QUESTIONNAIRE_SECTIONS: {
   {
     id: 'business',
     label: 'Business',
-    mapsToIncludes: ['self_employed', 'business_', 'schedule_c', 'qbi', 'business_miles', 'business_vehicle'],
+    mapsToIncludes: [
+      'self_employed',
+      'business_',
+      'schedule_c',
+      'qbi',
+      'business_miles',
+      'business_vehicle',
+      'total_miles',
+      'mileage',
+      'depreciation',
+      'home_office',
+      'equipment',
+      'se_health',
+      'actual_expense',
+    ],
   },
   {
     id: 'deductions',
@@ -68,7 +82,7 @@ function questionInSection(q: ProgressQuestion, sectionId: QuestionnaireSectionI
   // Benefit discovery catch-alls by section keywords
   if (q.category === 'benefit_discovery') {
     const key = q.mapsTo
-    if (sectionId === 'business') return /self_employ|business|mileage|vehicle|qbi/.test(key)
+    if (sectionId === 'business') return /self_employ|business|mileage|vehicle|qbi|depreciation|home_office|se_health|equipment|structure|total_miles|actual_expense/.test(key)
     if (sectionId === 'deductions')
       return /home|mortgage|charit|medical|retirement|student_loan|donation/.test(key)
     if (sectionId === 'credits')

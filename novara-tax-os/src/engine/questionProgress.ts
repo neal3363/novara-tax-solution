@@ -9,7 +9,7 @@ import type { TaxpayerProfile } from './benefitOptimizer'
 import { nextInterviewQuestions, runBenefitOptimization } from './benefitOptimizer'
 import { applyDependentAnswer, emptyDependent, nextDependentQuestion } from './dependentsEngine'
 import { nextBenefitDiscoveryTurn, nextFilingStatusTurn } from './smartInterview'
-import { registryTurnIfUnanswered } from './interviewRegistry'
+import { lookupRegistryQuestion, registryTurnIfUnanswered } from './interviewRegistry'
 
 export type QuestionStatus = 'answered' | 'unanswered' | 'awaiting_verification' | 'not_applicable'
 
@@ -219,8 +219,19 @@ export function buildInterviewProgress(profile: TaxpayerProfile): InterviewProgr
       'education_expenses',
       'tuition_paid',
       'self_employed',
+      'business_structure',
+      'qbi_amount',
       'business_vehicle',
+      'total_miles',
       'business_miles',
+      'mileage_log',
+      'actual_expense_method',
+      'prior_vehicle_depreciation',
+      'equipment_depreciation',
+      'equipment_depreciation_amount',
+      'home_office',
+      'se_health_premiums_yes',
+      'se_health_premium_amount',
       'owns_home',
       'retirement_contributions',
       'student_loan_interest',
@@ -228,24 +239,31 @@ export function buildInterviewProgress(profile: TaxpayerProfile): InterviewProgr
     for (const key of discoveryKeys) {
       if (!isAnswered(profile, key)) continue
       if (seen.has(key)) continue
+      const reg = lookupRegistryQuestion(key, profile)
       push({
         id: `disc:${key}`,
         mapsTo: key,
-        prompt: `Benefit question: ${key.replace(/_/g, ' ')}`,
+        prompt: reg?.prompt ?? `Benefit question: ${key.replace(/_/g, ' ')}`,
         category: 'benefit_discovery',
-        categoryLabel: 'Tax benefits',
+        categoryLabel: key.startsWith('business') || /self_employ|qbi|mileage|depreciation|home_office|se_health|equipment|total_miles|vehicle/.test(key)
+          ? 'Business'
+          : 'Tax benefits',
         status: profile.unresolvedKeys.includes(key) ? 'awaiting_verification' : 'answered',
       })
     }
     for (const q of qs) {
       if (seen.has(q.mapsTo)) continue
       const answered = isAnswered(profile, q.mapsTo)
+      const biz =
+        /self_employ|business|qbi|mileage|depreciation|home_office|se_health|equipment|total_miles|vehicle|actual_expense|structure/.test(
+          q.mapsTo,
+        )
       push({
         id: `disc:${q.mapsTo}`,
         mapsTo: q.mapsTo,
         prompt: q.prompt,
         category: 'benefit_discovery',
-        categoryLabel: 'Tax benefits',
+        categoryLabel: biz ? 'Business' : 'Tax benefits',
         status: answered ? 'answered' : 'unanswered',
       })
     }

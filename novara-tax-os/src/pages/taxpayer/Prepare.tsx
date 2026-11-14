@@ -125,6 +125,13 @@ export function Prepare() {
         }
         if (parsed.intent === 'personal_and_business' || parsed.intent === 'business') {
           setSection('business')
+          // Unlock business follow-ups (mileage, depreciation, QBI, etc.) in the shared interview.
+          actions.answerSmartInterview(
+            'self_employed',
+            'Yes',
+            'Did you earn money from your own business or freelancing?',
+          )
+          actions.focusInterviewQuestion('business_structure')
         } else if (parsed.intent === 'amend' || parsed.intent === 'prior_year') {
           setSection('filing')
         } else {
