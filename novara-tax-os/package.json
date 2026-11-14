@@ -38,7 +38,8 @@
     "test:payments-phase10": "node scripts/test-payments-phase10.mjs",
     "test:returns-phase11": "node scripts/test-returns-phase11.mjs",
     "test:launch-phase12": "node scripts/test-launch-phase12.mjs",
-    "test:master-acceptance": "node scripts/test-master-acceptance.mjs"
+    "test:master-acceptance": "node scripts/test-master-acceptance.mjs",
+    "test:tax-remediation": "node scripts/test-tax-remediation.mjs"
   },
   "dependencies": {
     "@fontsource/figtree": "^5.3.0",

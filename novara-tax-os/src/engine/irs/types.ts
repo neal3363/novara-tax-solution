@@ -128,6 +128,15 @@ export interface IrsReturnInput {
     qualifiedExpenses: number
     eligible: boolean
   }[]
+  /** Form 8889 HSA deduction */
+  hsaContribution?: number
+  hsaFamilyCoverage?: boolean
+  hsaEmployerContribution?: number
+  /** Traditional IRA deduction (Pub 590-A themes) */
+  iraContribution?: number
+  iraCoveredByWorkplacePlan?: boolean
+  /** Form 5695 residential energy credit (partial) */
+  residentialEnergySpend?: number
 }
 
 export interface IrsReturnResult {
@@ -161,6 +170,9 @@ export interface IrsReturnResult {
   excessAptcRepayment: number
   educationNonrefundable: number
   educationRefundable: number
+  hsaDeduction: number
+  iraDeduction: number
+  residentialEnergyCredit: number
   scheduleBInterestDividends: number
   scheduleDNet: number
   scheduleENet: number

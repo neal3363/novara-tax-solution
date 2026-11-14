@@ -80,8 +80,15 @@ export { computeForm8949 } from './forms/form8949'
 export { computeForm6251 } from './forms/form6251Amt'
 export { computeForm8960 } from './forms/form8960Niit'
 export { computeForm1040X } from './forms/form1040x'
+export { computeForm8889 } from './forms/form8889Hsa'
+export { computeForm5695 } from './forms/form5695Energy'
+export { computeIraDeduction } from './forms/iraDeduction'
 export { PHASE4_GOLDEN_FIXTURES } from './golden/phase4Fixtures'
 export { PHASE5_GOLDEN_FIXTURES } from './golden/phase5Fixtures'
+export {
+  REMEDIATION_GOLDEN_FIXTURES,
+  REMEDIATION_GOLDEN_IDS,
+} from './golden/remediationFixtures'
 export {
   runInternalShadowSuite,
   isAuthorizedShadowTester,

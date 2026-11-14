@@ -11,6 +11,9 @@ import { computeForm8863 } from './forms/form8863'
 import { computeForm8960 } from './forms/form8960Niit'
 import { computeForm8962 } from './forms/form8962'
 import { computeForm8995A } from './forms/form8995A'
+import { computeForm8889 } from './forms/form8889Hsa'
+import { computeForm5695 } from './forms/form5695Energy'
+import { computeIraDeduction } from './forms/iraDeduction'
 import { computeScheduleB } from './forms/scheduleB'
 import { computeForm8949 } from './forms/form8949'
 import { computeScheduleD } from './forms/scheduleD'
@@ -136,6 +139,9 @@ function emptyResult(
     excessAptcRepayment: 0,
     educationNonrefundable: 0,
     educationRefundable: 0,
+    hsaDeduction: 0,
+    iraDeduction: 0,
+    residentialEnergyCredit: 0,
     scheduleBInterestDividends: 0,
     scheduleDNet: 0,
     scheduleENet: 0,
@@ -212,6 +218,43 @@ export function computeIrsFederalReturn(input: IrsReturnInput): IrsReturnResult 
     capitalForAgi = net >= 0 ? net : -Math.min(lossLimit, -net)
   }
 
+  // Form 8889 HSA (AGI adjustment) — limit from year tables
+  let hsaDeduction = 0
+  if ((input.hsaContribution ?? 0) > 0 || (input.hsaEmployerContribution ?? 0) > 0) {
+    const hsaLimit = input.hsaFamilyCoverage
+      ? Math.round(tables.hsaLimitSelfOnly * 2)
+      : tables.hsaLimitSelfOnly
+    const hsa = computeForm8889({
+      taxYear: input.taxYear,
+      contributions: input.hsaContribution ?? 0,
+      annualLimit: hsaLimit,
+      familyCoverage: input.hsaFamilyCoverage,
+      employerContributions: input.hsaEmployerContribution,
+    })
+    hsaDeduction = hsa.deductibleContribution
+    notes.push(...hsa.notes)
+    unsupportedCases.push('hsa_hdhp_eligibility_not_verified')
+  }
+
+  // Traditional IRA deduction — preliminary MAGI without IRA (circular; use wages+SE proxy)
+  let iraDeduction = 0
+  if ((input.iraContribution ?? 0) > 0) {
+    const magiProxy = Math.max(
+      0,
+      input.wages + input.selfEmploymentNetProfit - se.deductibleHalf - educator - studentLoan - hsaDeduction,
+    )
+    const ira = computeIraDeduction({
+      taxYear: input.taxYear,
+      contributions: input.iraContribution ?? 0,
+      filingStatus: input.filingStatus,
+      magi: magiProxy,
+      coveredByWorkplacePlan: input.iraCoveredByWorkplacePlan,
+    })
+    iraDeduction = ira.deductible
+    notes.push(...ira.notes)
+    unsupportedCases.push(...ira.unsupportedCases)
+  }
+
   // MAGI before passive losses (for Form 8582 special-allowance phaseout)
   const magiBeforePassive = Math.max(
     0,
@@ -220,7 +263,9 @@ export function computeIrsFederalReturn(input: IrsReturnInput): IrsReturnResult 
         input.selfEmploymentNetProfit -
         se.deductibleHalf -
         educator -
-        studentLoan +
+        studentLoan -
+        hsaDeduction -
+        iraDeduction +
         schB.agiInclusion +
         capitalForAgi,
     ),
@@ -419,16 +464,31 @@ export function computeIrsFederalReturn(input: IrsReturnInput): IrsReturnResult 
     notes.push(...edu.notes)
   }
 
+  // Form 5695 energy (partial nonrefundable credit)
+  let residentialEnergyCredit = 0
+  if ((input.residentialEnergySpend ?? 0) > 0) {
+    const energy = computeForm5695({
+      taxYear: input.taxYear,
+      qualifiedImprovementSpend: input.residentialEnergySpend ?? 0,
+    })
+    residentialEnergyCredit = energy.creditBeforeTaxLimit
+    notes.push(...energy.notes)
+    unsupportedCases.push(...energy.unsupportedCases)
+  }
+
   let taxLeft = incomeTaxBeforeCredits
   const eduUsed = Math.min(educationNonrefundable, taxLeft)
   taxLeft -= eduUsed
+  const energyUsed = Math.min(residentialEnergyCredit, taxLeft)
+  taxLeft -= energyUsed
   const odcUsed = Math.min(odcPotential, taxLeft)
   taxLeft -= odcUsed
   const cdccUsed = Math.min(cdcc, taxLeft)
   taxLeft -= cdccUsed
   const ctcNonrefundable = Math.min(ctcPotential, taxLeft)
   taxLeft -= ctcNonrefundable
-  const nonrefundableCredits = eduUsed + odcUsed + cdccUsed + ctcNonrefundable
+  const nonrefundableCredits = eduUsed + energyUsed + odcUsed + cdccUsed + ctcNonrefundable
+  residentialEnergyCredit = energyUsed
 
   const ctcRemaining = ctcPotential - ctcNonrefundable
   const earned = input.wages + Math.max(0, input.selfEmploymentNetProfit)
@@ -505,6 +565,9 @@ export function computeIrsFederalReturn(input: IrsReturnInput): IrsReturnResult 
     excessAptcRepayment,
     educationNonrefundable: eduUsed,
     educationRefundable,
+    hsaDeduction,
+    iraDeduction,
+    residentialEnergyCredit,
     scheduleBInterestDividends: schB.agiInclusion,
     scheduleDNet,
     scheduleENet: schE?.agiInclusion ?? 0,

@@ -23,6 +23,18 @@ export interface DemoIrsComparison {
 }
 
 export function profileToIrsInput(profile: TaxpayerProfile): IrsReturnInput {
+  const eduType = String(profile.answers.education_credit_type || '').toLowerCase()
+  const educationStudents =
+    profile.tuitionPaid > 0 && (eduType === 'aotc' || eduType === 'llc' || eduType === 'american opportunity' || eduType === 'lifetime learning')
+      ? [
+          {
+            creditType: (eduType.startsWith('a') || eduType.includes('opportunity') ? 'aotc' : 'llc') as 'aotc' | 'llc',
+            qualifiedExpenses: profile.tuitionPaid,
+            eligible: true,
+          },
+        ]
+      : undefined
+
   return {
     taxYear: profile.taxYear,
     filingStatus: mapFilingStatus(profile.filingStatus === 'unknown' ? 'single' : profile.filingStatus),
@@ -34,6 +46,11 @@ export function profileToIrsInput(profile: TaxpayerProfile): IrsReturnInput {
     businessMiles: profile.businessMileage,
     educatorExpenses: profile.educatorExpenses,
     studentLoanInterest: profile.studentLoanInterest,
+    hsaContribution: profile.hsaContributions > 0 ? profile.hsaContributions : undefined,
+    iraContribution: profile.retirementContributions > 0 ? profile.retirementContributions : undefined,
+    iraCoveredByWorkplacePlan: profile.answers.workplace_retirement_plan === 'yes',
+    residentialEnergySpend: profile.energyImprovements > 0 ? profile.energyImprovements : undefined,
+    educationStudents,
     itemizedDeductions:
       profile.mortgageInterest || profile.propertyTax || profile.charitableGifts || profile.medicalExpenses
         ? {

@@ -75,13 +75,14 @@ export function detectUnsupportedSituations(
     /* reachable only via synthetic IRS-side profiles */
   }
   if (profile.energyImprovements > 0) {
-    flags.push('energy_credits_not_fully_mapped_to_irs_adapter')
+    // Mapped to Form 5695 partial — still escalate (not filing-ready)
+    flags.push('energy_credit_partial_form_5695_requires_review')
   }
   if (profile.hsaContributions > 0) {
-    flags.push('hsa_deduction_not_fully_mapped_to_irs_adapter')
+    flags.push('hsa_mapped_form_8889_hdhp_eligibility_requires_review')
   }
   if (profile.retirementContributions > 0) {
-    flags.push('retirement_contribution_deduction_partial_mapping')
+    flags.push('retirement_ira_deduction_partial_pub590a_requires_review')
   }
   if (profile.tuitionPaid > 0 && !profile.answers.education_credit_type) {
     flags.push('education_credit_needs_followup_questions')
