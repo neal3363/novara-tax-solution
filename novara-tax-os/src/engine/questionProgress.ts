@@ -183,7 +183,9 @@ export function buildInterviewProgress(profile: TaxpayerProfile): InterviewProgr
       const answered =
         isAnswered(profile, q.mapsTo) ||
         (q.mapsTo.endsWith('_name') && Boolean(profileDep?.fullLegalName?.trim())) ||
-        (q.mapsTo.endsWith('_dob') && Boolean(profileDep?.dateOfBirth?.trim()))
+        (q.mapsTo.endsWith('_dob') && Boolean(profileDep?.dateOfBirth?.trim())) ||
+        (q.mapsTo.endsWith('_tin_path') && profileDep != null && profileDep.tinStatus !== 'missing') ||
+        (q.mapsTo.endsWith('_tin_last4') && Boolean(profileDep?.tinLast4))
 
       push({
         id: `dep:${q.mapsTo}`,

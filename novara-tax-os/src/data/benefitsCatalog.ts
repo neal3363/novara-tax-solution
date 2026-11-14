@@ -222,7 +222,7 @@ export const BENEFIT_CATALOG_2025: BenefitRule[] = [
     shortName: 'SE health insurance',
     description: 'Above-the-line deduction for eligible self-employed health insurance premiums.',
     ruleCitation: 'IRC §162(l)',
-    triggerFacts: ['self_employed', 'se_health_premiums'],
+    triggerFacts: ['se_health_premiums'],
     requiredAnswers: ['self_employed', 'se_health_premiums_yes', 'se_health_premium_amount', 'se_health_employer_eligible'],
     requiredDocs: ['Insurance statements'],
     estimatedSavingsHint: 1100,
@@ -235,7 +235,7 @@ export const BENEFIT_CATALOG_2025: BenefitRule[] = [
     shortName: 'Business mileage',
     description: 'Deductible business use of vehicle under standard mileage or actual expense method.',
     ruleCitation: 'IRC §162 · Pub 463',
-    triggerFacts: ['self_employed', 'business_vehicle'],
+    triggerFacts: ['business_vehicle'],
     requiredAnswers: [
       'business_vehicle',
       'self_employed',
@@ -324,7 +324,8 @@ export const BENEFIT_CATALOG_2025: BenefitRule[] = [
     shortName: 'State EITC',
     description: 'State-level EITC patterned on federal eligibility when the filing state offers a credit. Demo evaluates Texas residency as not offering a general EITC and flags other states for review.',
     ruleCitation: 'State conformity · TY2025',
-    triggerFacts: ['has_earned_income'],
+    // Soft until taxpayer opts in with a filing state — never hold a federal docs-complete return.
+    triggerFacts: ['filing_state_ready'],
     requiredAnswers: ['filing_state', 'federal_eitc_eligible'],
     requiredDocs: ['State residency evidence if requested'],
     estimatedSavingsHint: 400,

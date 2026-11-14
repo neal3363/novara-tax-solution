@@ -721,8 +721,8 @@ export function Prepare() {
             <div className="list-panel panel interview-chat">
               <h2>Short questions</h2>
               <p className="muted" style={{ marginTop: 0 }}>
-                Upload first — W-2, 1099, mortgage, tuition, and childcare credits apply from your docs. We only ask
-                what’s left. Green = done.
+                If your docs are complete, the return is done. We only ask about extra credits you might not know
+                about — those may need proof uploads later. Green = done.
               </p>
               <QuestionProgressBar profile={taxProfile} />
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.55rem', marginBottom: '0.75rem', alignItems: 'center' }}>
@@ -763,13 +763,20 @@ export function Prepare() {
                   />
                 </div>
               ) : (
-                <div className="answer-row">
-                  <Link className="btn btn-secondary" to="/app/taxpayer/documents">
-                    Review missing documents
-                  </Link>
-                  <button className="btn btn-primary" type="button" onClick={() => actions.completeSmartInterview()}>
-                    Calculate my result
-                  </button>
+                <div className="answer-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '0.65rem' }}>
+                  <p className="muted" style={{ margin: 0 }}>
+                    {benefitReport?.auditComplete
+                      ? 'Your documents finished this return. Optional credits (charity, medical, Marketplace, etc.) are in Maximize savings if you want them — those may need proof uploads.'
+                      : 'No required questions left. Calculate to see your result.'}
+                  </p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.55rem' }}>
+                    <Link className="btn btn-secondary" to="/app/taxpayer/documents">
+                      Review documents
+                    </Link>
+                    <button className="btn btn-primary" type="button" onClick={() => actions.completeSmartInterview()}>
+                      {benefitReport?.auditComplete ? 'See my result' : 'Calculate my result'}
+                    </button>
+                  </div>
                 </div>
               )}
 

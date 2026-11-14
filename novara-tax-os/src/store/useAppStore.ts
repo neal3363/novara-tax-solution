@@ -1666,10 +1666,15 @@ export const actions = {
       taxProfile,
       'Household confirmed — applying credits from your documents.',
     )
+    const requiredTurn = nextInterviewTurn(taxProfile)
+    const docsDone = !requiredTurn && benefitReport.dependentInfoComplete
+    const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
     const chat = {
       id: uid('iv'),
       role: 'assistant' as const,
-      text: `${filingRecommendation.rationale} Recommended status: ${filingRecommendation.recommended.toUpperCase()}.`,
+      text: docsDone
+        ? `Your documents finished this return. Estimated refund ${money.format(benefitReport.projectedRefund)} with ${money.format(benefitReport.verifiedSavings)} in credits from your forms. Optional: check “more savings” only if you think you have charity, medical, retirement, or Marketplace credits — you may need proof uploads for those.`
+        : `${filingRecommendation.rationale} Recommended status: ${filingRecommendation.recommended.toUpperCase()}.`,
       at: new Date().toISOString(),
     }
     state = {
@@ -1678,7 +1683,7 @@ export const actions = {
       taxProfile,
       benefitReport,
       returns: syncReturnRefund(benefitReport),
-      prepStep: 2,
+      prepStep: docsDone ? 3 : 2,
       interviewChat: [...state.interviewChat, chat],
     }
     emit()
