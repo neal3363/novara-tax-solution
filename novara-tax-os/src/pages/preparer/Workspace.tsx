@@ -171,7 +171,8 @@ export function Workspace() {
         <section className="list-panel panel">
           <h2>Create business return</h2>
           <p className="muted" style={{ marginTop: 0 }}>
-            Charges the centralized business software fee ({formatMoney(TP_BUSINESS_FEE)}). {UNLIMITED_CLIENTS_COPY} —
+            Charges the TP business-entity fee ({formatMoney(TP_BUSINESS_FEE)} per return). Office-employed preparers
+            are covered by the office subscription ($0 additional). {UNLIMITED_CLIENTS_COPY} —
             no volume caps. Never also charge the TC retail price on this line.
           </p>
           <form onSubmit={createBiz} style={{ display: 'grid', gap: '0.75rem' }}>

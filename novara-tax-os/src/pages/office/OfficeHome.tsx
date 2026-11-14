@@ -77,7 +77,7 @@ export function OfficeHome() {
                 <span className="row-meta">{t.blurb}</span>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <strong>{t.annual != null ? formatMoney(t.annual) : 'TBD'}</strong>
+                <strong>{t.annual != null ? `${formatMoney(t.annual)}/year` : 'TBD'}</strong>
                 <div>
                   <span className={`badge ${t.status === 'approved' ? 'badge-ok' : 'badge-warn'}`}>{t.status}</span>
                 </div>

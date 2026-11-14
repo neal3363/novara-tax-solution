@@ -307,6 +307,11 @@ export interface AppState {
   }[]
   /** Active billing tier for this session (TC / TP / Office) */
   accountTier?: 'TC' | 'TP' | 'Office'
+  /**
+   * Active Office subscription plan id (fees.ts OfficePlanId).
+   * Preserved for existing agreements — catalog changes do not auto-migrate.
+   */
+  officePlanId?: string
   registrationPayments?: {
     id: string
     label: string

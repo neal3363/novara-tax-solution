@@ -10,16 +10,15 @@ import { detectFilingIntent } from '../engine/conversationIntent'
 import { PUBLIC_DEMO_BANNER, isPublicDemoMode } from '../engine/demo/publicDemo'
 import { actions } from '../store/useAppStore'
 import {
-  OFFICE_BUSINESS_FEE,
-  OFFICE_PERSONAL_FEE,
-  OFFICE_SUBSCRIPTION_FLOOR,
-  OFFICE_SUBSCRIPTION_HIGH,
+  OFFICE_SUBSCRIPTION_BUSINESS,
+  OFFICE_SUBSCRIPTION_PERSONAL,
+  OFFICE_SUBSCRIPTION_SELF_EMPLOYED,
   STARTER_INCLUDES,
   TC_BUSINESS_FEE,
   TC_PERSONAL_FEE,
   TP_BUSINESS_FEE,
   TP_PERSONAL_FEE,
-  TP_REGISTRATION_FEE,
+  TP_SELF_EMPLOYED_FEE,
   UNLIMITED_CLIENTS_COPY,
   formatMoney,
 } from '../data/fees'
@@ -349,15 +348,16 @@ export function Landing() {
             <article className="price-card">
               <h3>Tax Professional</h3>
               <p>
-                Registration {formatMoney(TP_REGISTRATION_FEE)} · Personal {formatMoney(TP_PERSONAL_FEE)} · Business{' '}
-                {formatMoney(TP_BUSINESS_FEE)}
+                Pay per return · Personal {formatMoney(TP_PERSONAL_FEE)} · Self-employed {formatMoney(TP_SELF_EMPLOYED_FEE)}{' '}
+                · Business entity {formatMoney(TP_BUSINESS_FEE)} · No annual subscription
               </p>
             </article>
             <article className="price-card">
               <h3>Office</h3>
               <p>
-                Subscription {formatMoney(OFFICE_SUBSCRIPTION_FLOOR)}–{formatMoney(OFFICE_SUBSCRIPTION_HIGH)} · Personal{' '}
-                {formatMoney(OFFICE_PERSONAL_FEE)} · Business {formatMoney(OFFICE_BUSINESS_FEE)}
+                Per year · Personal {formatMoney(OFFICE_SUBSCRIPTION_PERSONAL)} · Self-Employed{' '}
+                {formatMoney(OFFICE_SUBSCRIPTION_SELF_EMPLOYED)} · Business {formatMoney(OFFICE_SUBSCRIPTION_BUSINESS)} ·
+                Covered returns included
               </p>
             </article>
           </div>

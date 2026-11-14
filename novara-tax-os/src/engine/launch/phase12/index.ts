@@ -51,9 +51,10 @@ export function assertApprovedPricingIntact(): {
   const ok =
     TC_PERSONAL_FEE === 300 &&
     TC_BUSINESS_FEE === 399 &&
-    PRICING.TP.registration === 599 &&
-    PRICING.Office.subscriptionLow === 899 &&
-    PRICING.Office.subscriptionHigh === 1250
+    PRICING.TP.registration === 0 &&
+    PRICING.TP.personalReturn === 89 &&
+    PRICING.Office.plans.personal.annual === 899 &&
+    PRICING.Office.plans.business.annual === 1499
   return { ok, tcPersonal: TC_PERSONAL_FEE, tcBusiness: TC_BUSINESS_FEE }
 }
 

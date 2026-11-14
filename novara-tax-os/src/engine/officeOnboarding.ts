@@ -4,10 +4,9 @@
  */
 
 import {
-  OFFICE_BUSINESS_FEE,
-  OFFICE_PERSONAL_FEE,
-  OFFICE_SUBSCRIPTION_FLOOR,
-  OFFICE_SUBSCRIPTION_HIGH,
+  OFFICE_SUBSCRIPTION_BUSINESS,
+  OFFICE_SUBSCRIPTION_PERSONAL,
+  OFFICE_SUBSCRIPTION_SELF_EMPLOYED,
   formatMoney,
 } from '../data/fees'
 import type { OfficeStaffMember, UserAccount } from '../data/types'
@@ -134,8 +133,8 @@ export function evaluateOfficeOnboarding(input: {
       complete: true,
       blockers: [],
       notes: [
-        `NOVARA office subscription ${formatMoney(OFFICE_SUBSCRIPTION_FLOOR)}–${formatMoney(OFFICE_SUBSCRIPTION_HIGH)} (unchanged).`,
-        `NOVARA platform per-return: personal ${formatMoney(OFFICE_PERSONAL_FEE)} · business ${formatMoney(OFFICE_BUSINESS_FEE)}.`,
+        `NOVARA office annual plans: Personal ${formatMoney(OFFICE_SUBSCRIPTION_PERSONAL)}, Self-Employed ${formatMoney(OFFICE_SUBSCRIPTION_SELF_EMPLOYED)}, Business ${formatMoney(OFFICE_SUBSCRIPTION_BUSINESS)}.`,
+        `Covered returns: $0 additional NOVARA per-return fee (office-employed preparers included).`,
         draft.officeServicePersonalFee != null
           ? `Office service fee (personal) configured: ${formatMoney(draft.officeServicePersonalFee)} — office charge, not a NOVARA price change.`
           : 'Optional: set office preparation service fees separately from NOVARA platform fees.',

@@ -18,7 +18,7 @@ writeFileSync(
   join(tmp, 'run.ts'),
   `
 import { readFileSync, existsSync } from 'node:fs'
-import { TC_PERSONAL_FEE, TC_BUSINESS_FEE, PRIOR_YEAR_SURCHARGE, PRICING, TP_REGISTRATION_FEE, OFFICE_SUBSCRIPTION_FLOOR, OFFICE_SUBSCRIPTION_HIGH } from '../src/data/fees.ts'
+import { TC_PERSONAL_FEE, TC_BUSINESS_FEE, PRIOR_YEAR_SURCHARGE, PRICING, TP_REGISTRATION_FEE, TP_PERSONAL_FEE, OFFICE_SUBSCRIPTION_FLOOR, OFFICE_SUBSCRIPTION_HIGH } from '../src/data/fees.ts'
 import {
   defaultProfile, applyAnswer, runBenefitOptimization, type TaxpayerProfile,
 } from '../src/engine/benefitOptimizer.ts'
@@ -85,7 +85,7 @@ bootstrapStagingSecurity({ durableRoot: DURABLE })
 
 // ——— STEP 1 protect ———
 assert(TC_PERSONAL_FEE === 300 && TC_BUSINESS_FEE === 399, 'pricing-tc', 'Pricing', 'TC $300/$399 intact', 'TC pricing drifted')
-assert(TP_REGISTRATION_FEE === 599 && OFFICE_SUBSCRIPTION_FLOOR === 899 && OFFICE_SUBSCRIPTION_HIGH === 1250, 'pricing-tp-office', 'Pricing', 'TP/Office tiers intact', 'TP/Office pricing drifted')
+assert(TP_REGISTRATION_FEE === 0 && TP_PERSONAL_FEE === 89 && OFFICE_SUBSCRIPTION_FLOOR === 899 && OFFICE_SUBSCRIPTION_HIGH === 1499, 'pricing-tp-office', 'Pricing', 'TP pay-per-return + Office annual plans intact', 'TP/Office pricing drifted')
 assert(PRIOR_YEAR_SURCHARGE === 250, 'pricing-prior-year', 'Pricing', 'Prior-year surcharge $250', 'Prior-year surcharge drifted')
 assert(existsSync('src/components/HeroVideoBackground.tsx'), 'homepage-hero-component', 'Website', 'HeroVideoBackground present', 'Hero component missing')
 assert(existsSync('public/media/novara-cinematic-hero.mp4'), 'homepage-video-asset', 'Website', 'Cinematic hero mp4 present', 'Cinematic video missing')
