@@ -77,8 +77,6 @@ const forbidden = [
   'u-owner-lakes',
   'Continue & edit sample',
   'Enter sample sandbox',
-  'webkitSpeechRecognition',
-  'SpeechRecognition',
   'VoiceInputDev',
 ]
 
@@ -87,9 +85,16 @@ for (const needle of forbidden) {
 }
 
 assert(!/role-card panel/.test(bundle), 'bundle excludes role-card picker markup')
+// Browser on-device mic is allowed. Third-party STT SDKs and the DEV-only helper must stay out.
+const thirdPartyStt = ['@google-cloud/speech', 'microsoft-cognitiveservices-speech', 'aws-sdk/client-transcribe', 'openai.audio']
+for (const needle of thirdPartyStt) {
+  assert(!bundle.includes(needle), `bundle excludes third-party STT "${needle}"`)
+}
 assert(
-  bundle.includes('Cloud speech recognition is disabled') || bundle.includes('type to NOVARA'),
-  'production discloses typing-only voice path',
+  bundle.includes('stays on this device') ||
+    bundle.includes('type or upload') ||
+    bundle.includes('Mic stays on this device'),
+  'production discloses on-device mic / type-or-upload path',
 )
 
 console.log('=== Role clamp helpers ===')

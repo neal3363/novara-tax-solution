@@ -32,6 +32,7 @@ import {
   type HouseholdRelationChoice,
 } from '../../engine/documentIntakeEngine'
 import { buildDocumentChecklist } from '../../engine/documentChecklist'
+import { takeLandingUploads } from '../../engine/pendingLandingUploads'
 import '../shared.css'
 import './Prepare.css'
 
@@ -143,7 +144,16 @@ export function Prepare() {
         actions.setPrepStep(2)
       }
     }
-    if (params.get('upload') === '1') {
+    const stashed = takeLandingUploads()
+    if (stashed.length > 0) {
+      actions.uploadFiles(stashed)
+      actions.setPrepStep(2)
+      actions.addMessage(
+        'assistant',
+        `Sorted ${stashed.length} landing upload${stashed.length === 1 ? '' : 's'} into your return by document type. Missing a credit receipt? Upload it later from Documents or the Vault — it will route the same way.`,
+      )
+    } else if (params.get('upload') === '1') {
+      // Legacy handoff: open the picker if the landing page only set the flag.
       requestAnimationFrame(() => inputRef.current?.click())
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once on enter
