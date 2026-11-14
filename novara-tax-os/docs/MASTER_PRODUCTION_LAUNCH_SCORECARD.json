@@ -1,12 +1,12 @@
 {
-  "generatedAt": "2026-11-14T13:57:06.345Z",
+  "generatedAt": "2026-11-14T14:00:30.911Z",
   "productionActivation": false,
   "totals": {
-    "recorded": 22,
+    "recorded": 24,
     "pass": 11,
-    "pass_staging": 2,
+    "pass_staging": 3,
     "fail": 0,
-    "blocked": 8,
+    "blocked": 9,
     "not_tested": 1
   },
   "decisions": {
@@ -163,6 +163,19 @@
       "area": "Continuity",
       "status": "PASS",
       "detail": "Business continuity pack present"
+    },
+    {
+      "id": "host-csp",
+      "area": "Security",
+      "status": "PASS_STAGING",
+      "detail": "Demo host CSP + frame denial headers"
+    },
+    {
+      "id": "auth-data-plane",
+      "area": "Backend",
+      "status": "BLOCKED",
+      "detail": "Tax data remains client/store-scoped; server multi-tenant API absent",
+      "severity": "critical"
     }
   ]
 }

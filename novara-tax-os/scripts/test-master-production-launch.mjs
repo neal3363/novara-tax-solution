@@ -23,6 +23,7 @@ const requiredDocs = [
   'public/robots.txt',
   'public/sitemap.xml',
   'src/pages/Legal.tsx',
+  'vercel.json',
 ]
 
 let failed = 0
@@ -43,6 +44,13 @@ for (const rel of requiredDocs) {
 const robots = readFileSync(join(root, 'public/robots.txt'), 'utf8')
 assert(robots.includes('Sitemap:'), 'robots declares sitemap')
 assert(robots.includes('Disallow: /app/'), 'robots disallows authenticated app paths')
+
+const vercel = readFileSync(join(root, 'vercel.json'), 'utf8')
+assert(vercel.includes('Content-Security-Policy'), 'vercel CSP header configured')
+assert(vercel.includes('X-Frame-Options'), 'vercel frame denial configured')
+
+const arch = readFileSync(join(root, 'docs/ARCHITECTURE.md'), 'utf8')
+assert(arch.includes('browser store') || arch.includes('client/store'), 'architecture documents client-store auth gap')
 
 const legal = readFileSync(join(root, 'src/pages/Legal.tsx'), 'utf8')
 assert(legal.includes('draft'), 'legal pages marked draft')
@@ -128,6 +136,8 @@ add('dns', 'Domain', 'BLOCKED', 'Custom DNS requires owner approval', 'high')
 add('gsc', 'SEO', 'PASS_STAGING', 'robots.txt + sitemap present; Search Console needs owned domain')
 add('legal-draft', 'Ops', existsSync(join(root, 'src/pages/Legal.tsx')) ? 'PASS_STAGING' : 'FAIL', 'Draft Privacy/Terms/Help pages')
 add('continuity-docs', 'Continuity', existsSync(join(root, 'docs/BUSINESS_CONTINUITY.md')) ? 'PASS' : 'FAIL', 'Business continuity pack present')
+add('host-csp', 'Security', readFileSync(join(root, 'vercel.json'), 'utf8').includes('Content-Security-Policy') ? 'PASS_STAGING' : 'FAIL', 'Demo host CSP + frame denial headers')
+add('auth-data-plane', 'Backend', 'BLOCKED', 'Tax data remains client/store-scoped; server multi-tenant API absent', 'critical')
 
 const totals = { recorded: rows.length, pass: 0, pass_staging: 0, fail: 0, blocked: 0, not_tested: 0 }
 for (const r of rows) {

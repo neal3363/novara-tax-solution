@@ -47,6 +47,8 @@ This report does **not** claim the application is bug-free or production-ready f
 | `test:final-review` asserted Office per-return fees `> 0` after PR #58 made them `$0` | high (regressed assertion) | Fixed — assert annual $899/$1499 and $0 per-return |
 | Office onboarding copy still described non-zero NOVARA per-return Office fees | medium | Fixed copy to annual plans + $0 covered returns |
 | Unused `OFFICE_BUSINESS_FEE` import after copy fix | low | Removed |
+| Host headers lacked CSP / frame denial (security audit) | medium | Added CSP + `X-Frame-Options` + Permissions-Policy in `vercel.json` |
+| Tax data primarily client-store scoped (backend audit) | critical (architecture) | Documented in `ARCHITECTURE.md` — server data plane still BLOCKED |
 
 Prior Master QA / remediation: see `MASTER_ACCEPTANCE_TEST_REPORT.md` and `RELEASE_READINESS_REPORT.md`.
 

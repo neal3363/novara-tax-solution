@@ -50,6 +50,12 @@
 | Native iOS / Android apps | **Absent** |
 | Production Stripe Price IDs bound in secrets | **Absent** (`livePayments=false`) |
 | Official IRS ATS transmitter connection | **Absent** (mock only) |
+| Production tax-data APIs with server authz | **Absent** — tax state lives primarily in the browser store |
+| Cloud KMS / SIEM / transactional email | **Absent** |
+
+### Critical auth gap (confirmed in backend audit)
+
+Cursor identity via `api/session.ts` is a **real host gate** for published sign-in, but **tax returns, documents, roles, and billing state are still client/store-scoped**. Staging Phase 6/7 MFA, CSRF, vault, and audit engines are **not** the production IdP or multi-tenant API layer. Turning on live locks without a server-backed data plane would be unsafe.
 
 ## 4. Recommended production target (owner-approved build)
 
