@@ -724,11 +724,48 @@ export interface InterviewQuestion {
 export function nextInterviewQuestions(p: TaxpayerProfile, report: OptimizationReport): InterviewQuestion[] {
   const qs: InterviewQuestion[] = []
   const answered = (id: string) => answerPresent(p, id) || p.unresolvedKeys.includes(id)
+  const depsAlreadyKnown =
+    answered('potential_dependents') ||
+    answered('has_dependents') ||
+    answered('has_qualifying_person') ||
+    p.dependents.length > 0
 
-  if (!answered('has_dependents')) {
+  // Income type first — simple Yes/No; skipped when docs already filled wages/1099/SE.
+  if (!answered('had_w2') && p.wages <= 0) {
+    qs.push({
+      id: 'had_w2',
+      prompt: 'Got a W-2 from a job?',
+      kind: 'yesno',
+      mapsTo: 'had_w2',
+      benefitIds: ['eitc', 'ctc'],
+    })
+  }
+
+  if (!answered('had_1099') && p.selfEmploymentIncome <= 0 && p.answers.has_interest_income !== 'yes') {
+    qs.push({
+      id: 'had_1099',
+      prompt: 'Got a 1099?',
+      kind: 'yesno',
+      mapsTo: 'had_1099',
+      benefitIds: ['qbi', 'mileage', 'se_health'],
+    })
+  }
+
+  if (!answered('self_employed') && p.selfEmploymentIncome <= 0) {
+    qs.push({
+      id: 'self_employed',
+      prompt: 'Self-employed or side hustle?',
+      kind: 'yesno',
+      mapsTo: 'self_employed',
+      benefitIds: ['qbi', 'mileage', 'se_health'],
+    })
+  }
+
+  // Only ask dependents once — skip if filing/household already answered.
+  if (!depsAlreadyKnown) {
     qs.push({
       id: 'has_dependents',
-      prompt: 'Do you have any dependents?',
+      prompt: 'Any kids or dependents?',
       kind: 'yesno',
       mapsTo: 'has_dependents',
       benefitIds: ['ctc', 'eitc', 'odc', 'hoh', 'cdcc'],
@@ -736,40 +773,56 @@ export function nextInterviewQuestions(p: TaxpayerProfile, report: OptimizationR
   }
 
   if ((p.answers.has_dependents === 'yes' || hasDependents(p)) && !answered('has_child')) {
-    qs.push({
-      id: 'has_child',
-      prompt: 'Do you have a child under 17 who lived with you?',
-      kind: 'yesno',
-      mapsTo: 'has_child',
-      benefitIds: ['ctc', 'cdcc', 'eitc'],
-    })
+    const knownChild = p.dependents.some((d) => d.age >= 0 && d.age < 17)
+    const knownNoChild = p.dependents.length > 0 && p.dependents.every((d) => d.age >= 17)
+    if (!knownChild && !knownNoChild) {
+      qs.push({
+        id: 'has_child',
+        prompt: 'Any child under 17 living with you?',
+        kind: 'yesno',
+        mapsTo: 'has_child',
+        benefitIds: ['ctc', 'cdcc', 'eitc'],
+      })
+    }
   }
+
+  const depTestsDone = p.dependents.some(
+    (d) =>
+      (d.monthsLivedWith != null && d.monthsLivedWith >= 0) ||
+      d.providedOwnSupport != null ||
+      d.anotherMayClaim != null,
+  )
 
   if (hasChild(p) || p.answers.has_child === 'yes') {
     ;[
       {
         id: 'child_lived_with',
-        prompt: 'Did your child live with you for more than half the year?',
+        prompt: 'Child lived with you over half the year?',
         mapsTo: 'child_lived_with',
+        skipIfDepTests: true,
       },
       {
         id: 'child_support',
-        prompt: 'Did you pay more than half of your child’s support?',
+        prompt: 'Did you pay most of their support?',
         mapsTo: 'child_support',
+        skipIfDepTests: true,
       },
       {
         id: 'another_claimant',
-        prompt: 'Could someone else claim this child on their taxes?',
+        prompt: 'Could someone else claim this child?',
         mapsTo: 'another_claimant',
+        skipIfDepTests: true,
       },
       {
         id: 'paid_childcare',
-        prompt: 'Did you pay for childcare so you could work?',
+        prompt: 'Paid for childcare so you could work?',
         mapsTo: 'paid_childcare',
+        skipIfDepTests: false,
       },
     ].forEach((q) => {
+      if (q.skipIfDepTests && depTestsDone) return
       if (!answered(q.mapsTo)) {
-        qs.push({ ...q, kind: 'yesno', benefitIds: ['ctc', 'cdcc'] })
+        qs.push({ id: q.id, prompt: q.prompt, mapsTo: q.mapsTo, kind: 'yesno', benefitIds: ['ctc', 'cdcc'] })
       }
     })
   }
@@ -777,7 +830,7 @@ export function nextInterviewQuestions(p: TaxpayerProfile, report: OptimizationR
   if ((p.answers.paid_childcare === 'yes' || p.childcarePaid > 0) && !answered('childcare_amount')) {
     qs.push({
       id: 'childcare_amount',
-      prompt: 'About how much did you pay for childcare?',
+      prompt: 'How much for childcare?',
       kind: 'number',
       mapsTo: 'childcare_amount',
       benefitIds: ['cdcc'],
@@ -787,7 +840,7 @@ export function nextInterviewQuestions(p: TaxpayerProfile, report: OptimizationR
   if ((p.answers.paid_childcare === 'yes' || p.childcarePaid > 0) && !answered('care_provider')) {
     qs.push({
       id: 'care_provider',
-      prompt: 'Do you have your childcare provider’s name and tax ID?',
+      prompt: 'Have daycare name and tax ID?',
       kind: 'yesno',
       mapsTo: 'care_provider',
       benefitIds: ['cdcc'],
@@ -797,7 +850,7 @@ export function nextInterviewQuestions(p: TaxpayerProfile, report: OptimizationR
   if ((p.answers.paid_childcare === 'yes' || p.childcarePaid > 0) && !answered('employer_dependent_care')) {
     qs.push({
       id: 'employer_dependent_care',
-      prompt: 'Did your job help pay for childcare (a dependent-care benefit)?',
+      prompt: 'Job help pay for childcare?',
       kind: 'yesno',
       mapsTo: 'employer_dependent_care',
       benefitIds: ['cdcc'],
@@ -807,7 +860,7 @@ export function nextInterviewQuestions(p: TaxpayerProfile, report: OptimizationR
   if (!answered('education_expenses')) {
     qs.push({
       id: 'education_expenses',
-      prompt: 'Did you or a dependent pay college tuition?',
+      prompt: 'Any college tuition?',
       kind: 'yesno',
       mapsTo: 'education_expenses',
       benefitIds: ['aotc', 'llc'],
@@ -817,7 +870,7 @@ export function nextInterviewQuestions(p: TaxpayerProfile, report: OptimizationR
   if (!answered('student_loan_interest') && p.studentLoanInterest <= 0) {
     qs.push({
       id: 'student_loan_interest',
-      prompt: 'Did you pay student loan interest?',
+      prompt: 'Paid student loan interest?',
       kind: 'yesno',
       mapsTo: 'student_loan_interest',
       benefitIds: ['student_loan'],
@@ -827,20 +880,10 @@ export function nextInterviewQuestions(p: TaxpayerProfile, report: OptimizationR
   if (!answered('retirement_contributions')) {
     qs.push({
       id: 'retirement_contributions',
-      prompt: 'Did you put money into a retirement account (IRA or 401k)?',
+      prompt: 'Put money in IRA or 401k?',
       kind: 'yesno',
       mapsTo: 'retirement_contributions',
       benefitIds: ['savers'],
-    })
-  }
-
-  if (!answered('self_employed') && p.selfEmploymentIncome <= 0) {
-    qs.push({
-      id: 'self_employed',
-      prompt: 'Did you earn money from your own business or freelancing?',
-      kind: 'yesno',
-      mapsTo: 'self_employed',
-      benefitIds: ['qbi', 'mileage', 'se_health'],
     })
   }
 
@@ -999,7 +1042,7 @@ export function nextInterviewQuestions(p: TaxpayerProfile, report: OptimizationR
   if (!answered('owns_home')) {
     qs.push({
       id: 'owns_home',
-      prompt: 'Do you own a home?',
+      prompt: 'Own a home?',
       kind: 'yesno',
       mapsTo: 'owns_home',
       benefitIds: ['mortgage', 'property_tax', 'energy'],
@@ -1009,7 +1052,7 @@ export function nextInterviewQuestions(p: TaxpayerProfile, report: OptimizationR
   if (!answered('had_marketplace')) {
     qs.push({
       id: 'had_marketplace',
-      prompt: 'Did you get health insurance through the Marketplace (Healthcare.gov)?',
+      prompt: 'Health insurance from Healthcare.gov?',
       kind: 'yesno',
       mapsTo: 'had_marketplace',
       benefitIds: ['ptc'],
@@ -1019,7 +1062,7 @@ export function nextInterviewQuestions(p: TaxpayerProfile, report: OptimizationR
   if (!answered('charitable_gifts')) {
     qs.push({
       id: 'charitable_gifts',
-      prompt: 'Did you make charitable donations you can document?',
+      prompt: 'Any charity donations?',
       kind: 'yesno',
       mapsTo: 'charitable_gifts',
       benefitIds: ['charity'],
@@ -1029,7 +1072,7 @@ export function nextInterviewQuestions(p: TaxpayerProfile, report: OptimizationR
   if (!answered('high_medical')) {
     qs.push({
       id: 'high_medical',
-      prompt: 'Did you have large medical bills this year?',
+      prompt: 'Big medical bills this year?',
       kind: 'yesno',
       mapsTo: 'high_medical',
       benefitIds: ['medical'],
@@ -1039,7 +1082,7 @@ export function nextInterviewQuestions(p: TaxpayerProfile, report: OptimizationR
   if (!answered('filing_state')) {
     qs.push({
       id: 'filing_state',
-      prompt: 'Which state was your main home for tax purposes?',
+      prompt: 'Which state do you live in?',
       kind: 'choice',
       choices: ['Texas', 'California', 'New York', 'Florida', 'Other'],
       mapsTo: 'filing_state',
@@ -1087,6 +1130,10 @@ export function applyAnswer(p: TaxpayerProfile, mapsTo: string, value: string | 
     next.answers.dependent_count = 0
     next.dependents = []
   }
+  if (mapsTo === 'had_w2' && (value === 'yes' || value === true || value === 'Yes')) {
+    next.answers.has_earned_income = 'yes'
+  }
+  // had_1099 yes → checklist asks for the form; self_employed stays its own Yes/No.
   if (mapsTo === 'potential_dependents' || mapsTo === 'dependent_count' || mapsTo.startsWith('dep_')) {
     const applied = applyDependentAnswer(next.answers, next.dependents, mapsTo, value, next.taxYear)
     next.answers = applied.answers

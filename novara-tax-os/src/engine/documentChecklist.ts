@@ -47,24 +47,28 @@ export function buildDocumentChecklist(
   }
 
   // Core identity / income
-  if (profile.wages > 0 || profile.answers.has_earned_income === 'yes') {
+  if (profile.wages > 0 || profile.answers.has_earned_income === 'yes' || profile.answers.had_w2 === 'yes') {
     push({
       id: 'doc-w2',
       benefitName: 'Wages',
       name: 'Form W-2',
-      reason: 'Supports wage income and withholding on your return.',
+      reason: 'Needed for your job wages.',
       requiredForFiling: true,
       matchTypes: ['W-2'],
       alternative: 'Employer wage statement',
     })
   }
-  if (profile.selfEmploymentIncome > 0 || profile.answers.self_employed === 'yes') {
+  if (
+    profile.selfEmploymentIncome > 0 ||
+    profile.answers.self_employed === 'yes' ||
+    profile.answers.had_1099 === 'yes'
+  ) {
     push({
       id: 'doc-1099nec',
       benefitId: 'qbi',
       benefitName: 'Self-employment',
       name: 'Form 1099-NEC / business income records',
-      reason: 'Supports self-employment income and related deductions.',
+      reason: 'Needed for 1099 / self-employment income.',
       requiredForFiling: true,
       matchTypes: ['1099-NEC', 'P&L'],
       alternative: 'Business P&L or bank deposits summary',

@@ -104,6 +104,14 @@ export function syncProfileFromDocuments(profile: TaxpayerProfile, documents: Do
     if (d.type === 'W-2') {
       hasW2 = true
       d.facts.forEach((f) => {
+        // W-2 fills personal + wages so users are almost done after upload.
+        if (/employee name/i.test(f.label) && typeof f.value === 'string' && f.value.trim() && !next.answers.full_name) {
+          next.answers.full_name = f.value.trim()
+        }
+        if (/employee ssn|ssn \(last 4\)|tax id/i.test(f.label) && typeof f.value === 'string' && !next.answers.ssn_last4) {
+          const last4 = f.value.replace(/\D/g, '').slice(-4)
+          if (last4.length === 4) next.answers.ssn_last4 = last4
+        }
         if (/wage/i.test(f.label)) wages += parseMoney(f.value)
         if (/withheld|withholding/i.test(f.label)) withholding += parseMoney(f.value)
       })
@@ -115,6 +123,7 @@ export function syncProfileFromDocuments(profile: TaxpayerProfile, documents: Do
       })
     }
     if (d.type === '1099-INT') {
+      has1099 = true
       d.facts.forEach((f) => {
         if (/interest|income/i.test(f.label)) interest += parseMoney(f.value)
       })
@@ -193,7 +202,11 @@ export function syncProfileFromDocuments(profile: TaxpayerProfile, documents: Do
   }
   if (tuition > 0) next.answers.aotc_docs = 'yes'
   if (mortgage > 0) next.answers.mortgage_docs = 'yes'
-  if (hasW2) next.answers.has_earned_income = 'yes'
+  if (hasW2) {
+    next.answers.has_earned_income = 'yes'
+    next.answers.had_w2 = 'yes'
+  }
+  if (has1099) next.answers.had_1099 = 'yes'
   if (hasId) next.answers.id_on_file = 'yes'
   if (has1099 && se > 0) next.answers.schedule_c_signal = 'yes'
 
@@ -225,11 +238,11 @@ export function nextFilingStatusTurn(profile: TaxpayerProfile): SmartTurn | null
     return {
       id: 'married_dec31',
       phase: 'filing_status',
-      prompt: 'Were you married on December 31 of the tax year?',
+      prompt: 'Married on Dec 31?',
       kind: 'choice',
       choices: ['Yes', 'No', 'My spouse passed away'],
       mapsTo: 'married_dec31',
-      aiLead: 'First I need your filing status. I’ll only ask what’s legally required.',
+      aiLead: 'Quick filing question.',
     }
   }
 
@@ -240,30 +253,31 @@ export function nextFilingStatusTurn(profile: TaxpayerProfile): SmartTurn | null
     return {
       id: 'married_filing_plan',
       phase: 'filing_status',
-      prompt: married
-        ? 'How are you planning to file?'
-        : 'As a surviving spouse, how would you like to evaluate filing?',
+      prompt: married ? 'How will you file?' : 'How should we file for you?',
       kind: 'choice',
       choices: married
         ? ['Married Filing Jointly', 'Married Filing Separately', 'Help me determine which applies']
         : ['Qualifying Surviving Spouse if eligible', 'Help me determine which applies', 'File as Single if QSS does not apply'],
       mapsTo: 'married_filing_plan',
-      aiLead: 'Your December 31 marital status affects which filing statuses we can consider.',
+      aiLead: 'Pick the filing option that fits.',
     }
   }
 
-  if (!answered(profile, 'potential_dependents') && !answered(profile, 'has_qualifying_person')) {
+  // Skip if household intake already answered dependents.
+  if (
+    !answered(profile, 'potential_dependents') &&
+    !answered(profile, 'has_qualifying_person') &&
+    !answered(profile, 'has_dependents') &&
+    profile.dependents.length === 0
+  ) {
     return {
       id: 'potential_dependents',
       phase: 'filing_status',
-      prompt: 'Do you have any children or other people who may qualify as your dependents?',
+      prompt: 'Any kids or dependents?',
       kind: 'choice',
       choices: ['Yes', 'No'],
       mapsTo: 'potential_dependents',
-      aiLead:
-        !married
-          ? 'Dependent credits and Head of Household require knowing exactly who you may claim — we never assume a count from documents or estimates.'
-          : 'We’ll collect each potential dependent’s details before calculating Child Tax Credit, EITC, or other dependent benefits.',
+      aiLead: 'One dependents question — we won’t ask again.',
     }
   }
 
@@ -271,17 +285,19 @@ export function nextFilingStatusTurn(profile: TaxpayerProfile): SmartTurn | null
     (profile.answers.potential_dependents === 'yes' ||
       profile.answers.potential_dependents === 'Yes' ||
       profile.answers.has_qualifying_person === 'Yes' ||
-      profile.answers.has_qualifying_person === 'yes') &&
-    !answered(profile, 'dependent_count')
+      profile.answers.has_qualifying_person === 'yes' ||
+      profile.answers.has_dependents === 'yes') &&
+    !answered(profile, 'dependent_count') &&
+    profile.dependents.length === 0
   ) {
     return {
       id: 'dependent_count',
       phase: 'filing_status',
-      prompt: 'How many children or other potential dependents do you have?',
+      prompt: 'How many dependents?',
       kind: 'choice',
       choices: ['0', '1', '2', '3', '4', '5+'],
       mapsTo: 'dependent_count',
-      aiLead: 'Enter the actual number. Do not skip this — refund amounts cannot be verified without it.',
+      aiLead: 'Tap the number.',
     }
   }
 
@@ -289,17 +305,19 @@ export function nextFilingStatusTurn(profile: TaxpayerProfile): SmartTurn | null
     profile.answers.potential_dependents === 'yes' ||
     profile.answers.potential_dependents === 'Yes' ||
     profile.answers.has_qualifying_person === 'Yes' ||
-    profile.answers.has_qualifying_person === 'yes'
+    profile.answers.has_qualifying_person === 'yes' ||
+    profile.answers.has_dependents === 'yes' ||
+    profile.dependents.length > 0
 
   if (hasPotential && !answered(profile, 'maintained_home')) {
     return {
       id: 'maintained_home',
       phase: 'filing_status',
-      prompt: 'Did you pay more than half the cost of maintaining your home?',
+      prompt: 'Did you pay most of the home costs?',
       kind: 'choice',
       choices: ['Yes', 'No', 'Not sure'],
       mapsTo: 'maintained_home',
-      aiLead: 'Head of Household and some dependent tests require that you maintained the home.',
+      aiLead: 'Needed for Head of Household.',
     }
   }
 
@@ -352,27 +370,52 @@ export function applyFilingStatusAnswer(profile: TaxpayerProfile, mapsTo: string
 export function nextBenefitDiscoveryTurn(profile: TaxpayerProfile): SmartTurn | null {
   const report = runBenefitOptimization(profile)
   const qs = nextInterviewQuestions(profile, report)
-  // Skip questions already known from documents
+  const depsAnswered =
+    answered(profile, 'potential_dependents') ||
+    answered(profile, 'has_dependents') ||
+    answered(profile, 'has_qualifying_person') ||
+    profile.dependents.length > 0
+  const depTestsDone = profile.dependents.some(
+    (d) =>
+      (d.monthsLivedWith != null && d.monthsLivedWith >= 0) ||
+      d.providedOwnSupport != null ||
+      d.anotherMayClaim != null,
+  )
+  // Skip questions already known from documents / household intake
   const filtered = qs.filter((q) => {
+    if (q.mapsTo === 'had_w2' && (profile.wages > 0 || profile.answers.had_w2 === 'yes')) return false
+    if (q.mapsTo === 'had_1099' && (profile.selfEmploymentIncome > 0 || profile.answers.had_1099 === 'yes')) return false
     if (q.mapsTo === 'self_employed' && profile.selfEmploymentIncome > 0) return false
     if (q.mapsTo === 'owns_home' && profile.mortgageInterest > 0) return false
-    if (q.mapsTo === 'has_dependents' && profile.dependents.length > 0) return false
-    if (q.mapsTo === 'has_child' && profile.dependents.some((d) => d.age < 17)) return false
+    if (q.mapsTo === 'has_dependents' && depsAnswered) return false
+    if (q.mapsTo === 'has_child') {
+      if (profile.answers.has_dependents === 'no' || profile.answers.potential_dependents === 'no') return false
+      if (profile.dependents.some((d) => d.age >= 0 && d.age < 17)) return false
+      if (profile.dependents.length > 0 && profile.dependents.every((d) => d.age >= 17)) return false
+    }
+    if (
+      (q.mapsTo === 'child_lived_with' || q.mapsTo === 'child_support' || q.mapsTo === 'another_claimant') &&
+      depTestsDone
+    ) {
+      return false
+    }
     return true
   })
   const q = filtered[0]
   if (!q) return null
 
   const childCount = profile.dependents.filter((d) => d.age < 17).length
-  let aiLead = 'I’m checking for tax benefits that may apply to your situation.'
-  if (q.mapsTo === 'paid_childcare' && childCount > 0) {
-    aiLead = `I see you have ${childCount} child${childCount === 1 ? '' : 'ren'}. Did you pay for childcare while you worked?`
+  let aiLead = 'Short questions. Upload docs to skip more.'
+  if (q.mapsTo === 'had_w2') aiLead = 'How did you get paid?'
+  else if (q.mapsTo === 'had_1099') aiLead = 'Any 1099 income?'
+  else if (q.mapsTo === 'paid_childcare' && childCount > 0) {
+    aiLead = `You have ${childCount} child${childCount === 1 ? '' : 'ren'}. Paid for childcare?`
   } else if (q.mapsTo === 'childcare_amount') {
-    aiLead = 'Thank you. I’ll check whether those expenses qualify for a tax credit. About how much did you pay?'
+    aiLead = 'About how much for childcare?'
   } else if (q.mapsTo === 'care_provider') {
-    aiLead = 'I may need provider details before we can apply the Child and Dependent Care Credit.'
+    aiLead = 'Do you have the daycare name and tax ID?'
   } else if (q.mapsTo === 'education_expenses') {
-    aiLead = 'Next I’ll look for education credits — only if someone attended an eligible school.'
+    aiLead = 'Any college tuition?'
   } else if (q.mapsTo === 'self_employed' && profile.selfEmploymentIncome > 0) {
     return nextBenefitDiscoveryTurn(applyAnswer(profile, 'self_employed', 'yes'))
   }

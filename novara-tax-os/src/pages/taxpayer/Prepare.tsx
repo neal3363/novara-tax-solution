@@ -461,11 +461,11 @@ export function Prepare() {
             tabIndex={0}
             onKeyDown={(e) => e.key === 'Enter' && inputRef.current?.click()}
           >
-            <span className="badge">Start with documents</span>
-            <h2>Drop ID, SSN docs, W-2s, 1099s, and family records</h2>
+            <span className="badge">Upload first</span>
+            <h2>Drop your ID, SSN card, W-2s, and 1099s</h2>
             <p>
-              Tip for this demo: name files like <code>ID_First_Last.pdf</code>, <code>license_Mary_Johnson.pdf</code>,{' '}
-              <code>ssn_Emma_Blake.pdf</code> so multiple people are extracted for relationship questions.
+              We fill name, birth date, Social, and W-2 numbers for you. Less typing. Name files like{' '}
+              <code>ID_Your_Name.pdf</code> or <code>W2_Your_Name.pdf</code>.
             </p>
             <input
               ref={inputRef}
@@ -496,9 +496,9 @@ export function Prepare() {
 
           {documents.length > 0 && (
             <div className="list-panel panel" style={{ marginTop: '1rem' }}>
-              <h2>Confirm extracted information</h2>
+              <h2>Check what we found</h2>
               <p className="muted" style={{ marginTop: 0 }}>
-                Tax IDs are masked. Confirm uncertain fields — do not re-enter accurate extracted values.
+                Confirm if anything looks wrong. Correct info stays filled in.
               </p>
               {known.length > 0 && (
                 <div className="known-box">
@@ -652,13 +652,11 @@ export function Prepare() {
 
       {showMissing && (
         <section className="list-panel panel rise">
-          <h2>Anyone else to claim?</h2>
+          <h2>Anyone else?</h2>
           <p>
-            <strong>
-              Is there anyone else you may be able to claim on your tax return who was not included in these documents?
-            </strong>
+            <strong>Anyone else to claim who was not in these uploads?</strong>
           </p>
-          <p className="muted">We never assume uploaded documents represent the complete household.</p>
+          <p className="muted">We only ask once.</p>
           {householdIntake.missingHouseholdAnswer === null && (
             <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
               <button className="btn btn-primary" type="button" onClick={() => actions.answerMissingHousehold('yes')}>
@@ -721,10 +719,10 @@ export function Prepare() {
         <section className="smart-interview rise">
           <div className="interview-layout">
             <div className="list-panel panel interview-chat">
-              <h2>Tax questions &amp; maximize savings</h2>
+              <h2>Short questions</h2>
               <p className="muted" style={{ marginTop: 0 }}>
-                Green means answered. Orange means unanswered. Each answer can apply a credit or deduction to your live
-                refund — see All possible tax savings on the right. Speak, type, or upload into the same return.
+                Upload docs first so we skip what we already know. Green = done. Orange = still needed. Tap Yes/No —
+                keep reading light.
               </p>
               <QuestionProgressBar profile={taxProfile} />
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.55rem', marginBottom: '0.75rem', alignItems: 'center' }}>

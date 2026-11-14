@@ -29,7 +29,7 @@ export const QUESTIONNAIRE_SECTIONS: {
   {
     id: 'income',
     label: 'Income',
-    mapsToIncludes: ['wages', 'interest', 'dividends', 'unemployment', 'other_income'],
+    mapsToIncludes: ['had_w2', 'had_1099', 'wages', 'interest', 'dividends', 'unemployment', 'other_income', 'has_earned'],
   },
   {
     id: 'business',
