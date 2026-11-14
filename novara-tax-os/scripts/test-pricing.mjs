@@ -34,8 +34,8 @@ function assert(c: boolean, m: string) {
 }
 
 console.log('=== Official price table ===')
-assert(TC_PERSONAL_FEE === 399, 'TC personal 399')
-assert(TC_BUSINESS_FEE === 300, 'TC business 300')
+assert(TC_PERSONAL_FEE === 300, 'TC personal 300')
+assert(TC_BUSINESS_FEE === 399, 'TC business 399')
 assert(TP_REGISTRATION_FEE === 599, 'TP reg 599')
 assert(TP_PERSONAL_FEE === 129, 'TP personal 129')
 assert(TP_BUSINESS_FEE === 249, 'TP business 249')
@@ -50,8 +50,8 @@ assert(TP_PERSONAL_FEE !== 89.99, 'not legacy 89.99 personal')
 assert(TP_BUSINESS_FEE !== 239.98, 'not legacy 239.98 business')
 
 console.log('=== Checkout helpers ===')
-assert(returnSoftwareFee('TC', false).amount === 399, 'TC personal checkout')
-assert(returnSoftwareFee('TC', true).amount === 300, 'TC business checkout')
+assert(returnSoftwareFee('TC', false).amount === 300, 'TC personal checkout')
+assert(returnSoftwareFee('TC', true).amount === 399, 'TC business checkout')
 assert(returnSoftwareFee('TP', false).amount === 129, 'TP personal checkout')
 assert(returnSoftwareFee('TP', true).amount === 249, 'TP business checkout')
 assert(returnSoftwareFee('Office', false).amount === 89, 'Office personal checkout')
