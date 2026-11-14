@@ -74,8 +74,9 @@ export const CUTOVER_CRITERIA: CutoverCriterion[] = [
     title: 'Maximizer interface preserved until adapter approved',
     measure: 'No change to Maximizer UI/question flow; optional read-only adapter behind flag',
     threshold: 'Maximizer discovery retained; IRS supplies arithmetic only after explicit approval',
-    status: 'blocked',
-    evidence: 'Phase 3/4/5 did not wire Maximizer; migration plan only',
+    status: 'partial',
+    evidence:
+      'Phase 9 staging adapter + dual-run; Maximizer UX unchanged; taxpayerVisible/cutover remain false',
     requiredForCutover: true,
   },
   {

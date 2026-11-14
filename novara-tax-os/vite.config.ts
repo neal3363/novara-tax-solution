@@ -59,6 +59,7 @@ function securityApiPlugin(): Plugin {
     '/api/security/audit': '/api/security/audit.ts',
     '/api/security/status': '/api/security/status.ts',
     '/api/security/mef': '/api/security/mef.ts',
+    '/api/security/irs-staging': '/api/security/irs-staging.ts',
   }
   return {
     name: 'novara-security-api-staging',
