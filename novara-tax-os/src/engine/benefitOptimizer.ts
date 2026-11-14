@@ -28,7 +28,7 @@ export interface TaxpayerProfile {
   wages: number
   withholding: number
   selfEmploymentIncome: number
-  filingStatus: 'single' | 'mfj' | 'hoh' | 'mfs' | 'unknown'
+  filingStatus: 'single' | 'mfj' | 'hoh' | 'mfs' | 'qss' | 'unknown'
   dependents: DependentRecord[]
   childcarePaid: number
   careProvider?: string

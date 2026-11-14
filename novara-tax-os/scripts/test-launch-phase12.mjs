@@ -99,7 +99,7 @@ assert(gaps.mayMarkFilingReady === false, 'never filing-ready with gaps')
 assert(gaps.blocks.length >= 3, 'blocks present for energy/hsa/business/state/unsupported')
 assert(gaps.reviews.length >= 1, 'reviews present')
 assert(PHASE12_TAX_GAPS.every(g => g.filingReady === false), 'all gap filingReady false')
-const silent = assertNoSilentVerifiedFiling(true, ['energy_credits_not_fully_mapped_to_irs_adapter'])
+const silent = assertNoSilentVerifiedFiling(true, ['energy_credit_partial_form_5695_requires_review'])
 assert(!silent.ok, 'rejects silent fullyValidated claim')
 assert(assertNoSilentVerifiedFiling(false, ['x']).ok, 'allows non-validated with flags')
 
