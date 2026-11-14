@@ -65,9 +65,10 @@ It excludes `.git`, `node_modules`, `.next`, `.data`, and secret `.env*` files.
    git push -u origin main
    ```
 3. Point Cursor Cloud environment / publish settings at the new repository.
-4. Configure the nine authentication variables from `.env.example` / `docs/AUTH_CONFIGURATION.md`.
-5. Confirm removal of obsolete `PREVIEW_AUTH_PASSWORD` in Cursor Secrets if still listed.
-6. Leave Tax OS history on `novara-tax-solution` untouched.
+4. Configure the nine authentication variables from `.env.example` / `docs/AUTH_CONFIGURATION.md` via the secure form only.
+5. If an obsolete shared-password preview secret still appears in Cursor Secrets, confirm its removal in the UI.
+6. Keep the current published preview until a replacement from this repo is verified.
+7. Leave Tax OS history on `novara-tax-solution` untouched.
 
 Live asset connectors remain disabled. Authentication configuration does not enable live asset data.
 EOF
