@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
-import { Menu, Shield, X } from "lucide-react";
+import { LogOut, Menu, Shield, X } from "lucide-react";
 import type { PortalRole } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { SyntheticBanner } from "@/components/ui/SyntheticBanner";
 import { previewUsers } from "@/lib/synthetic/data";
+import { Button } from "@/components/ui/Button";
 
 export type NavItem = { href: string; label: string };
 
@@ -28,8 +29,15 @@ export function PortalShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const user = previewUsers[role];
   const [open, setOpen] = useState(false);
+
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/login");
+    router.refresh();
+  }
 
   return (
     <div className="min-h-screen bg-midnight text-white">
@@ -41,10 +49,13 @@ export function PortalShell({
               NOVARA
             </Link>
             <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-champagne">
+              Asset Intelligence™
+            </div>
+            <div className="mt-2 text-[10px] uppercase tracking-[0.14em] text-silver-muted">
               {roleLabels[role]}
             </div>
           </div>
-          <nav className="flex-1 space-y-1 p-3">
+          <nav className="flex-1 space-y-1 overflow-y-auto p-3 scrollbar-thin">
             {nav.map((item) => (
               <Link
                 key={item.href}
@@ -61,10 +72,13 @@ export function PortalShell({
           <div className="border-t border-[rgba(183,195,213,0.12)] p-4 text-xs text-silver-muted">
             <div className="flex items-center gap-2 text-champagne">
               <Shield size={14} />
-              MFA enabled (preview)
+              MFA session active (preview)
             </div>
             <div className="mt-2">{user.name}</div>
             <div>{user.organizationName}</div>
+            <Button variant="ghost" className="mt-3 !px-2 !py-1.5 !text-xs" onClick={logout}>
+              <LogOut size={14} /> Sign out
+            </Button>
           </div>
         </aside>
 
@@ -73,7 +87,7 @@ export function PortalShell({
             <div>
               <div className="font-display text-lg">NOVARA</div>
               <div className="text-[10px] uppercase tracking-[0.16em] text-champagne">
-                {roleLabels[role]}
+                Asset Intelligence™ · {roleLabels[role]}
               </div>
             </div>
             <button
@@ -99,6 +113,13 @@ export function PortalShell({
                   {item.label}
                 </Link>
               ))}
+              <button
+                type="button"
+                className="mt-2 block w-full rounded-md px-3 py-2 text-left text-sm text-silver"
+                onClick={logout}
+              >
+                Sign out
+              </button>
             </div>
           ) : null}
           <main className="flex-1 overflow-auto p-4 md:p-6 lg:p-8">{children}</main>
