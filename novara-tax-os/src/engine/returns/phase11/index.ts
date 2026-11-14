@@ -22,6 +22,11 @@ export {
   listPrioritizedStates,
   STATE_SUPPORTED_YEARS,
 } from './state/tables'
+export {
+  computeCa540Worksheet,
+  computeNyItWorksheet,
+  computeIlFlatWorksheet,
+} from './state/worksheets'
 
 export { computeForm1065 } from './business/form1065'
 export { computeForm1120S } from './business/form1120s'
