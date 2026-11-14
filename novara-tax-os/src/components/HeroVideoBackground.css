@@ -16,8 +16,8 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  /* Bias right so face-forward subjects sit in the clearer half beside copy */
-  object-position: 68% 28%;
+  /* Bias slightly right so lobby/handshake/tax action stays clear of left copy */
+  object-position: 58% 40%;
 }
 
 /* Dual-buffer seamless loop — active layer visible, idle layer primed at t=0 */
@@ -36,7 +36,7 @@
 @media (max-width: 768px) {
   .hero-video-el,
   .hero-video-poster {
-    object-position: 62% 22%;
+    object-position: 55% 35%;
   }
 }
 

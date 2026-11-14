@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import './HeroVideoBackground.css'
 
-/** 12s face-forward reel (Black woman close-up → Black man close-up → handshake faces → advisor faces). */
+/** 12s cinematic arc: luxury building → lobby walk-in → handshake → tax/advisory desk. */
 const DESKTOP_WEBM = '/media/novara-cinematic-hero.webm'
 const DESKTOP_MP4 = '/media/novara-cinematic-hero.mp4'
 const MOBILE_WEBM = '/media/novara-cinematic-hero-mobile.webm'
