@@ -53,7 +53,10 @@
     "test:refund-settlement": "node scripts/test-refund-settlement-pipeline.mjs",
     "test:prod-readiness-audit": "node scripts/test-prod-readiness-audit.mjs",
     "test:direct-irs-mef-auth": "node scripts/test-direct-irs-mef-auth.mjs",
-    "test:independent-company": "node scripts/test-independent-company.mjs"
+    "test:independent-company": "node scripts/test-independent-company.mjs",
+    "test:security-assessment": "node scripts/test-security-assessment.mjs",
+    "test:official-ats-package": "node scripts/test-official-ats-package.mjs",
+    "test:mobile-apps": "node mobile/scripts/test-mobile-scaffold.mjs"
   },
   "dependencies": {
     "@fontsource/figtree": "^5.3.0",

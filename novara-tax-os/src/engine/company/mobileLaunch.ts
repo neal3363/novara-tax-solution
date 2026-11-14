@@ -22,15 +22,17 @@ export function mobileDistributionChecklist(): MobileLaunchItem[] {
     },
     {
       platform: 'ios',
-      status: 'not_built',
-      requirement: 'Native or wrapped iOS app + App Store listing',
-      ownerAction: 'Apple Developer enrollment ($99/yr); App Review when binary exists',
+      status: 'account_required',
+      requirement: 'Capacitor iOS shell (mobile/) + App Store listing package',
+      ownerAction:
+        'Apple Developer enrollment ($99/yr); macOS signed IPA + TestFlight; see mobile/store/ios/',
     },
     {
       platform: 'android',
-      status: 'not_built',
-      requirement: 'Native or wrapped Android app + Play listing',
-      ownerAction: 'Play Console enrollment ($25); store listing when AAB exists',
+      status: 'account_required',
+      requirement: 'Capacitor Android shell (mobile/) + Play listing package',
+      ownerAction:
+        'Play Console enrollment ($25); signed AAB; see mobile/store/android/',
     },
   ]
 }

@@ -15,15 +15,15 @@ Items Cursor **cannot** complete through code alone. Do **not** mark complete wi
 | EXT-STRIPE-PRICES | Live Stripe Price IDs matching `fees.ts` | Finance | **BLOCKED** | Price IDs for TP $89/$119/$249, Office $899/$1199/$1499, TC $300/$399 |
 | EXT-BANK-PARTNER | Banking partner agreements (refund-transfer / settlement — **not Stripe**) | Finance / legal | **BLOCKED** | Signed partner agreement + settlement test report; secrets `REFUND_BANK_PARTNER_*` / `NOVARA_VIRTUAL_SETTLEMENT_ACCOUNT_ID` |
 | EXT-PCI | PCI compliance obligations | Security / finance | **BLOCKED** | SAQ/ROC or AoC matching hosted-checkout model |
-| EXT-APPSEC | Independent application security assessment | Security | **BLOCKED** | Third-party AppSec / penetration test with remediations closed |
+| EXT-APPSEC | Independent application security assessment | Security | **BLOCKED** | Third-party AppSec / penetration test with remediations closed; internal scans ≠ substitute — see `APPSEC_EXTERNAL_FIRM_PACKAGE.md` |
 | EXT-HOST-KEYS | Production hosting and encryption-key infrastructure | Platform | **BLOCKED** | Hosting runbook + KMS/HSM key custody evidence |
 | EXT-CF-DNS | Official domain + Cloudflare DNS/SSL/WAF | Platform / owner | **BLOCKED** | Owner-approved DNS cutover evidence |
 | EXT-EMAIL | Branded business + transactional email | Ops | **BLOCKED** | Domain verified + ESP live + templates |
 | EXT-SUPPORT | Production ticket / helpdesk system | Ops | **BLOCKED** | Staffed support channel evidence |
 | EXT-LEGAL | Final Privacy Policy & Terms | Legal | **BLOCKED** | Counsel-approved policies (draft pages exist only) |
 | EXT-SEO | Google Search Console / GA4 / Business Profile | Marketing | **BLOCKED** | Property verification + sitemap submit on owned domain |
-| EXT-IOS | Apple App Store release | Mobile | **BLOCKED** | TestFlight + App Review submission (no native app yet) |
-| EXT-ANDROID | Google Play release | Mobile | **BLOCKED** | Signed AAB + Play Console listing (no native app yet) |
+| EXT-IOS | Apple App Store release | Mobile | **BLOCKED** | Capacitor scaffold ready (`mobile/`); needs Apple Developer + macOS signed IPA/TestFlight — see `mobile/store/ios/APP_STORE_CONNECT.md` |
+| EXT-ANDROID | Google Play release | Mobile | **BLOCKED** | Capacitor scaffold ready (`mobile/`); needs Play Console + signed AAB — see `mobile/store/android/PLAY_CONSOLE.md` |
 | EXT-LOAD | Controlled load test evidence (100 / 1k / 10k) | Platform | **BLOCKED** | Measured results on staging infra — not claimed |
 | EXT-DR | Production backup restore drill | Platform | **BLOCKED** | Timed restore evidence on production-class storage |
 | EXT-HUMAN-LAUNCH | Human launch authorization | Executive | **BLOCKED** | Signed go-live decision after gates pass |
