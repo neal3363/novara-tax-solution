@@ -126,7 +126,7 @@
     {
       "id": "pay:pay-renewal",
       "status": "PASS_STAGING",
-      "detail": "sub=sub_test_5447afb3f809; renewals=1"
+      "detail": "sub=sub_test_19486c5a8702; renewals=1"
     },
     {
       "id": "pay:pay-refund",
@@ -181,7 +181,7 @@
     {
       "id": "rec:rec-session",
       "status": "PASS_STAGING",
-      "detail": "Session sess_b0aca7741b6827962fc32210a2f4e1fa revoked; requireActiveSession rejects"
+      "detail": "Session sess_ad1bacc8127501da8e65d003de5841fd revoked; requireActiveSession rejects"
     },
     {
       "id": "rec:rec-reset-token",

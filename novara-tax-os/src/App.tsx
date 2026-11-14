@@ -5,6 +5,7 @@ import { Landing } from './pages/Landing'
 import { Login } from './pages/Login'
 import { RegisterFlow, RegisterHub } from './pages/Register'
 import { Fees } from './pages/Fees'
+import { HelpPage, PrivacyPage, TermsPage } from './pages/Legal'
 import { TaxpayerHome } from './pages/taxpayer/TaxpayerHome'
 import { Prepare } from './pages/taxpayer/Prepare'
 import { YearSelect } from './pages/taxpayer/YearSelect'
@@ -45,6 +46,10 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<RegisterHub />} />
       <Route path="/register/:tier" element={<RegisterFlow />} />
+      <Route path="/fees" element={<Fees />} />
+      <Route path="/privacy" element={<PrivacyPage />} />
+      <Route path="/terms" element={<TermsPage />} />
+      <Route path="/help" element={<HelpPage />} />
       <Route path="/upload/:token" element={<SecureUpload />} />
       <Route path="/app" element={<RequireAuth />}>
         <Route path="taxpayer" element={<RoleGate roles={['taxpayer']}><TaxpayerHome /></RoleGate>} />

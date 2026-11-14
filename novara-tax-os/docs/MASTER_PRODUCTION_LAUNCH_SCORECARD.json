@@ -1,0 +1,168 @@
+{
+  "generatedAt": "2026-11-14T13:57:06.345Z",
+  "productionActivation": false,
+  "totals": {
+    "recorded": 22,
+    "pass": 11,
+    "pass_staging": 2,
+    "fail": 0,
+    "blocked": 8,
+    "not_tested": 1
+  },
+  "decisions": {
+    "publicDemoLaunch": "GO_SYNTHETIC_ONLY",
+    "realTaxpayerProduction": "NO-GO"
+  },
+  "authorizationRequired": [
+    "Custom DNS / Cloudflare",
+    "Live Stripe keys and Price IDs",
+    "Live IRS ATS / filing",
+    "Banking partner go-live",
+    "Production enforcement flags",
+    "App Store / Play submission",
+    "Accepting real taxpayer data"
+  ],
+  "rows": [
+    {
+      "id": "pricing-tp",
+      "area": "Pricing",
+      "status": "PASS",
+      "detail": "TP per-return 89/119/249"
+    },
+    {
+      "id": "pricing-office",
+      "area": "Pricing",
+      "status": "PASS",
+      "detail": "Office annual 899/1199/1499"
+    },
+    {
+      "id": "pricing-office-per-return",
+      "area": "Pricing",
+      "status": "PASS",
+      "detail": "Office covered returns $0 NOVARA fee"
+    },
+    {
+      "id": "pricing-tc",
+      "area": "Pricing",
+      "status": "PASS",
+      "detail": "TC 300/399 intact"
+    },
+    {
+      "id": "locks-pay",
+      "area": "Production locks",
+      "status": "PASS",
+      "detail": "livePayments OFF"
+    },
+    {
+      "id": "locks-mef",
+      "area": "Production locks",
+      "status": "PASS",
+      "detail": "MeF live OFF"
+    },
+    {
+      "id": "locks-cutover",
+      "area": "Production locks",
+      "status": "PASS",
+      "detail": "IRS cutover/visibility OFF"
+    },
+    {
+      "id": "locks-enforce",
+      "area": "Production locks",
+      "status": "PASS",
+      "detail": "productionEnforcement OFF"
+    },
+    {
+      "id": "gate-ready",
+      "area": "Launch gate",
+      "status": "PASS",
+      "detail": "productionReady=false"
+    },
+    {
+      "id": "gate-go",
+      "area": "Launch gate",
+      "status": "PASS",
+      "detail": "productionGo=false even if humanApproved"
+    },
+    {
+      "id": "backend-workers",
+      "area": "Backend",
+      "status": "BLOCKED",
+      "detail": "Cloudflare Workers/wrangler absent — expected until infra build",
+      "severity": "critical"
+    },
+    {
+      "id": "backend-d1",
+      "area": "Backend",
+      "status": "BLOCKED",
+      "detail": "D1 migrations absent",
+      "severity": "critical"
+    },
+    {
+      "id": "backend-r2",
+      "area": "Backend",
+      "status": "BLOCKED",
+      "detail": "R2 document store absent",
+      "severity": "critical"
+    },
+    {
+      "id": "mobile-native",
+      "area": "Mobile",
+      "status": "BLOCKED",
+      "detail": "No native iOS/Android store apps",
+      "severity": "high"
+    },
+    {
+      "id": "load-concurrent",
+      "area": "Scalability",
+      "status": "NOT_TESTED",
+      "detail": "100/1k/10k concurrent HTTP users not measured",
+      "severity": "high"
+    },
+    {
+      "id": "appsec",
+      "area": "Security",
+      "status": "BLOCKED",
+      "detail": "Independent AppSec / pen test required",
+      "severity": "critical"
+    },
+    {
+      "id": "irs-ats",
+      "area": "IRS MeF",
+      "status": "BLOCKED",
+      "detail": "Official ATS not executed",
+      "severity": "critical"
+    },
+    {
+      "id": "stripe-live",
+      "area": "Payments",
+      "status": "BLOCKED",
+      "detail": "Live Stripe Price IDs not bound",
+      "severity": "critical"
+    },
+    {
+      "id": "dns",
+      "area": "Domain",
+      "status": "BLOCKED",
+      "detail": "Custom DNS requires owner approval",
+      "severity": "high"
+    },
+    {
+      "id": "gsc",
+      "area": "SEO",
+      "status": "PASS_STAGING",
+      "detail": "robots.txt + sitemap present; Search Console needs owned domain"
+    },
+    {
+      "id": "legal-draft",
+      "area": "Ops",
+      "status": "PASS_STAGING",
+      "detail": "Draft Privacy/Terms/Help pages"
+    },
+    {
+      "id": "continuity-docs",
+      "area": "Continuity",
+      "status": "PASS",
+      "detail": "Business continuity pack present"
+    }
+  ]
+}
