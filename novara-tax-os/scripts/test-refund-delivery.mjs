@@ -92,6 +92,18 @@ console.log('=== Fee breakdown preserves pricing ===')
     seasonYear: 2026,
   })
   assert(prior.lines.some((l) => l.amount === PRIOR_YEAR_SURCHARGE), 'prior-year surcharge present')
+  // Seed snapshots use a different label than the ledger line — must not double-count.
+  const dup = buildPreSignFeeBreakdown({
+    accountType: 'tc',
+    taxReturn: {
+      feeSnapshot: [{ label: 'Personal tax return (TC)', amount: TC_PERSONAL_FEE, status: 'quoted' }],
+    } as any,
+    taxYear: 2025,
+    seasonYear: 2026,
+  })
+  const softwareLines = dup.lines.filter((l) => l.amount === TC_PERSONAL_FEE && l.status === 'due')
+  assert(softwareLines.length === 1, 'TC software fee not double-counted with seed snapshot')
+  assert(dup.novaraTotal === TC_PERSONAL_FEE, 'novaraTotal equals single TC personal fee')
 }
 
 console.log('=== Readiness requires delivery ===')
