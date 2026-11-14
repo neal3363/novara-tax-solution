@@ -1,28 +1,16 @@
 /**
- * Phase 6 security session API (isolated).
+ * Phase 6/7 security session API (isolated staging).
  * Not wired into existing taxpayer UI login.
  * Guest auto-login rejected when production auth flags are enabled.
- *
- * Runtime note: handlers dynamically import the Phase 6 engine so a missing
- * compile step cannot crash the legacy /api/session identity route.
+ * Production enforcement remains OFF by default.
  */
 
-const JSON_HEADERS = {
-  'content-type': 'application/json',
-  'cache-control': 'private, no-store',
-} as const
-
-function json(status: number, body: Record<string, unknown>) {
-  return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS })
-}
-
-async function loadPhase6() {
-  return import('../../src/engine/security/phase6/index.js')
-}
+import { json, loadPhase6, loadPhase7, sessionIdFrom } from './_shared.js'
 
 export async function POST(request: Request) {
   try {
     const p6 = await loadPhase6()
+    const p7 = await loadPhase7()
     const body = (await request.json()) as Record<string, unknown>
     const principalId = String(body.principalId ?? '')
     if (!principalId) return json(400, { error: 'missing_principal' })
@@ -59,19 +47,24 @@ export async function POST(request: Request) {
 
     const session = p6.createSession({
       principal,
-      fingerprintSalt: String(body.fingerprintSalt ?? 'phase6'),
+      fingerprintSalt: String(body.fingerprintSalt ?? 'phase7'),
       userAgent: request.headers.get('user-agent') ?? undefined,
       mfaSatisfied: Boolean(body.mfaSatisfied),
     })
 
-    p6.appendAudit({
+    const audit = p6.appendAudit({
       actorId: principalId,
       tenantId,
       action: 'login_success',
       resource: `session:${session.sessionId}`,
       outcome: 'success',
-      meta: { role, accountType },
+      meta: { role, accountType, phase: 'phase7-staging' },
     })
+
+    if (p7.getPhase7Flags().durableStoreEnabled) {
+      p7.persistSessionSnapshot(session)
+      p7.durableAppendAudit(audit)
+    }
 
     return json(200, {
       sessionId: session.sessionId,
@@ -81,7 +74,9 @@ export async function POST(request: Request) {
       tenantId: session.tenantId,
       mfaSatisfied: session.mfaSatisfied,
       phase6: true,
+      phase7Staging: true,
       enforcementDefaultOff: true,
+      productionEnforcement: false,
     })
   } catch {
     return json(500, { error: 'session_create_failed' })
@@ -91,8 +86,7 @@ export async function POST(request: Request) {
 export async function GET(request: Request) {
   try {
     const p6 = await loadPhase6()
-    const url = new URL(request.url)
-    const sessionId = url.searchParams.get('sessionId')
+    const sessionId = sessionIdFrom(request)
     if (!sessionId) return json(400, { error: 'missing_session' })
     const session = p6.getSession(sessionId)
     if (!session || session.status !== 'active') {
@@ -105,6 +99,7 @@ export async function GET(request: Request) {
       role: session.role,
       tenantId: session.tenantId,
       mfaSatisfied: session.mfaSatisfied,
+      phase7Staging: true,
     })
   } catch {
     return json(500, { error: 'session_get_failed' })
@@ -113,22 +108,19 @@ export async function GET(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    const p6 = await loadPhase6()
+    const p7 = await loadPhase7()
     const url = new URL(request.url)
     const sessionId = url.searchParams.get('sessionId')
     const actorId = url.searchParams.get('actorId') ?? 'unknown'
     if (!sessionId) return json(400, { error: 'missing_session' })
-    const revoked = p6.revokeSession(sessionId, actorId)
+    const revoked = p7.stagingRevokeSession(sessionId, actorId)
     if (!revoked) return json(404, { error: 'not_found' })
-    p6.appendAudit({
-      actorId,
-      tenantId: revoked.tenantId,
-      action: 'session_revoke',
-      resource: `session:${sessionId}`,
-      outcome: 'success',
-      meta: {},
+    return json(200, {
+      revoked: true,
+      sessionId,
+      status: revoked.status,
+      productionEnforcement: false,
     })
-    return json(200, { revoked: true, sessionId, status: revoked.status })
   } catch {
     return json(500, { error: 'session_revoke_failed' })
   }

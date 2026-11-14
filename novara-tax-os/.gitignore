@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Phase 7 staging security durable data (synthetic only — never commit)
+.novara-staging-security/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

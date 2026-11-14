@@ -297,3 +297,16 @@ export function getVaultObjectMeta(docId: string): Omit<VaultObject, 'ciphertext
   const { ciphertext: _c, encryptedDek: _e, iv: _i, tag: _t, ...meta } = o
   return meta
 }
+
+/** Staging durability export — copies encrypted material only (never plaintext). */
+export function exportEncryptedVaultObject(docId: string): VaultObject | null {
+  const o = objects.get(docId)
+  if (!o) return null
+  return {
+    ...o,
+    encryptedDek: Buffer.from(o.encryptedDek),
+    iv: Buffer.from(o.iv),
+    tag: Buffer.from(o.tag),
+    ciphertext: Buffer.from(o.ciphertext),
+  }
+}

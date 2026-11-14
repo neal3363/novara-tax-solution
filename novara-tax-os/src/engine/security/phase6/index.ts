@@ -71,6 +71,8 @@ export {
 export {
   getKmsProvider,
   localKmsProvider,
+  cloudKmsProviderStub,
+  setKmsProviderOverride,
   verifyEncryptionRoundTrip,
   kmsAccessPolicy,
   setKmsEnvironment,
@@ -78,6 +80,7 @@ export {
   encryptWithDek,
   decryptWithDek,
 } from './kms'
+export type { KmsProvider, DataKey } from './kms'
 
 export {
   vaultUpload,
@@ -87,6 +90,7 @@ export {
   purgeExpiredDeleted,
   vaultSelfTest,
   getVaultObjectMeta,
+  exportEncryptedVaultObject,
   resetVaultForTests,
 } from './vault'
 

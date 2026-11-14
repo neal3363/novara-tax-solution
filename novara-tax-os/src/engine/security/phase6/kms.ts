@@ -39,6 +39,7 @@ export function setKmsEnvironment(env: keyof typeof ENV_RINGS): void {
 export function resetKmsForTests(): void {
   for (const ring of Object.values(ENV_RINGS)) ring.clear()
   activeEnv = 'development'
+  providerOverride = null
   setPhase6FlagsForTests({ cloudKmsEnabled: false, vaultEncryptionVerified: false })
 }
 
@@ -109,7 +110,15 @@ export const cloudKmsProviderStub: KmsProvider = {
   },
 }
 
+/** Optional override (Phase 7 staging cloud adapter). Cleared on reset. */
+let providerOverride: KmsProvider | null = null
+
+export function setKmsProviderOverride(provider: KmsProvider | null): void {
+  providerOverride = provider
+}
+
 export function getKmsProvider(): KmsProvider {
+  if (providerOverride) return providerOverride
   return getPhase6Flags().cloudKmsEnabled ? cloudKmsProviderStub : localKmsProvider
 }
 
