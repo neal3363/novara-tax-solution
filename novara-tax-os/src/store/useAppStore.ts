@@ -128,6 +128,20 @@ import {
   type RefundDeliverySelection,
 } from '../engine/refundDelivery'
 import { createOfflineBankApplication } from '../engine/bankProducts'
+import {
+  openRefundSettlementCase,
+  receiveIrsWire,
+  verifyInboundDeposit,
+  withholdAuthorizedFees,
+  submitClientDisbursement,
+  confirmClientDisbursement,
+  sendDepositTransactionalEmail,
+  runSandboxSettlementHappyPath,
+  achDestinationFromForm,
+  debitRailDestination,
+  type ClientPayoutDestination,
+  type DebitRail,
+} from '../engine/payments/phase10/refundSettlementPipeline'
 import { type OfficeOnboardingDraft } from '../engine/officeOnboarding'
 import {
   emptyEngagementConsentState,
@@ -522,6 +536,8 @@ let state: Store = {
   filingAuth: null,
   refundDelivery: null,
   bankProductApplication: null,
+  refundSettlementCase: null,
+  lastSettlementEmailId: null,
   officeOnboarding: null,
   engagementConsent: null,
   hydrated: false,
@@ -606,6 +622,8 @@ function freshWorkspaceForViewer(ws: {
     filingAuth: null,
     refundDelivery: null,
     bankProductApplication: null,
+    refundSettlementCase: null,
+    lastSettlementEmailId: null,
     officeOnboarding: null,
     engagementConsent: null,
   }
@@ -2729,6 +2747,8 @@ export const actions = {
         filingAuth: null,
         refundDelivery: null,
         bankProductApplication: null,
+        refundSettlementCase: null,
+        lastSettlementEmailId: null,
         officeOnboarding: null,
         engagementConsent: null,
         hydrated: true,
@@ -3086,6 +3106,114 @@ export const actions = {
     }
     emit()
     return { ok: true as const }
+  },
+  /**
+   * Open sandbox settlement: IRS wire → virtual bank → fee withhold → client ACH/debit → email after confirm.
+   */
+  openRefundSettlement(input: {
+    expectedRefundDollars: number
+    authorizedPrepFeeDollars?: number
+    bankRailFeeDollars?: number
+    payout:
+      | { kind: 'ach_bank'; routingNumber: string; accountNumber: string; accountType: 'checking' | 'savings' }
+      | { kind: 'debit_rail'; rail: DebitRail; handle: string }
+  }) {
+    const actor = state.currentUser
+    if (!actor) return { ok: false as const, error: 'Sign in required.' }
+    const verified = state.benefitReport?.projectedRefund ?? input.expectedRefundDollars
+    let destination: ClientPayoutDestination
+    try {
+      destination =
+        input.payout.kind === 'ach_bank'
+          ? achDestinationFromForm({
+              routingNumber: input.payout.routingNumber,
+              accountNumber: input.payout.accountNumber,
+              accountType: input.payout.accountType,
+            })
+          : debitRailDestination(input.payout.rail, input.payout.handle)
+    } catch (e) {
+      return { ok: false as const, error: e instanceof Error ? e.message : 'Invalid payout destination' }
+    }
+    try {
+      const opened = openRefundSettlementCase({
+        tenantId: resolveWriteTenant(actor),
+        ownerId: actor.id,
+        taxpayerEmail: actor.email || 'taxpayer@example.test',
+        taxYear: state.activeTaxYear,
+        expectedRefundDollars: input.expectedRefundDollars || verified,
+        authorizedPrepFeeDollars: input.authorizedPrepFeeDollars ?? TC_PERSONAL_FEE,
+        bankRailFeeDollars: input.bankRailFeeDollars ?? 0,
+        destination,
+      })
+      state = {
+        ...state,
+        refundSettlementCase: opened,
+        lastSettlementEmailId: null,
+        auditEvents: appendAudit(
+          'refund_settlement_opened',
+          'Sandbox refund settlement opened (virtual bank; live rails OFF). Taxpayer email blocked until deposit confirmed.',
+          { caseId: opened.id, expected: opened.expectedRefundCents },
+        ),
+      }
+      emit()
+      return { ok: true as const, caseId: opened.id }
+    } catch (e) {
+      return { ok: false as const, error: e instanceof Error ? e.message : 'Could not open settlement' }
+    }
+  },
+  /** Advance one settlement step, or run the full happy path (sandbox). */
+  advanceRefundSettlement(
+    step:
+      | 'receive_wire'
+      | 'verify'
+      | 'withhold_fees'
+      | 'submit_disbursement'
+      | 'confirm_disbursement'
+      | 'send_email'
+      | 'run_happy_path',
+    wireDollars?: number,
+  ) {
+    const current = state.refundSettlementCase
+    if (!current) return { ok: false as const, error: 'No settlement case open.' }
+    try {
+      let next = current
+      let emailId: string | null = state.lastSettlementEmailId
+      if (step === 'run_happy_path') {
+        const result = runSandboxSettlementHappyPath(current.id, {
+          wireDollars: wireDollars ?? current.expectedRefundCents / 100,
+        })
+        next = result.settlement
+        emailId = result.email.id
+      } else if (step === 'receive_wire') {
+        next = receiveIrsWire(current.id, wireDollars ?? current.expectedRefundCents / 100)
+      } else if (step === 'verify') {
+        next = verifyInboundDeposit(current.id)
+      } else if (step === 'withhold_fees') {
+        next = withholdAuthorizedFees(current.id)
+      } else if (step === 'submit_disbursement') {
+        next = submitClientDisbursement(current.id)
+      } else if (step === 'confirm_disbursement') {
+        next = confirmClientDisbursement(current.id)
+      } else if (step === 'send_email') {
+        const result = sendDepositTransactionalEmail(current.id)
+        next = result.settlement
+        emailId = result.email.id
+      }
+      state = {
+        ...state,
+        refundSettlementCase: next,
+        lastSettlementEmailId: emailId,
+        auditEvents: appendAudit(
+          'refund_settlement_advanced',
+          `Settlement phase: ${next.phase.replace(/_/g, ' ')} (sandbox).`,
+          { caseId: next.id, phase: next.phase },
+        ),
+      }
+      emit()
+      return { ok: true as const, phase: next.phase }
+    } catch (e) {
+      return { ok: false as const, error: e instanceof Error ? e.message : 'Settlement step failed' }
+    }
   },
   ensureEngagementConsent() {
     if (state.engagementConsent) return

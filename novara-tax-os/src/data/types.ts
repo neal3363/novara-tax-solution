@@ -344,6 +344,10 @@ export interface AppState {
   refundDelivery: import('../engine/refundDelivery').RefundDeliverySelection | null
   /** Bank-product application status — offline until provider is live */
   bankProductApplication: import('../engine/bankProducts').BankProductApplication | null
+  /** Sandbox refund settlement: virtual bank → fee split → client payout → email */
+  refundSettlementCase: import('../engine/payments/phase10/refundSettlementPipeline').RefundSettlementCase | null
+  /** Last sandbox transactional email id from settlement (deposit notice) */
+  lastSettlementEmailId: string | null
   /** Additive office onboarding wizard draft */
   officeOnboarding: import('../engine/officeOnboarding').OfficeOnboardingDraft | null
   /** Engagement letters + §7216 consent lifecycle (additive) */

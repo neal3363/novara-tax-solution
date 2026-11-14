@@ -96,7 +96,8 @@ export function RefundDeliveryPanel({
       <h2>Refund delivery</h2>
       <p className="muted">
         Uses your <strong>verified</strong> refund calculation ({formatMoney(verifiedRefund)}) from the AI Refund
-        Maximizer — not hypothetical potential savings.
+        Maximizer — not hypothetical potential savings. For fee-withhold + Chime/Cash App/ACH payout after the IRS wire
+        hits NOVARA’s virtual bank, use Refund tracking → Refund settlement (sandbox).
       </p>
 
       <div className="delivery-options">

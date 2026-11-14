@@ -55,6 +55,39 @@ export {
 } from './bankingAdapter'
 export type { BankingFeeBreakdown, BankingSettlementRecord, BankingSettlementStatus } from './bankingAdapter'
 
+export {
+  openRefundSettlementCase,
+  receiveIrsWire,
+  verifyInboundDeposit,
+  withholdAuthorizedFees,
+  submitClientDisbursement,
+  confirmClientDisbursement,
+  sendDepositTransactionalEmail,
+  runSandboxSettlementHappyPath,
+  listRefundSettlementCases,
+  getRefundSettlementCase,
+  resetRefundSettlementForTests,
+  destinationLabel,
+  achDestinationFromForm,
+  debitRailDestination,
+  validatePayoutDestination,
+} from './refundSettlementPipeline'
+export type {
+  RefundSettlementCase,
+  SettlementPhase,
+  ClientPayoutDestination,
+  DebitRail,
+  FeeSplitBreakdown,
+} from './refundSettlementPipeline'
+
+export {
+  listTransactionalEmails,
+  resetTransactionalEmailForTests,
+  maskEmail,
+  buildRefundDepositNotice,
+} from './transactionalEmail'
+export type { TransactionalEmailRecord, TransactionalEmailKind } from './transactionalEmail'
+
 export { appendLedger, listLedger, resetLedgerForTests } from './ledger'
 export type { LedgerEntry, LedgerEntryKind } from './ledger'
 
@@ -68,6 +101,8 @@ import { resetStripeSandboxForTests } from './stripeSandbox'
 import { resetSubscriptionsForTests } from './subscriptions'
 import { resetBankingAdapterForTests } from './bankingAdapter'
 import { resetLedgerForTests } from './ledger'
+import { resetRefundSettlementForTests } from './refundSettlementPipeline'
+import { resetTransactionalEmailForTests } from './transactionalEmail'
 
 export function resetPhase10ForTests(): void {
   resetPhase10Flags()
@@ -75,6 +110,8 @@ export function resetPhase10ForTests(): void {
   resetSubscriptionsForTests()
   resetBankingAdapterForTests()
   resetLedgerForTests()
+  resetRefundSettlementForTests()
+  resetTransactionalEmailForTests()
 }
 
 export function phase10Summary(): string {
